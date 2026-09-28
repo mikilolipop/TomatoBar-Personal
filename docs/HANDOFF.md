@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-09-28，by Codex（交叉评审；仅文档）
+最后更新：2026-09-28，by Claude Code（Opus 5）· 复核 Codex 评审 `d01bc20`
 
 ---
 
@@ -10,10 +10,10 @@
 
 | 项 | 值 |
 |---|---|
-| 已安装版本 | **3.8.0（V1.2）**，`/Applications/TomatoBar Personal.app`，此前 Claude 会话构建并安装；本轮只读确认进程正在运行，未重装 |
-| HEAD | 本轮文档评审提交（基于 `1f43359`；精确 hash 用 `git log -1`，分支 `feature/personal-focus`） |
-| 工作区 | 干净 |
-| 测试 | `scripts/test.sh` → **55 项全绿** |
+| 已安装版本 | **3.8.0（V1.2）**，`/Applications/TomatoBar Personal.app`，此前 Claude 会话构建并安装；Codex 评审轮只读确认进程正在运行，未重装 |
+| HEAD | `d01bc20`（Codex 交叉评审，仅文档）← `1f43359`（协作结构）← `8fb1e74`（首次提交 V1.0–V1.2）← `90a77d6`（上游基线） |
+| 工作区 | 干净，与 `origin/feature/personal-focus` 一致 |
+| 测试 | `scripts/test.sh` → **55 项全绿**（Claude 与 Codex 两轮各自独立复跑确认） |
 | 远程 | `origin` = `mikilolipop/TomatoBar-Personal`（私有，默认分支 `feature/personal-focus`）；`upstream` = `ivoronin/TomatoBar` |
 | 用户真实数据 | 此前 Claude 会话记录为 **1 条**、phase=idle；本轮未重新读取 sessions.json，未触碰数据 |
 | git 身份 | 本仓库 `--local`：`mikilolipop <207336577+mikilolipop@users.noreply.github.com>`（全局仍未设置） |
@@ -78,6 +78,36 @@ P7 的 main 首次零运行根因仍未证实，不得当成已解决；feature 
 
 ---
 
+## 刚做完（2026-09-28，Claude Code 复核 Codex 评审）
+
+对 `d01bc20` 的每条反驳做了**独立验证**，不直接采信。结论：**Codex 全部正确，Claude 原分析有三处事实错误。**
+
+| 我原来的判断 | 实测结果 |
+|---|---|
+| P4「`lproj` 只出现 3 次 → 并非以独立 build file 形式引用，清理牵连面小」 | ❌ **错**。`project.pbxproj:16` 是 `PBXBuildFile /* Localizable.strings in Resources */`，`:169` 在 Resources build phase，`:217-226` 是 `PBXVariantGroup`，`:33/:36/:37` 是三种语言子引用。我的 `grep -c "lproj"` 只匹配到 path 属性行，**漏掉了全部按 UUID 的间接引用**。只删磁盘文件会破坏构建 |
+| P5「每次构造 32 趟**全量**记录扫描，月视图 31 天 → 416 趟」 | ❌ **错两处**。(a) `Analytics.swift:54,59` 的 `Self.totals(records: self.records, …)` 用的是 `:50-53` **筛选并排序后**的 `self.records`（M 条），不是入参全库（N 条）。(b) 九月是 **30** 天不是 31 天。416 是错误假设下的算术，不是实测 |
+| P6「保留 `convert.sh` + 一张源图即可」 | ❌ **错**。`Icons/convert.sh:3` `APPICON_SRC=TomatoBar.png`、`:5` `BARICON_SRC=tomato-filled.png` —— **两张源图各服务一个入口**，只留一张会破坏其中一个 |
+
+另外确认 Codex 的三条新发现成立：
+
+- **P1**：我提议的 `NSApp.launchedAsHidden` **在当前 SDK 不存在** —— `xcrun swift -e` 实测报
+  `value of type 'NSApplication' has no member 'launchedAsHidden'`。我用问句提出，但若直接实施就是编译错误
+- **P7**：我漏了 `.github/workflows/main.yml:53-54` 硬编码 `TomatoBar.app`，而
+  `project.pbxproj:372,407` 的 `PRODUCT_NAME = "TomatoBar Personal"` —— **即使 secrets 齐全，Build 步骤也会因产物名不符而失败**
+- **P9**：真实 bug，我读过 `retrySave()` 却没发现问题。`Timer.swift:108` 是
+  `if !loadFailed { persist() }`，而读盘失败路径（`:37`）恰恰会设 `loadFailed = true` **并且**设 `storageError`；
+  `View.swift:50` 与 `MainWindow.swift:221` 又在 `storageError != nil` 时无条件显示该按钮
+  → **在读错误场景下按钮 100% 是死的**，用户即使在外部修好了文件也点不动，只能重启
+
+**P8 是最重要的发现**：我提的方案 B 只包住 `App.swift:43` 的 `showMainWindow()`，但
+`App.swift:44` 的 `reminder.show()` 同样会在登录时触发，而 `Notifications.swift:22` 里也有
+`NSApp.activate(ignoringOtherApps: true)` → **按我原方案实施，登录时仍会抢焦点**。方案 B 不完整。
+
+已确认 Codex 遵守协议：`git show --stat d01bc20` = 仅 `docs/BACKLOG.md` + `docs/HANDOFF.md`，
+未碰任何代码；两轮 55 项测试均绿；远程一致。
+
+---
+
 ## 刚做完（本次会话，2026-09-28）
 
 1. **完整通读并理解项目**（约 1300 行 Swift + 全部文档）
@@ -124,6 +154,12 @@ P7 的 main 首次零运行根因仍未证实，不得当成已解决；feature 
 | 开启 GitHub Issues 做 backlog | 单人 + 两个 AI，`docs/BACKLOG.md` 随代码走、可 diff、离线可读、不需 API，更简单。仓库建时已设 `has_issues: false` |
 | 用休息分钟数相等判断长休息 | Codex 评审：长短时长可以相同，每组数量可中途改变；不能稳定表示本次休息类型 |
 | 只把原发布 workflow 的分支过滤从 `*` 改成 `**` | 会让开发分支开始跑缺 secret、带删 prerelease 操作的上游发布流程；应整体设计无 secret 验证流程 |
+| 只删 `.lproj` 磁盘文件来清理本地化（P4） | Claude 原判断「无独立 build file 引用」是**错的**：`pbxproj:16/169/217-226/33/36/37` 有完整的 BuildFile + Resources phase + PBXVariantGroup 引用链。只删文件会破坏构建，必须同步处理 variant group / build file / 资源阶段 / knownRegions |
+| 用 `grep -c "lproj"` 判断 Xcode 项目引用 | pbxproj 主要靠 **UUID 互引**，按字符串数出现次数会系统性漏掉间接引用。要查引用请用 `PBXBuildFile` / `PBXVariantGroup` / build phase 段落，或直接 `rg 'Localizable|PBXVariantGroup'` |
+| 用静态 grep 出现次数推算 SwiftUI 计算属性的动态调用次数（P5） | 静态次数 ≠ 动态次数：分支未必都走、`LazyVStack` 行内访问随记录数增长、闭包内访问是延迟的。SwiftUI 没有自动 memoization 契约，但精确调用数只能靠 Instruments 或临时计数 |
+| 用 `NSApp.launchedAsHidden` 判断登录自启 | **该 API 在当前 SDK 不存在**（实测编译错误）。应改用 `NSAppleEventManager.shared().currentAppleEvent` 读 `kAEOpenApplication` 的 `keyAEPropData` 是否为 `keyAELaunchedAsLogInItem`，并在启动事件处理期尽早保存 |
+| 只包住 `showMainWindow()` 来实现「登录静默」（方案 B 原始形态） | 不完整。`App.swift:44` 的 `reminder.show()` 同样在登录时触发，`Notifications.swift:22` 也调 `activate(ignoringOtherApps: true)`。见 P8 |
+| 删掉 `Icons/` 整个目录 | `convert.sh` 需要 **两张**源图（`TomatoBar.png` → AppIcon，`tomato-filled.png` → 四组菜单栏图标），`README.md` 记录图标来源。源素材与开发工具不因「Xcode 零引用」而失去价值 |
 
 ---
 
