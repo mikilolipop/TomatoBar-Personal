@@ -1,68 +1,52 @@
-name: main
+name: tests
 
+# Replaces the upstream release workflow, which was unusable here: it needs
+# CODESIGN_CERT_* secrets this repo does not have, its Build step hardcodes
+# TomatoBar.app while PRODUCT_NAME is "TomatoBar Personal", and its first step
+# deletes a prerelease tag. See docs/BACKLOG.md P7.
+#
+# `main` is excluded because it is the frozen upstream baseline (90a77d6) and
+# contains neither scripts/test.sh nor Tests/. Note that a push to `main` would
+# run the workflow file from that ref, i.e. the upstream one, not this file.
 on:
   push:
-    branches:
-      - '*'
-    tags:
-      - 'v*'
+    branches-ignore: [main]
+    tags: ['v*']
+  pull_request:
+
+# A newer push to the same branch supersedes an in-flight run. macOS minutes
+# count 10x against the private-repo allowance, so do not stack them.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: macos-15
-
+  verify:
+    name: Domain tests + build smoke check
+    runs-on: macos-latest
     steps:
-      - name: Delete old prerelease
-        if: github.ref_type == 'branch'
-        uses: dev-drprasad/delete-tag-and-release@v1.1
-        with:
-          delete_release: true
-          tag_name: prerelease
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
 
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      # Fast, and needs no secrets or signing: scripts/test.sh compiles
+      # State.swift + Log.swift + Analytics.swift + Tests/main.swift with swiftc.
+      # Runs first so a logic failure does not burn build minutes.
+      - name: Domain tests
+        run: sh scripts/test.sh
 
-      - name: Set version for tag
-        if: github.ref_type == 'tag'
-        run: echo "version=$(git describe --tags --match 'v*')" >> $GITHUB_ENV
-
-      - name: Set version for branch
-        if: github.ref_type == 'branch'
-        run: echo "version=$(git describe --tags)" >> $GITHUB_ENV
-
-      - name: Import signing certificate
-        uses: apple-actions/import-codesign-certs@v3
-        with:
-          p12-file-base64: ${{ secrets.CODESIGN_CERT_BASE64 }}
-          p12-password: ${{ secrets.CODESIGN_CERT_PASSWORD }}
-
-      - name: Trust signing certificate
+      # scripts/test.sh only compiles 3 of the 9 Swift files. The UI and bridging
+      # layer (App, Timer, View, MainWindow, FocusCharts, Notifications) is covered
+      # by nothing else, so a compile check is the only guard against a typo there.
+      - name: Build Release (ad-hoc signed)
         run: |
-          echo "${{ secrets.CODESIGN_CERT_PEM_BASE64 }}" | base64 -d > /tmp/ci-cert.pem
-          sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /tmp/ci-cert.pem
-          rm /tmp/ci-cert.pem
+          xcodebuild -project TomatoBar.xcodeproj -scheme TomatoBar -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
+            ONLY_ACTIVE_ARCH=NO build
 
-      - name: Build
+      - name: Verify product
         run: |
-          BUILT_PRODUCTS_DIR=$(xcodebuild -project TomatoBar.xcodeproj -scheme TomatoBar -configuration Release -showBuildSettings | awk '/^ *BUILT_PRODUCTS_DIR = / {print $3}')
-          xcodebuild build -project TomatoBar.xcodeproj -scheme TomatoBar -configuration Release MARKETING_VERSION=${{github.ref_name}} CODE_SIGN_IDENTITY="CI Code Signing" CODE_SIGN_STYLE=Manual ONLY_ACTIVE_ARCH=NO
-          cp -r "$BUILT_PRODUCTS_DIR/TomatoBar.app" .
-          zip -r "TomatoBar-${{env.version}}.zip" "TomatoBar.app"
-
-      - name: Release
-        if: github.ref_type == 'tag'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: TomatoBar-${{env.version}}.zip
-
-      - name: Prerelease
-        if: github.ref_type == 'branch'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: prerelease
-          prerelease: true
-          files: TomatoBar-${{env.version}}.zip
+          app="build/Build/Products/Release/TomatoBar Personal.app"
+          test -d "$app"
+          codesign --verify --deep --strict "$app"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist" \
+            | grep -x 'com.dilyar.TomatoBarPersonal'
