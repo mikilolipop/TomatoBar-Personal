@@ -218,7 +218,11 @@ struct TimerCard: View {
                     .buttonStyle(.plain).help("展开倒计时").accessibilityLabel("展开倒计时")
             }
             if let error = timer.storageError {
-                HStack { Text(error).font(.caption).foregroundColor(.red); Button("重试保存") { timer.retrySave() } }
+                HStack(spacing: 10) {
+                    Text(error).font(.caption).foregroundColor(.red)
+                    Button(timer.storageRetryTitle) { timer.retryStorage() }
+                    Button("打开记录文件夹") { timer.openRecordsFolder() }
+                }
             }
         }.padding(.horizontal, 18).padding(.vertical, 9).background(Garden.red.opacity(0.085)).cornerRadius(9)
     }

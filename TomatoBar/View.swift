@@ -45,9 +45,12 @@ struct TBPopoverView: View {
                 Text("完成 \(timer.todayCount) 个番茄")
             }.font(.caption).foregroundColor(.secondary)
             if let error = timer.storageError {
-                VStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 5) {
                     Text(error).foregroundColor(.red)
-                    Button("重试保存") { timer.retrySave() }
+                    HStack(spacing: 10) {
+                        Button(timer.storageRetryTitle) { timer.retryStorage() }
+                        Button("打开记录文件夹") { timer.openRecordsFolder() }
+                    }
                 }.font(.caption)
             }
             Picker("内容", selection: $tab) {

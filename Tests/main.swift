@@ -167,3 +167,29 @@ check(legacyDay.records.count == 4 && legacyDay.days.count == 1, "early-stopped 
 check(legacyDay.categories.count == 1 && legacyDay.categories[0].name == "未分类",
       "untagged legacy records collapse into a single 未分类 bucket")
 print("PASS: \(checks) total checks including duration formatting and real-data regression")
+
+// P9: the recovery path behind the "重新读取" button. TBTimer imports SwiftUI so it is not
+// in this compile set; this covers the FocusStore + FocusState half. A failed load must
+// keep the original bytes, and an externally repaired file must load on the next attempt
+// without a relaunch.
+let repairDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+let repairStore = FocusStore(url: repairDir.appendingPathComponent("sessions.json"))
+var repairState = FocusState()
+repairState.startWork(name: "修复前", seconds: 60, at: base)
+repairState.tick(at: base.addingTimeInterval(60))
+check(repairState.records.count == 1 && repairState.phase == .workFinished, "repair fixture completes one record")
+try repairStore.save(repairState)
+try Data("{ truncated".utf8).write(to: repairStore.url)
+do { _ = try repairStore.load(); fatalError("corrupt file must not load") } catch { checks += 1 }
+check((try? String(contentsOf: repairStore.url, encoding: .utf8)) == "{ truncated",
+      "failed load leaves the corrupt bytes untouched")
+try repairStore.save(repairState)   // stands in for the user repairing the file externally
+var repaired = try repairStore.load()
+repaired.recover()
+check(repaired.records.count == 1 && repaired.records[0].name == "修复前",
+      "repaired file loads again without a relaunch")
+check(repaired.records[0].seconds == 60 && repaired.phase == .workFinished,
+      "reloaded record keeps its duration and its pending confirmation")
+check(repaired.needsAttention, "reload never silently clears a waiting reminder")
+try FileManager.default.removeItem(at: repairDir)
+print("PASS: \(checks) total checks including storage recovery")

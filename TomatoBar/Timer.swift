@@ -35,7 +35,7 @@ final class TBTimer: ObservableObject {
             state.recover()
         } catch {
             loadFailed = true
-            storageError = "无法读取专注记录，已保留原文件。请先检查存储位置。"
+            storageError = "无法读取专注记录，已保留原文件未覆盖。可打开记录文件夹检查，修复后点「重新读取」。"
         }
         history.records = state.records
         KeyboardShortcuts.onKeyUp(for: .startStopTimer) { [weak self] in
@@ -105,14 +105,42 @@ final class TBTimer: ObservableObject {
         }
     }
 
-    func retrySave() { if !loadFailed { persist() } }
+    /// A failed read and a failed write recover differently, so both the action and its
+    /// label depend on which happened. Offering "retry save" after a failed load used to
+    /// render a button that could never do anything, because persist() guards on loadFailed.
+    func retryStorage() { if loadFailed { reload() } else { persist() } }
+    var storageRetryTitle: String { loadFailed ? "重新读取" : "重试保存" }
     var hasUnsavedChanges: Bool { storageError != nil && !loadFailed }
+
+    /// Adopting freshly loaded state cannot discard user data: while loadFailed is set,
+    /// startWork is blocked by storageError and editRecord and persist are blocked by
+    /// loadFailed, so phase stays .idle and every remaining mutation is a no-op.
+    /// This deliberately does not weaken the guard that stops persist() overwriting a
+    /// corrupt file — reloading only reads.
+    private func reload() {
+        do {
+            var loaded = try store.load()
+            loaded.recover()
+            state = loaded
+            history.records = loaded.records
+            loadFailed = false
+            storageError = nil
+            lastSave = Date()
+            updateStatus()
+        } catch {
+            storageError = "仍然无法读取专注记录，原文件已保留。请修复文件后重试，或重启应用。"
+        }
+    }
     func openRecordsFolder() {
         let folder = store.url.deletingLastPathComponent()
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             NSWorkspace.shared.open(folder)
-        } catch { storageError = "无法打开记录文件夹，请检查磁盘空间和权限。" }
+        } catch {
+            // Never overwrite an existing storage error: it is the user's only signal that
+            // their records are at risk, and this button now sits right beside that message.
+            if storageError == nil { storageError = "无法打开记录文件夹，请检查磁盘空间和权限。" }
+        }
     }
 
     private func change(_ mutation: (inout FocusState, Date) -> Void) {
