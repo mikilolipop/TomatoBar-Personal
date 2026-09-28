@@ -431,7 +431,58 @@ nl -ba Icons/convert.sh
 
 ## ⚪ P7 — CI workflow 是上游的，缺 secret 会失败
 
-**状态**：待评审 · 已建议方案，待用户确认
+**状态**：✅ **已修复 @ `abf55df`**（2026-09-28，Claude Code），并已在真实 CI 运行中验证 · Codex 评审后提升为中等构建/发布风险
+
+### 修复方式
+
+整体替换 `.github/workflows/main.yml`，不是改过滤器（Codex 已否决只把 `*` 改成 `**`）。
+新 workflow 单 job 两步：
+
+1. **Domain tests** — `sh scripts/test.sh`。无 secret、无签名、数秒完成，放在第一步，
+   逻辑失败就不必再花构建分钟数
+2. **Build smoke check** — Release 构建 + 断言产物名、ad-hoc 签名、bundle id。
+   理由采纳 Codex 意见：`test.sh` 只编译 9 个 Swift 文件中的 **3 个**，
+   App / Timer / View / MainWindow / FocusCharts / Notifications **无任何其他覆盖**，
+   编译检查是防止 UI 层拼写错误的唯一防线
+
+单个 job 而非两个：macOS 分钟数对私有仓库额度按 **10 倍**计。
+`concurrency` 取消同分支被取代的运行，同理。
+`branches-ignore: [main]`：main 是冻结的上游基线，既无 `scripts/test.sh` 也无 `Tests/`。
+`runs-on: macos-latest` 而非钉死 `macos-15`（会被退役）。
+
+### 首次真实运行结果（[run 36431326540](https://github.com/mikilolipop/TomatoBar-Personal/actions/runs/36431326540)）
+
+| 项 | 值 |
+|---|---|
+| 结论 | **success**，分支 `feature/personal-focus` |
+| 耗时 | 46 秒（测试 13:49:10 → 构建成功 13:49:53） |
+| Runner | `macos-latest`，Xcode 26.6，macOS SDK 26.5 |
+| 测试 | 四行 PASS 齐全，末尾 **`PASS: 61 total checks including storage recovery`** |
+| 构建 | 42 行 SwiftCompile/Ld + `** BUILD SUCCEEDED **`，**arm64 + x86_64 通用二进制** |
+| 产物断言 | `grep -x 'com.dilyar.TomatoBarPersonal'` 实际匹配并输出（日志第 2150 行） |
+
+> 46 秒含一次通用二进制 Release 构建，快得可疑，因此**拉取完整日志逐项核实**，
+> 没有只看绿色勾。步骤确实做了实事。
+
+### 顺带解决了本条的「未解之谜」
+
+这次推送是天然实验：同一分支、同一仓库，**只把过滤器从 `branches: '*'` 换成
+`branches-ignore: [main]`，workflow 就立刻登记并运行了**
+（`actions/workflows` 从 0 → 1、state=active；`actions/runs` 从 0 → 1）。
+
+这**证实了 Codex 的诊断**：GitHub filter 的 `*` 不跨越 `/`，所以 `feature/personal-focus`
+从未匹配过。
+
+但 **main 首次推送为何也没触发，仍未证实** —— main 当时带的是上游那份 `branches: '*'`，
+理应匹配。保留为未解，不写成已查明。现已无关紧要：新 workflow 显式处理了分支匹配。
+
+### 原上游 workflow 为何必须整体替换（保留 Codex 的发现）
+
+- 需要 `CODESIGN_CERT_BASE64` / `_PASSWORD` / `_PEM_BASE64`，本仓库 `actions/secrets` 为 0
+- **Build 步骤 `cp -r "$BUILT_PRODUCTS_DIR/TomatoBar.app"`，而 `PRODUCT_NAME = "TomatoBar Personal"`**
+  （`project.pbxproj:372,407`）→ 即使 secret 齐全也会失败（Codex 发现，Claude 漏掉）
+- 第一步删 prerelease tag、末尾发布 zip，是上游公开发布流程，对个人 fork 无意义
+- **它从不运行 `scripts/test.sh`** —— 61 项领域检查此前完全没有 CI
 
 ### 证据
 
@@ -541,7 +592,44 @@ sed -n '184,187p' TomatoBar/State.swift
 
 ## 🟡 P9 — 读盘失败界面提供一个必然无效的「重试保存」按钮
 
-**状态**：Codex 新增，静态控制流确认；未破坏真实文件做 UI 复现。**严重性：低，错误恢复体验。**
+**状态**：✅ **已修复 @ `e69be32`**（2026-09-28，Claude Code）· Codex 新增，静态控制流确认 · 严重性：低，错误恢复体验
+
+### 修复方式
+
+没有隐藏按钮，而是**让它真的能用**：`retrySave()` → `retryStorage()`，读失败时重新读盘
+（新增私有 `reload()`），写失败时重试保存；`storageRetryTitle` 相应显示「重新读取」/「重试保存」。
+两个错误横幅都加了「打开记录文件夹」，让修复路径从提示文案处即可到达。
+
+`loadFailed` 阻止 `persist()` 覆盖损坏文件的保护**完全保留** —— `reload()` 只读不写。
+
+顺带修了 `openRecordsFolder()` 会覆写既有 `storageError` 的问题：它现在紧贴那条消息，
+覆盖掉就等于藏起「记录有风险」的唯一信号。
+
+### reload() 为何安全（这是整个修法的前提，已逐个写入口核验）
+
+`loadFailed` 期间 `phase` 恒为 `.idle`：`startWork` 被 `storageError` 挡住（`Timer.swift:74`），
+`editRecord` 与 `persist` 被 `loadFailed` 挡住（`:90`、`:135`），因此从未写盘；
+其余变更方法在 idle 下全是 no-op（`State.swift:140/156/164` 的 guard）。**内存中无可丢失数据。**
+该不变量已写进 `reload()` 的注释，因为它是这个方法安全的全部理由。
+
+### 测试
+
+55 → **61 项**。`TBTimer` 依赖 SwiftUI，不在 `scripts/test.sh` 编译范围内，
+故新增检查覆盖恢复路径的 `FocusStore` + `FocusState` 一半：失败读取保留损坏字节原样、
+修复后无需重启即可再次加载、且保留时长/待确认状态/`needsAttention`。
+
+变异检验：让 `recover()` 清掉 `needsAttention` **被抓到**；让 `load()` 完全吞掉错误
+（真实世界里「防御式编程」最可能犯的错，会静默丢弃全部记录）**被 `Tests/main.swift:52`
+既有的 corrupt-file 检查抓到**。
+
+> ⚠️ 第一次做该变异时只改了 decode 一行，结果**无效** —— `load()` 有**四个**抛错点
+> （`Data(contentsOf:)`、`JSONDecoder`、`JSONSerialization`、`copyItem`），
+> 其余仍在抛错，行为未变。做变异检验时必须确认变异**真的改变了可观察行为**，
+> 否则「没抓到」是变异无效，不是测试有洞。
+
+UI 层改动 `test.sh` 编译不到，已用 `scripts/build.sh` 干净构建验证，
+并在产物二进制中确认 `重新读取`、`重试保存`、新错误文案与私有 `reload()` 符号
+（`_$s18TomatoBar_Personal7TBTimerC6reload…`）均存在。
 
 证据：`Timer.swift:36-38` 读盘异常后 loadFailed=true；`:108` 的 retrySave 在此条件下什么也不做，
 也不会重新 load。`View.swift:47-50` 与 `MainWindow.swift:220-221` 却对所有 storageError 展示「重试保存」。
@@ -605,21 +693,31 @@ PYPROBE
 
 ---
 
-## 已修完（本次会话）
+## 已修完
 
 | 项 | 内容 | 提交 |
 |---|---|---|
+| **P9** | 读盘失败时「重试保存」按钮必然无效 → 改为 `retryStorage()`，读失败重新读盘、写失败重试保存，按钮标题随场景变化；保留 `loadFailed` 防覆盖保护；错误横幅加「打开记录文件夹」；`openRecordsFolder()` 不再覆写既有错误。测试 55 → **61 项** | `e69be32` |
+| **P7** | 整体替换上游发布 workflow 为无 secret 的「领域测试 + 构建 smoke check」单 job 流程。**首次真实运行 success，46 秒，61 项全过，通用二进制构建通过，产物 bundle id 断言匹配**。同时证实 `branches: '*'` 不匹配开发分支 | `abf55df` |
 | — | `focusDuration()` 此前**零测试**，却被 6 处引用（含 `MainWindow.swift:110` 的 46pt 累计总时长、周/月图悬停提示、分类行、记录行）。补 6 项格式化断言 + 8 项真实数据回归，41 → **55 项** | `8fb1e74` |
 | — | 变异检验：注入 3 个错误（`% 60 == 0`→`== 1`、截断→四舍五入、`< 60`→`< 59`），全部被对应断言抓到，源码已还原并 diff 确认一致 | 同上 |
 | — | `docs/**/*.png` 加入 `.gitignore`，26 张 16MB QA 截图不进 git；已验证 `tests.txt`、上游 `screenshot.png`、构建必需的 imageset PNG 未被误伤 | 同上 |
 
 `focusDuration()` 位于 `Analytics.swift:80`，已在 `scripts/test.sh` 的编译列表内，补测零基建成本。
 
+> **注意 `scripts/test.sh` 的覆盖边界**：它只编译 `State.swift` + `Log.swift` + `Analytics.swift`，
+> 即 9 个 Swift 文件中的 3 个。**改到 App / Timer / View / MainWindow / FocusCharts / Notifications
+> 必须另外跑 `scripts/build.sh`**，否则拼写错误不会被发现。现在 CI 两步都跑，但本地要自己记得。
+
 ---
 
 ## 记录规则
 
 - 新问题追加到对应严重性分区，**必须附 file:line 证据和可独立执行的核验命令**
-- 修完的移到「已修完」，注明 commit hash
+- **P 编号是问题 ID，不当严重性等级用**（Codex 评审提出）。严重性写在每条的「状态」行里，可随评审调整
+- 修完的：把该条**状态行改成 `✅ 已修复 @ <hash>` 并原地补「修复方式」小节**，同时在「已修完」表加一行。
+  **不要删除原条目和评审意见** —— 分析过程和被推翻的判断本身就是资产
 - 被否决的移到 [`HANDOFF.md`](HANDOFF.md) 的「已否决的方案」并写明理由 —— 不要直接删掉，
   否则后续 AI 会重新提出同一个方案
+- **变异检验时必须确认变异真的改变了可观察行为**。「没抓到」可能是变异无效而非测试有洞
+  （见 P9 小节里那个只改一处抛错点的失败尝试）
