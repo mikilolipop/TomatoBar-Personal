@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-09-28，by Claude Code（Opus 5）
+最后更新：2026-09-28，by Codex（交叉评审；仅文档）
 
 ---
 
@@ -10,12 +10,12 @@
 
 | 项 | 值 |
 |---|---|
-| 已安装版本 | **3.8.0（V1.2）**，`/Applications/TomatoBar Personal.app`，本次会话中构建并安装，已启动运行 |
-| HEAD | `8fb1e74`（分支 `feature/personal-focus`） |
+| 已安装版本 | **3.8.0（V1.2）**，`/Applications/TomatoBar Personal.app`，此前 Claude 会话构建并安装；本轮只读确认进程正在运行，未重装 |
+| HEAD | 本轮文档评审提交（基于 `1f43359`；精确 hash 用 `git log -1`，分支 `feature/personal-focus`） |
 | 工作区 | 干净 |
 | 测试 | `scripts/test.sh` → **55 项全绿** |
 | 远程 | `origin` = `mikilolipop/TomatoBar-Personal`（私有，默认分支 `feature/personal-focus`）；`upstream` = `ivoronin/TomatoBar` |
-| 用户真实数据 | 个人版容器内 `sessions.json` 共 **1 条**记录，phase=idle，升级前后完好 |
+| 用户真实数据 | 此前 Claude 会话记录为 **1 条**、phase=idle；本轮未重新读取 sessions.json，未触碰数据 |
 | git 身份 | 本仓库 `--local`：`mikilolipop <207336577+mikilolipop@users.noreply.github.com>`（全局仍未设置） |
 
 ### 原版 TomatoBar 已退役
@@ -49,24 +49,26 @@ tarball 是首次提交前的应急措施。有了 git + 远程后必要性下�
 
 ## 进行中
 
-**无代码改动进行中。** 等待 Codex 对 BACKLOG P1–P7 的交叉评审。
-
-用户已决定：**先让 Codex 审这份分析，再决定改不改**。评审材料已写进 [`BACKLOG.md`](BACKLOG.md)，
-每条都带 file:line 证据和「如何独立核验」，Codex 无需本会话上下文即可验证。
+**P1–P7 交叉评审已完成，代码未改。** 结论见 BACKLOG 每条「评审意见（Codex）」。
+新增 P8（登录恢复提醒仍抢焦点）和 P9（读取失败时重试按钮无效）。等待用户决定实施范围。
+P7 的 main 首次零运行根因仍未证实，不得当成已解决；feature 分支过滤原因已确定。
 
 ---
 
 ## 下一步
 
-1. **等 Codex 交叉评审 BACKLOG P1–P7**（用户负责把 BACKLOG.md 交给 Codex）
-2. 评审回来后，按用户已选定的方案修 **P1 + P2 + P3**：
-   - 用户已选 **方案 B**：保留「打开应用即弹主窗口」的 V1.2 设计意图，但要
-     (a) 关窗后收回 Dock 图标，(b) 「登录时启动」场景下不弹窗口、不抢焦点
-   - P3 是 3 行改动（长休息用 `.longRest` 图标）
-   - 预计总量约 10–15 行
-3. P4（本地化死文件）、P6（`export_options.plist`、`.swiftlint.yml` 死文件）是清理，可合并成一个提交
-4. P7：建议把 `.github/workflows/main.yml` 换成只跑 `scripts/test.sh` 的极简 workflow（无需任何 secret）。**待用户确认**
-5. P5（FocusSummary 重复构造）**暂不修** —— 现在只有 1 条记录，属过早优化。但已在 BACKLOG 记录精确复杂度，数据量上来后再处理
+1. 用户审阅评审后，再决定修哪些问题；本轮没有实施授权，不沿用旧「10–15 行即可」估计。
+2. 方案 B 方向保留：P1 + P2 **须包含 P8**；继续 LSUIElement=YES，主窗口打开时 regular、真正关闭时 accessory。
+   登录来源优先检查 Apple 启动事件标记；NSApplication.launchedAsHidden 在当前 SDK 不存在，
+   LaunchAtLogin 5.0.2 也没有来源 API。真实 macOS 27 登录/手动启动/重开/恢复/提醒/设置 sheet 验收待做。
+3. P3 不应靠休息分钟数相等判断类型；若要求设置变化与重启后稳定，需保存本次休息类型、兼容旧 JSON 并补测。
+4. P4 / P6 降低优先级；本地化有 variant group + Resources 引用，不能只删文件。
+   Icons 是源素材与工具，至少保留两张脚本依赖源图及来源说明，不能整体判死。
+5. P7 后续宜替换上游发布 workflow 为正确匹配开发分支的无 secret 测试流程，构建 smoke check 可单独考虑。
+   本轮确认 Actions enabled、workflows=0、runs=0、secrets=0；不能保证未来 main/tag 不触发旧发布操作。
+6. P5 继续暂不修；原 13 次 / 416 趟估算撤回，500 条卡顿推断无依据；未来按 UI 实测主线程成本排期，
+   保持 history/timer 观察分层，缓存不能仅用 records.count。
+7. P9 可在后续错误恢复体验改动中处理，保留 loadFailed 阻止覆盖原文件的保护。
 
 ### V1.3 候选（尚未规划）
 
@@ -93,6 +95,21 @@ tarball 是首次提交前的应急措施。有了 git + 远程后必要性下�
 
 ---
 
+## 刚做完（2026-09-28，Codex 交叉评审）
+
+- 独立核对 P1–P7 的源码、资源、Xcode 引用、传统登录项查询；基线和提交前均跑 55 项测试。
+- 只读确认在用应用 activationPolicy=regular；没有关窗、登录切换或宣称端到端焦点验收。
+- 核对锁定 LaunchAtLogin 5.0.2 与 SDK/Apple 官方 API，否定 launchedAsHidden 猜测。
+- 领域层 `swiftc -O` 月汇总基准：1 / 500 / 5000 条约 0.020 / 1.231 / 5.854 ms（单次，非整页）；
+  可复跑脚本写在 BACKLOG，另已执行文档里的脚本验证可用。
+- 编码/解码/恢复探针复现 workFinished 仍 needsAttention，形成 P8；静态确认 P9。
+- GitHub REST 实查：私有、fork=false、enabled=true，但 workflows/runs/secrets 均 0；
+  两个远程分支 workflow blob 相同。事件列表不完整，main 首次未触发原因继续标未证实。
+- 修改仅限 BACKLOG / HANDOFF；未改 Swift、测试、CI、设置、历史验收文档或用户数据。
+- 不翻案任何原已否决方案；追加两条由评审排除的具体修法，避免接力时误用。
+
+---
+
 ## 已否决的方案（**请勿重走**）
 
 | 方案 | 否决理由 |
@@ -103,8 +120,10 @@ tarball 是首次提交前的应急措施。有了 git + 远程后必要性下�
 | 只用原版真实数据做测试输入 | 4 段最长 30 分钟，`focusDuration()` 的「小时」两个分支**真实数据永远够不着**。必须补合成值才能全覆盖 |
 | 把 16MB QA 截图提交进 git | 永不 diff 的二进制，每次 clone 都要背。已 gitignore，磁盘和 tarball 里有副本 |
 | 修改 `design-qa.md` 里的「41 项检查」 | 那是带日期的 V1.2 验收记录，改它等于篡改历史证据。数字过时也保留，V1.3 另写一份 |
-| 现在就优化 P5（FocusSummary 重复构造） | 当前只有 1 条记录，属过早优化。已记录精确复杂度，等数据量上来或实测到卡顿再处理 |
+| 现在就优化 P5（FocusSummary 重复构造） | 保留否决。此前记录为 1 条；Codex 已纠正原静态估算，后续按 UI profile 排期，不把旧估算称为精确成本 |
 | 开启 GitHub Issues 做 backlog | 单人 + 两个 AI，`docs/BACKLOG.md` 随代码走、可 diff、离线可读、不需 API，更简单。仓库建时已设 `has_issues: false` |
+| 用休息分钟数相等判断长休息 | Codex 评审：长短时长可以相同，每组数量可中途改变；不能稳定表示本次休息类型 |
+| 只把原发布 workflow 的分支过滤从 `*` 改成 `**` | 会让开发分支开始跑缺 secret、带删 prerelease 操作的上游发布流程；应整体设计无 secret 验证流程 |
 
 ---
 
