@@ -8,82 +8,105 @@ extension NSImage.Name {
     static let longRest = Self("BarIconLongRest")
 }
 
-private let digitFont = NSFont.monospacedDigitSystemFont(ofSize: 0, weight: .regular)
-
 @main
 struct TBApp: App {
     @NSApplicationDelegateAdaptor(TBStatusItem.self) var appDelegate
-
-    init() {
-        TBStatusItem.shared = appDelegate
-        LaunchAtLogin.migrateIfNeeded()
-        logger.append(event: TBLogEventAppStart())
-    }
-
-    var body: some Scene {
-        Settings {}
-    }
+    var body: some Scene { Settings {} }
 }
 
-class TBStatusItem: NSObject, NSApplicationDelegate {
+class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
+    private var mainWindow: NSWindow?
     private var popover = NSPopover()
     private var statusBarItem: NSStatusItem?
-    static var shared: TBStatusItem!
+    private var model: TBTimer!
+    private let reminder = TBReminder()
+    static var shared: TBStatusItem?
 
     func applicationDidFinishLaunching(_: Notification) {
-        let view = TBPopoverView()
-
+        Self.shared = self
+        LaunchAtLogin.migrateIfNeeded()
+        model = TBTimer()
         popover.behavior = .transient
-        popover.contentViewController = NSViewController()
-        popover.contentViewController?.view = NSHostingView(rootView: view)
-        if let contentViewController = popover.contentViewController {
-            popover.contentSize.height = contentViewController.view.intrinsicContentSize.height
-            popover.contentSize.width = 240
-        }
-
-        statusBarItem = NSStatusBar.system.statusItem(
-            withLength: NSStatusItem.variableLength
-        )
+        popover.contentViewController = NSHostingController(rootView: TBPopoverView(timer: model))
+        statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusBarItem?.button?.imagePosition = .imageLeft
-        setIcon(name: .idle)
-        statusBarItem?.button?.action = #selector(TBStatusItem.togglePopover(_:))
+        statusBarItem?.button?.target = self
+        statusBarItem?.button?.action = #selector(togglePopover(_:))
+        model.onAttention = { [weak self] in
+            guard let self = self else { return }
+            self.popover.performClose(nil)
+            self.reminder.show(timer: self.model)
+        }
+        model.updateStatus()
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(willSleep),
+            name: NSWorkspace.willSleepNotification, object: nil)
+        showMainWindow()
+        if model.state.needsAttention { reminder.show(timer: model) }
     }
-
+    @objc private func willSleep() { model.pause() }
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        model.pause()
+        guard model.hasUnsavedChanges else { return .terminateNow }
+        let alert = NSAlert()
+        alert.messageText = "专注记录尚未保存"
+        alert.informativeText = "请检查磁盘空间后重试保存，避免丢失当前记录。"
+        alert.addButton(withTitle: "返回")
+        alert.runModal()
+        return .terminateCancel
+    }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showMainWindow()
+        if model.state.needsAttention { reminder.show(timer: model) }
+        return true
+    }
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls where url.scheme?.lowercased() == "tomatobar-personal" {
+            if url.host?.lowercased() == "startstop" { model.primaryAction() }
+        }
+    }
+    func showMainWindow() {
+        popover.performClose(nil)
+        if mainWindow == nil {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1120, height: 800),
+                styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+            window.title = "TomatoBar · 专注时光"
+            window.titlebarAppearsTransparent = true
+            window.backgroundColor = NSColor(Garden.paper)
+            window.contentMinSize = NSSize(width: 920, height: 740)
+            window.isReleasedWhenClosed = false
+            window.delegate = self
+            let hosting = NSHostingController(rootView: MainWindowView(timer: model, history: model.history))
+            if #available(macOS 13.0, *) { hosting.sizingOptions = [] }
+            window.contentViewController = hosting
+            window.setContentSize(NSSize(width: 1120, height: 800))
+            window.center()
+            window.setFrameAutosaveName("TomatoBarMainWindow")
+            mainWindow = window
+        }
+        NSApp.setActivationPolicy(.regular)
+        mainWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        model.windowActivity.visible = true
+    }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+    func windowDidBecomeKey(_ notification: Notification) { model.windowActivity.visible = true }
+    func windowDidResignKey(_ notification: Notification) { model.windowActivity.visible = false }
+    func windowDidMiniaturize(_ notification: Notification) { model.windowActivity.visible = false }
+    func windowDidDeminiaturize(_ notification: Notification) { model.windowActivity.visible = true }
+    func windowWillClose(_ notification: Notification) { model.windowActivity.visible = false }
     func setTitle(title: String?) {
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.lineHeightMultiple = 0.9
-        paragraphStyle.alignment = NSTextAlignment.center
-
-        let attributedTitle = NSAttributedString(
-            string: title != nil ? " \(title!)" : "",
-            attributes: [
-                NSAttributedString.Key.font: digitFont,
-                NSAttributedString.Key.paragraphStyle: paragraphStyle
-            ]
-        )
-        statusBarItem?.button?.attributedTitle = attributedTitle
+        statusBarItem?.button?.attributedTitle = NSAttributedString(string: title.map { " \($0)" } ?? "",
+            attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)])
+        statusBarItem?.button?.toolTip = "番茄钟 · \(model.phaseLabel)"
     }
-
-    func setIcon(name: NSImage.Name) {
-        statusBarItem?.button?.image = NSImage(named: name)
+    func setIcon(name: NSImage.Name) { statusBarItem?.button?.image = NSImage(named: name) }
+    func showPopover(_ sender: AnyObject?) {
+        guard let button = statusBarItem?.button else { return }
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        popover.contentViewController?.view.window?.makeKey()
     }
-
-    func showPopover(_: AnyObject?) {
-        if let button = statusBarItem?.button {
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: NSRectEdge.minY)
-            popover.contentViewController?.view.window?.makeKey()
-        }
-    }
-
-    func closePopover(_ sender: AnyObject?) {
-        popover.performClose(sender)
-    }
-
+    func closePopover(_ sender: AnyObject?) { popover.performClose(sender) }
     @objc func togglePopover(_ sender: AnyObject?) {
-        if popover.isShown {
-            closePopover(sender)
-        } else {
-            showPopover(sender)
-        }
+        if popover.isShown { closePopover(sender) } else { showPopover(sender) }
     }
 }

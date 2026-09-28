@@ -1,5 +1,5 @@
 {
-  "originHash" : "60467d826e6e517911c51701bef6946e4641ae6c0ec3800ff91b0815c0d90c06",
+  "originHash" : "75202cb1391d816c99db5fd453a4e93e5c6249cccf4bef19dc4eb15568d40c1e",
   "pins" : [
     {
       "identity" : "keyboardshortcuts",
@@ -17,15 +17,6 @@
       "state" : {
         "revision" : "9a894d799269cb591037f9f9cb0961510d4dca81",
         "version" : "5.0.2"
-      }
-    },
-    {
-      "identity" : "swiftstate",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/ReactKit/SwiftState",
-      "state" : {
-        "branch" : "swift/5.0",
-        "revision" : "887e75b96da6be36a062e1b0ef832c32a803348b"
       }
     }
   ],

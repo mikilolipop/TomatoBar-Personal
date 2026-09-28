@@ -1,11 +1,213 @@
-import SwiftState
+import Foundation
 
-typealias TBStateMachine = StateMachine<TBStateMachineStates, TBStateMachineEvents>
+enum FocusPhase: String, Codable { case idle, work, rest, workFinished, restFinished }
 
-enum TBStateMachineEvents: EventType {
-    case startStop, timerFired, skipRest
+struct FocusSegment: Codable, Equatable {
+    let start: Date
+    let end: Date
+    var seconds: TimeInterval { max(0, end.timeIntervalSince(start)) }
 }
 
-enum TBStateMachineStates: StateType {
-    case idle, work, rest
+struct FocusRecord: Codable, Identifiable, Equatable {
+    let id: UUID
+    var name: String
+    let startedAt: Date
+    let endedAt: Date
+    let plannedSeconds: TimeInterval
+    let completed: Bool
+    let segments: [FocusSegment]
+    var tags: [String]
+
+    init(id: UUID, name: String, startedAt: Date, endedAt: Date, plannedSeconds: TimeInterval,
+         completed: Bool, segments: [FocusSegment], tags: [String] = []) {
+        self.id = id
+        self.name = name
+        self.startedAt = startedAt
+        self.endedAt = endedAt
+        self.plannedSeconds = plannedSeconds
+        self.completed = completed
+        self.segments = segments
+        self.tags = Self.normalizedTags(tags)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, startedAt, endedAt, plannedSeconds, completed, segments, tags
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        name = try values.decode(String.self, forKey: .name)
+        startedAt = try values.decode(Date.self, forKey: .startedAt)
+        endedAt = try values.decode(Date.self, forKey: .endedAt)
+        plannedSeconds = try values.decode(TimeInterval.self, forKey: .plannedSeconds)
+        completed = try values.decode(Bool.self, forKey: .completed)
+        segments = try values.decode([FocusSegment].self, forKey: .segments)
+        tags = Self.normalizedTags(try values.decodeIfPresent([String].self, forKey: .tags) ?? [])
+    }
+
+    static func normalizedTags(_ tags: [String]) -> [String] {
+        var result: [String] = []
+        for raw in tags {
+            let tag = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !tag.isEmpty && !result.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) {
+                result.append(tag)
+            }
+        }
+        return result
+    }
+
+    func hasTag(_ tag: String) -> Bool {
+        tags.contains { $0.caseInsensitiveCompare(tag) == .orderedSame }
+    }
+    var seconds: TimeInterval { segments.reduce(0) { $0 + $1.seconds } }
+    func seconds(on day: Date, calendar: Calendar = .current) -> TimeInterval {
+        guard let interval = calendar.dateInterval(of: .day, for: day) else { return 0 }
+        return segments.reduce(0) { sum, segment in
+            sum + max(0, min(segment.end, interval.end).timeIntervalSince(max(segment.start, interval.start)))
+        }
+    }
+}
+
+/// All timing decisions accept a clock value so pause, completion and recovery are testable.
+struct FocusState: Codable {
+    var phase: FocusPhase = .idle
+    var paused = false
+    var name = ""
+    var startedAt: Date?
+    var segmentStart: Date?
+    var deadline: Date?
+    var remaining: TimeInterval = 0
+    var planned: TimeInterval = 0
+    var segments: [FocusSegment] = []
+    var rounds = 0
+    var records: [FocusRecord] = []
+    var checkpoint = Date()
+
+    var allTags: [String] {
+        FocusRecord.normalizedTags(records.flatMap(\.tags)).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
+    func filteredRecords(tag: String?) -> [FocusRecord] {
+        guard let tag = tag else { return records }
+        return records.filter { $0.hasTag(tag) }
+    }
+
+    mutating func editRecord(id: UUID, name: String, tags: [String]) throws {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw RecordEditError.emptyName }
+        guard let index = records.firstIndex(where: { $0.id == id }) else { throw RecordEditError.missingRecord }
+        let known = allTags
+        let canonicalTags = FocusRecord.normalizedTags(tags).map { tag in
+            known.first { $0.caseInsensitiveCompare(tag) == .orderedSame } ?? tag
+        }
+        records[index].name = trimmed
+        records[index].tags = canonicalTags
+    }
+
+    var isTiming: Bool { phase == .work || phase == .rest }
+    var needsAttention: Bool { phase == .workFinished || phase == .restFinished }
+    func timeLeft(at now: Date) -> TimeInterval {
+        max(0, deadline?.timeIntervalSince(now) ?? remaining)
+    }
+
+    mutating func startWork(name: String, seconds: TimeInterval, at now: Date) {
+        guard phase == .idle || phase == .restFinished else { return }
+        self.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if self.name.isEmpty { self.name = "未命名专注" }
+        phase = .work
+        startedAt = now
+        segments = []
+        begin(seconds: seconds, at: now)
+    }
+
+    mutating func startRest(seconds: TimeInterval, at now: Date) {
+        guard phase == .workFinished else { return }
+        phase = .rest
+        begin(seconds: seconds, at: now)
+    }
+
+    private mutating func begin(seconds: TimeInterval, at now: Date) {
+        planned = max(1, seconds)
+        remaining = planned
+        deadline = now.addingTimeInterval(planned)
+        segmentStart = phase == .work ? now : nil
+        paused = false
+        checkpoint = now
+    }
+
+    mutating func tick(at now: Date) {
+        guard isTiming, !paused, let end = deadline, now >= end else { return }
+        if phase == .work {
+            closeSegment(at: end)
+            addRecord(completed: true, at: end)
+            rounds += 1
+            phase = .workFinished
+        } else {
+            phase = .restFinished
+        }
+        remaining = 0
+        deadline = nil
+        paused = false
+    }
+
+    mutating func pause(at now: Date) {
+        tick(at: now)
+        guard isTiming, !paused else { return }
+        remaining = timeLeft(at: now)
+        closeSegment(at: now)
+        deadline = nil
+        paused = true
+    }
+
+    mutating func resume(at now: Date) {
+        guard isTiming, paused else { return }
+        deadline = now.addingTimeInterval(remaining)
+        if phase == .work { segmentStart = now }
+        paused = false
+    }
+
+    mutating func stop(at now: Date) {
+        tick(at: now)
+        if phase == .work {
+            closeSegment(at: now)
+            addRecord(completed: false, at: now)
+        }
+        phase = .idle
+        deadline = nil
+        segmentStart = nil
+        remaining = 0
+        paused = false
+        rounds = 0
+    }
+
+    /// Never count time while the application was not running as focused work.
+    mutating func recover() {
+        if isTiming && !paused { pause(at: checkpoint) }
+    }
+
+    private mutating func closeSegment(at now: Date) {
+        guard let start = segmentStart else { return }
+        let end = max(start, min(now, deadline ?? now))
+        if end > start { segments.append(FocusSegment(start: start, end: end)) }
+        segmentStart = nil
+    }
+
+    private mutating func addRecord(completed: Bool, at now: Date) {
+        guard let start = startedAt else { return }
+        records.insert(FocusRecord(id: UUID(), name: name, startedAt: start, endedAt: now,
+                                   plannedSeconds: planned, completed: completed, segments: segments), at: 0)
+        startedAt = nil
+        segments = []
+    }
+}
+
+enum RecordEditError: LocalizedError {
+    case emptyName, missingRecord
+    var errorDescription: String? {
+        switch self {
+        case .emptyName: return "事件名称不能为空。"
+        case .missingRecord: return "这条记录已不存在，请重新打开记录列表。"
+        }
+    }
 }

@@ -1,3 +1,10 @@
+> **V1.2**：新增原生主窗口、日／周／月复盘、紧凑与大倒计时、轻微像素动画。见 [更新说明](docs/V1.2更新说明.md)。
+
+> **V1.1 已安装**：支持记录改名、多标签与标签筛选。见 [更新说明](docs/V1.1更新说明.md)。
+
+> **个人定制版 TomatoBar Personal**：事件记录、暂停/继续、完全无声及到时确认提醒。
+> 使用和验证状态见 [个人版使用与验证](docs/个人版使用与验证.md)。以下为上游项目说明，声音和原版 URL 等描述不适用于个人版。
+
 <p align="center">
 <img src="https://raw.githubusercontent.com/ivoronin/TomatoBar/main/TomatoBar/Assets.xcassets/AppIcon.appiconset/icon_128x128%402x.png" width="128" height="128"/>
 <p>

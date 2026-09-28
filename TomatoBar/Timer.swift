@@ -1,229 +1,148 @@
 import KeyboardShortcuts
-import SwiftState
 import SwiftUI
 
-class TBTimer: ObservableObject {
-    @AppStorage("stopAfterBreak") var stopAfterBreak = false
+final class FocusHistory: ObservableObject {
+    @Published var records: [FocusRecord] = []
+}
+
+final class WindowActivity: ObservableObject {
+    @Published var visible = false
+    @Published var paused = false
+}
+
+final class TBTimer: ObservableObject {
+    let history = FocusHistory()
+    let windowActivity = WindowActivity()
     @AppStorage("showTimerInMenuBar") var showTimerInMenuBar = true
     @AppStorage("workIntervalLength") var workIntervalLength = 25
     @AppStorage("shortRestIntervalLength") var shortRestIntervalLength = 5
     @AppStorage("longRestIntervalLength") var longRestIntervalLength = 15
     @AppStorage("workIntervalsInSet") var workIntervalsInSet = 4
-    // This preference is "hidden"
-    @AppStorage("overrunTimeLimit") var overrunTimeLimit = -60.0
+    @AppStorage("eventName") var eventName = ""
+    @Published private(set) var state = FocusState()
+    @Published private(set) var now = Date()
+    @Published private(set) var storageError: String?
+    private let store: FocusStore
+    private var ticker: Foundation.Timer?
+    private var lastSave = Date.distantPast
+    private var loadFailed = false
+    var onAttention: (() -> Void)?
 
-    private var stateMachine = TBStateMachine(state: .idle)
-    public let player = TBPlayer()
-    private var consecutiveWorkIntervals: Int = 0
-    private var notificationCenter = TBNotificationCenter()
-    private var finishTime: Date!
-    private var timerFormatter = DateComponentsFormatter()
-    @Published var timeLeftString: String = ""
-    @Published var timer: DispatchSourceTimer?
-
-    init() {
-        /*
-         * State diagram
-         *
-         *                 start/stop
-         *       +--------------+-------------+
-         *       |              |             |
-         *       |  start/stop  |  timerFired |
-         *       V    |         |    |        |
-         * +--------+ |  +--------+  | +--------+
-         * | idle   |--->| work   |--->| rest   |
-         * +--------+    +--------+    +--------+
-         *   A                  A        |    |
-         *   |                  |        |    |
-         *   |                  +--------+    |
-         *   |  timerFired (!stopAfterBreak)  |
-         *   |             skipRest           |
-         *   |                                |
-         *   +--------------------------------+
-         *      timerFired (stopAfterBreak)
-         *
-         */
-        stateMachine.addRoutes(event: .startStop, transitions: [
-            .idle => .work, .work => .idle, .rest => .idle,
-        ])
-        stateMachine.addRoutes(event: .timerFired, transitions: [.work => .rest])
-        stateMachine.addRoutes(event: .timerFired, transitions: [.rest => .idle]) { _ in
-            self.stopAfterBreak
+    init(store: FocusStore = FocusStore()) {
+        self.store = store
+        do {
+            state = try store.load()
+            state.recover()
+        } catch {
+            loadFailed = true
+            storageError = "无法读取专注记录，已保留原文件。请先检查存储位置。"
         }
-        stateMachine.addRoutes(event: .timerFired, transitions: [.rest => .work]) { _ in
-            !self.stopAfterBreak
+        history.records = state.records
+        KeyboardShortcuts.onKeyUp(for: .startStopTimer) { [weak self] in
+            DispatchQueue.main.async { self?.primaryAction() }
         }
-        stateMachine.addRoutes(event: .skipRest, transitions: [.rest => .work])
-
-        /*
-         * "Finish" handlers are called when time interval ended
-         * "End"    handlers are called when time interval ended or was cancelled
-         */
-        stateMachine.addAnyHandler(.any => .work, handler: onWorkStart)
-        stateMachine.addAnyHandler(.work => .rest, order: 0, handler: onWorkFinish)
-        stateMachine.addAnyHandler(.work => .any, order: 1, handler: onWorkEnd)
-        stateMachine.addAnyHandler(.any => .rest, handler: onRestStart)
-        stateMachine.addAnyHandler(.rest => .work, handler: onRestFinish)
-        stateMachine.addAnyHandler(.any => .idle, handler: onIdleStart)
-        stateMachine.addAnyHandler(.any => .any, handler: { ctx in
-            logger.append(event: TBLogEventTransition(fromContext: ctx))
-        })
-
-        stateMachine.addErrorHandler { ctx in fatalError("state machine context: <\(ctx)>") }
-
-        timerFormatter.unitsStyle = .positional
-        timerFormatter.allowedUnits = [.minute, .second]
-        timerFormatter.zeroFormattingBehavior = .pad
-
-        KeyboardShortcuts.onKeyUp(for: .startStopTimer, action: startStop)
-        notificationCenter.setActionHandler(handler: onNotificationAction)
-
-        let aem: NSAppleEventManager = NSAppleEventManager.shared()
-        aem.setEventHandler(self,
-                            andSelector: #selector(handleGetURLEvent(_:withReplyEvent:)),
-                            forEventClass: AEEventClass(kInternetEventClass),
-                            andEventID: AEEventID(kAEGetURL))
-    }
-
-    @objc func handleGetURLEvent(_ event: NSAppleEventDescriptor,
-                                 withReplyEvent: NSAppleEventDescriptor) {
-        guard let urlString = event.forKeyword(AEKeyword(keyDirectObject))?.stringValue else {
-            print("url handling error: cannot get url")
-            return
-        }
-        let url = URL(string: urlString)
-        guard url != nil,
-              let scheme = url!.scheme,
-              let host = url!.host else {
-            print("url handling error: cannot parse url")
-            return
-        }
-        guard scheme.caseInsensitiveCompare("tomatobar") == .orderedSame else {
-            print("url handling error: unknown scheme \(scheme)")
-            return
-        }
-        switch host.lowercased() {
-        case "startstop":
-            startStop()
-        default:
-            print("url handling error: unknown command \(host)")
-            return
+        ticker = Foundation.Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+            self?.tick()
         }
     }
 
-    func startStop() {
-        stateMachine <-! .startStop
+    var timeLeft: String {
+        let seconds = Int(ceil(state.timeLeft(at: now)))
+        return String(format: "%02d:%02d", seconds / 60, seconds % 60)
     }
-
-    func skipRest() {
-        stateMachine <-! .skipRest
+    var phaseLabel: String {
+        switch state.phase {
+        case .idle: return "准备开始"
+        case .work: return state.paused ? "专注已暂停" : "正在专注"
+        case .rest: return state.paused ? "休息已暂停" : "正在休息"
+        case .workFinished: return "专注完成"
+        case .restFinished: return "休息结束"
+        }
     }
+    var todaySeconds: TimeInterval { state.records.reduce(0) { $0 + $1.seconds(on: now) } }
+    var todayCount: Int {
+        state.records.filter { $0.completed && Calendar.current.isDate($0.endedAt, inSameDayAs: now) }.count
+    }
+    var restMinutes: Int { state.rounds % max(1, workIntervalsInSet) == 0 ? longRestIntervalLength : shortRestIntervalLength }
 
-    func updateTimeLeft() {
-        timeLeftString = timerFormatter.string(from: Date(), to: finishTime)!
-        if timer != nil, showTimerInMenuBar {
-            TBStatusItem.shared.setTitle(title: timeLeftString)
-        } else {
-            TBStatusItem.shared.setTitle(title: nil)
+    func primaryAction() {
+        if state.isTiming { togglePause() }
+        else if state.needsAttention { onAttention?() }
+        else { startWork() }
+    }
+    func startWork() {
+        guard storageError == nil else { return }
+        change { $0.startWork(name: eventName, seconds: Double(max(1, workIntervalLength) * 60), at: $1) }
+    }
+    func startRest() {
+        let seconds = Double(max(1, restMinutes) * 60)
+        change { $0.startRest(seconds: seconds, at: $1) }
+    }
+    func togglePause() {
+        change { state, date in
+            if state.paused { state.resume(at: date) } else { state.pause(at: date) }
+        }
+    }
+    func pause() { change { $0.pause(at: $1) } }
+    func stop() { change { $0.stop(at: $1) } }
+    /// Commit edits only after the atomic disk write succeeds; a failed edit stays in the editor.
+    func editRecord(id: UUID, name: String, tags: [String]) -> String? {
+        guard !loadFailed else { return "记录未能读取，暂时无法编辑。" }
+        var updated = state
+        do {
+            try updated.editRecord(id: id, name: name, tags: tags)
+            updated.checkpoint = Date()
+            try store.save(updated)
+            state = updated
+            history.records = updated.records
+            lastSave = updated.checkpoint
+            storageError = nil
+            return nil
+        } catch let error as RecordEditError {
+            return error.localizedDescription
+        } catch {
+            return "保存失败，修改尚未写入。请检查磁盘空间后重试。"
         }
     }
 
-    private func startTimer(seconds: Int) {
-        finishTime = Date().addingTimeInterval(TimeInterval(seconds))
-
-        let queue = DispatchQueue(label: "Timer")
-        timer = DispatchSource.makeTimerSource(flags: .strict, queue: queue)
-        timer!.schedule(deadline: .now(), repeating: .seconds(1), leeway: .never)
-        timer!.setEventHandler(handler: onTimerTick)
-        timer!.setCancelHandler(handler: onTimerCancel)
-        timer!.resume()
+    func retrySave() { if !loadFailed { persist() } }
+    var hasUnsavedChanges: Bool { storageError != nil && !loadFailed }
+    func openRecordsFolder() {
+        let folder = store.url.deletingLastPathComponent()
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            NSWorkspace.shared.open(folder)
+        } catch { storageError = "无法打开记录文件夹，请检查磁盘空间和权限。" }
     }
 
-    private func stopTimer() {
-        timer!.cancel()
-        timer = nil
+    private func change(_ mutation: (inout FocusState, Date) -> Void) {
+        let previous = state.phase
+        now = Date()
+        mutation(&state, now)
+        persist()
+        updateStatus()
+        if state.needsAttention && previous != state.phase { onAttention?() }
     }
-
-    private func onTimerTick() {
-        /* Cannot publish updates from background thread */
-        DispatchQueue.main.async { [self] in
-            updateTimeLeft()
-            let timeLeft = finishTime.timeIntervalSince(Date())
-            if timeLeft <= 0 {
-                /*
-                 Ticks can be missed during the machine sleep.
-                 Stop the timer if it goes beyond an overrun time limit.
-                 */
-                if timeLeft < overrunTimeLimit {
-                    stateMachine <-! .startStop
-                } else {
-                    stateMachine <-! .timerFired
-                }
-            }
-        }
+    private func tick() {
+        let previous = state.phase
+        now = Date()
+        state.tick(at: now)
+        if previous != state.phase || (state.isTiming && now.timeIntervalSince(lastSave) >= 5) { persist() }
+        updateStatus()
+        if state.needsAttention && previous != state.phase { onAttention?() }
     }
-
-    private func onTimerCancel() {
-        DispatchQueue.main.async { [self] in
-            updateTimeLeft()
-        }
+    private func persist() {
+        guard !loadFailed else { return }
+        if history.records != state.records { history.records = state.records }
+        state.checkpoint = now
+        do { try store.save(state); storageError = nil; lastSave = now }
+        catch { storageError = "记录保存失败，请检查磁盘空间。当前记录仍保留在内存中。" }
     }
-
-    private func onNotificationAction(action: TBNotification.Action) {
-        if action == .skipRest, stateMachine.state == .rest {
-            skipRest()
-        }
-    }
-
-    private func onWorkStart(context _: TBStateMachine.Context) {
-        TBStatusItem.shared.setIcon(name: .work)
-        player.playWindup()
-        player.startTicking()
-        startTimer(seconds: workIntervalLength * 60)
-    }
-
-    private func onWorkFinish(context _: TBStateMachine.Context) {
-        consecutiveWorkIntervals += 1
-        player.playDing()
-    }
-
-    private func onWorkEnd(context _: TBStateMachine.Context) {
-        player.stopTicking()
-    }
-
-    private func onRestStart(context _: TBStateMachine.Context) {
-        var body = NSLocalizedString("TBTimer.onRestStart.short.body", comment: "Short break body")
-        var length = shortRestIntervalLength
-        var imgName = NSImage.Name.shortRest
-        if consecutiveWorkIntervals >= workIntervalsInSet {
-            body = NSLocalizedString("TBTimer.onRestStart.long.body", comment: "Long break body")
-            length = longRestIntervalLength
-            imgName = .longRest
-            consecutiveWorkIntervals = 0
-        }
-        notificationCenter.send(
-            title: NSLocalizedString("TBTimer.onRestStart.title", comment: "Time's up title"),
-            body: body,
-            category: .restStarted
-        )
-        TBStatusItem.shared.setIcon(name: imgName)
-        startTimer(seconds: length * 60)
-    }
-
-    private func onRestFinish(context ctx: TBStateMachine.Context) {
-        if ctx.event == .skipRest {
-            return
-        }
-        notificationCenter.send(
-            title: NSLocalizedString("TBTimer.onRestFinish.title", comment: "Break is over title"),
-            body: NSLocalizedString("TBTimer.onRestFinish.body", comment: "Break is over body"),
-            category: .restFinished
-        )
-    }
-
-    private func onIdleStart(context _: TBStateMachine.Context) {
-        stopTimer()
-        TBStatusItem.shared.setIcon(name: .idle)
-        consecutiveWorkIntervals = 0
+    func updateStatus() {
+        if windowActivity.paused != state.paused { windowActivity.paused = state.paused }
+        let icon: NSImage.Name = state.phase == .work ? .work : (state.phase == .rest ? .shortRest : .idle)
+        TBStatusItem.shared?.setIcon(name: icon)
+        let title = state.needsAttention ? "请确认" : (state.isTiming && showTimerInMenuBar ? "\(state.paused ? "Ⅱ " : "")\(timeLeft)" : nil)
+        TBStatusItem.shared?.setTitle(title: title)
     }
 }
