@@ -193,3 +193,91 @@ check(repaired.records[0].seconds == 60 && repaired.phase == .workFinished,
 check(repaired.needsAttention, "reload never silently clears a waiting reminder")
 try FileManager.default.removeItem(at: repairDir)
 print("PASS: \(checks) total checks including storage recovery")
+
+// Deletion. By UUID only — never by index or name, both of which shift as the list changes.
+var delState = FocusState()
+let delA = statsRecord(day(2026, 9, 28, 9), day(2026, 9, 28, 9, 25), tags: ["英语"])          // 1500s
+let delB = statsRecord(day(2026, 9, 28, 11), day(2026, 9, 28, 11, 30), tags: ["数学"])         // 1800s
+let delC = statsRecord(day(2026, 9, 28, 14), day(2026, 9, 28, 14, 10), tags: ["数学", "英语"])  // 600s
+delState.records = [delA, delB, delC]
+let delBefore = FocusSummary(records: delState.records, period: .day, date: day(2026, 9, 28), calendar: cal)
+check(delBefore.seconds == 3900 && delBefore.categories.count == 2, "delete fixture starts at 3900s over 2 categories")
+try delState.deleteRecord(id: delB.id)
+check(delState.records.map(\.id) == [delA.id, delC.id], "delete by UUID removes only the target and preserves order")
+do { try delState.deleteRecord(id: UUID()); fatalError("unknown id must not be accepted") }
+catch RecordEditError.missingRecord { checks += 1 }
+check(delState.records.count == 2, "a failed delete leaves the list unchanged")
+let delAfter = FocusSummary(records: delState.records, period: .day, date: day(2026, 9, 28), calendar: cal)
+check(delAfter.seconds == 2100, "deleting the 30 minute record removes exactly its time")
+check(delAfter.categories.first { $0.name == "数学" }?.seconds == 600, "surviving category drops to its remaining record")
+check(!delAfter.records.contains { $0.id == delB.id }, "deleted record is absent from the summary")
+try delState.deleteRecord(id: delA.id)
+let delLast = FocusSummary(records: delState.records, period: .day, date: day(2026, 9, 28), calendar: cal)
+check(delLast.categories.count == 1 && delLast.categories[0].name == "数学", "a category disappears with its last record")
+check(delLast.seconds == 600 && delLast.records.count == 1, "total reflects only the survivor")
+let delDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+let delStore = FocusStore(url: delDir.appendingPathComponent("sessions.json"))
+try delStore.save(delState)
+let delRestored = try delStore.load()
+check(delRestored.records.count == 1 && delRestored.records[0].id == delC.id,
+      "deletion survives save and reload, survivor keeps its identity")
+check(!delRestored.records.contains { $0.id == delA.id || $0.id == delB.id }, "deleted records stay deleted")
+try FileManager.default.removeItem(at: delDir)
+
+// Deletion must not disturb a running timer. deleteRecord touches `records` and nothing
+// else, so this asserts the guarantee rather than trusting the implementation comment.
+var timingState = FocusState()
+timingState.startWork(name: "第一轮", seconds: 60, at: base)
+timingState.tick(at: base.addingTimeInterval(60))
+timingState.startRest(seconds: 10, at: base.addingTimeInterval(70))
+timingState.tick(at: base.addingTimeInterval(80))
+timingState.startWork(name: "第二轮", seconds: 60, at: base.addingTimeInterval(90))
+timingState.pause(at: base.addingTimeInterval(100))
+check(timingState.rounds == 1 && timingState.records.count == 1, "timing fixture has one round and one record")
+let tPhase = timingState.phase, tPaused = timingState.paused, tRounds = timingState.rounds
+let tRemaining = timingState.remaining, tDeadline = timingState.deadline
+let tName = timingState.name, tSegment = timingState.segmentStart, tStarted = timingState.startedAt
+try timingState.deleteRecord(id: timingState.records[0].id)
+check(timingState.records.isEmpty, "the finished record is gone")
+check(timingState.phase == tPhase && timingState.paused == tPaused && timingState.rounds == tRounds,
+      "delete leaves phase, pause state and round count alone")
+check(timingState.remaining == tRemaining && timingState.deadline == tDeadline,
+      "delete leaves the running countdown and its deadline alone")
+check(timingState.name == tName && timingState.segmentStart == tSegment && timingState.startedAt == tStarted,
+      "delete leaves the in-progress event and its open segment alone")
+
+// TBTimer commits a delete only after the atomic write succeeds: it mutates a copy, saves,
+// then assigns. Both halves of what makes that safe are checked here. The ordering itself
+// lives in Timer.swift, which imports SwiftUI and is outside this compile set.
+var commitOriginal = FocusState()
+commitOriginal.records = [delC]
+var commitCopy = commitOriginal
+try commitCopy.deleteRecord(id: delC.id)
+check(commitOriginal.records.count == 1 && commitCopy.records.isEmpty,
+      "mutating a copy leaves the original intact, so a failed save cannot lose the record")
+let unwritable = FocusStore(url: URL(fileURLWithPath: "/dev/null/cannot/create/sessions.json"))
+do { try unwritable.save(commitCopy); fatalError("an unwritable destination must throw") } catch { checks += 1 }
+check(commitOriginal.records.count == 1, "original still holds the record after the failed save")
+
+// Category switching. The statistics category is the first tag, so switching moves the
+// chosen tag to the front and keeps everything else.
+check(FocusRecord.tags(withPrimaryCategory: "英语", in: ["数学", "英语"]) == ["英语", "数学"],
+      "switching category moves the chosen tag to the front")
+check(FocusRecord.tags(withPrimaryCategory: "建模", in: ["数学"]) == ["建模", "数学"],
+      "a new category is prepended and the old first tag survives as an ordinary tag")
+check(FocusRecord.tags(withPrimaryCategory: "建模", in: []) == ["建模"], "an untagged record gains its first category")
+check(FocusRecord.tags(withPrimaryCategory: "swift", in: ["Swift", "数学"]) == ["swift", "数学"],
+      "case-insensitive dedupe keeps a single spelling")
+check(FocusRecord.tags(withPrimaryCategory: "  英语  ", in: ["数学"]) == ["英语", "数学"], "category input is trimmed")
+check(FocusRecord.tags(withPrimaryCategory: "数学", in: ["数学"]) == ["数学"],
+      "re-selecting the current category does not duplicate it")
+check(FocusRecord.tags(withPrimaryCategory: "", in: ["数学", "英语"]) == ["数学", "英语"],
+      "an empty category is a no-op, not a way to clear tags")
+check(FocusRecord.tags(withPrimaryCategory: "英语", in: ["数学", "英语", " 英语 "]) == ["英语", "数学"],
+      "existing duplicates collapse while switching")
+let primaryRecord = FocusRecord(id: UUID(), name: "分类", startedAt: base, endedAt: base,
+                                plannedSeconds: 60, completed: true, segments: [], tags: ["数学", "英语"])
+check(primaryRecord.category == "数学", "the statistics category is the first tag")
+check(FocusRecord(id: UUID(), name: "无", startedAt: base, endedAt: base, plannedSeconds: 60,
+                  completed: true, segments: []).category == "未分类", "no tags displays as 未分类")
+print("PASS: \(checks) total checks including deletion and category switching")

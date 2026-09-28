@@ -10,6 +10,14 @@ enum Garden {
         Color(red: 0.81, green: 0.65, blue: 0.34), Color(red: 0.48, green: 0.62, blue: 0.66),
         Color(red: 0.71, green: 0.54, blue: 0.40), Color(red: 0.65, green: 0.59, blue: 0.70),
         Color(red: 0.75, green: 0.62, blue: 0.54), Color(red: 0.43, green: 0.54, blue: 0.48)]
+    /// Categories offered in the record editor. These are suggestions only: choosing one
+    /// tags that record and nothing else — no sample records, no edits to existing ones,
+    /// no invented statistics.
+    ///
+    /// Order is load-bearing. `color()` indexes `colors` by position in this array, so
+    /// reordering or inserting an entry would silently recolour records the user has
+    /// already tagged. Append new suggestions at the end only.
+    static let suggestedCategories = ["材料力学", "建模", "英语", "编程", "阅读", "数学", "写作"]
     static func symbol(_ name: String) -> String {
         switch name {
         case "材料力学", "阅读": return "book.closed"
@@ -23,8 +31,7 @@ enum Garden {
     }
     static func color(_ name: String) -> Color {
         if name == "未分类" { return muted }
-        let known = ["材料力学", "建模", "英语", "编程", "阅读", "数学", "写作"]
-        if let index = known.firstIndex(of: name) { return colors[index] }
+        if let index = suggestedCategories.firstIndex(of: name) { return colors[index] }
         let hash = name.lowercased().utf8.reduce(UInt64(14695981039346656037)) { ($0 ^ UInt64($1)) &* 1099511628211 }
         return colors[Int(hash % UInt64(colors.count))]
     }
@@ -109,7 +116,7 @@ struct FocusChart: View {
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(.trailing, 8)
             }
         }
-        Text("每一块是一段专注 · 按时间排列 · 点击可编辑")
+        Text("每一块是一段专注，按时间排列。点击色块，编辑名称、分类和标签。")
             .font(.caption).foregroundColor(Garden.muted)
         }
     }

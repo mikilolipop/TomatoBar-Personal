@@ -62,7 +62,7 @@ struct TBPopoverView: View {
                 if tab == 0 { history }
                 else if tab == 1 { intervals }
                 else { settings }
-            }.frame(height: 270)
+            }.frame(height: 320)
             Divider()
             HStack {
                 Button("打开主窗口") { TBStatusItem.shared?.showMainWindow() }
@@ -80,12 +80,11 @@ struct TBPopoverView: View {
                     editingRecord = nil
                 }, onSave: { name, tags in
                     let error = timer.editRecord(id: record.id, name: name, tags: tags)
-                    if error == nil {
-                        if let tag = selectedTag, !timer.state.records.contains(where: { $0.hasTag(tag) }) {
-                            selectedTag = nil
-                        }
-                        editingRecord = nil
-                    }
+                    if error == nil { clearStaleFilter(); editingRecord = nil }
+                    return error
+                }, onDelete: {
+                    let error = timer.deleteRecord(id: record.id)
+                    if error == nil { clearStaleFilter(); editingRecord = nil }
                     return error
                 }).id(record.id)
             } else {
@@ -145,6 +144,13 @@ struct TBPopoverView: View {
             }
         }
     }
+    /// Drop the active filter when the record just edited or deleted was the last one
+    /// carrying it, so the list never rests on a tag that no longer exists.
+    private func clearStaleFilter() {
+        if let tag = selectedTag, !timer.state.records.contains(where: { $0.hasTag(tag) }) {
+            selectedTag = nil
+        }
+    }
     private func duration(_ seconds: TimeInterval) -> String {
         let value = Int(seconds)
         return "\(value / 60)分\(value % 60)秒"
@@ -177,38 +183,137 @@ struct RecordEditor: View {
     let availableTags: [String]
     let onCancel: () -> Void
     let onSave: (String, [String]) -> String?
+    /// Returns an error message, or nil once the deletion has been committed to disk.
+    /// The caller dismisses the editor, because it also owns the filter selection that may
+    /// need clearing when the deleted record was the last one carrying that tag.
+    let onDelete: () -> String?
+    private let record: FocusRecord
     @State private var name: String
     @State private var tags: [String]
     @State private var newTag = ""
+    @State private var newCategory = ""
     @State private var error: String?
+    @State private var confirmDelete = false
 
     init(record: FocusRecord, availableTags: [String], onCancel: @escaping () -> Void,
-         onSave: @escaping (String, [String]) -> String?) {
+         onSave: @escaping (String, [String]) -> String?, onDelete: @escaping () -> String?) {
+        self.record = record
         self.availableTags = availableTags
         self.onCancel = onCancel
         self.onSave = onSave
+        self.onDelete = onDelete
         _name = State(initialValue: record.name)
         _tags = State(initialValue: record.tags)
     }
 
+    /// Shared with the record-row menu in MainWindowView so deleting from either place
+    /// warns identically.
+    static func confirmationMessage(for record: FocusRecord) -> String {
+        "「\(record.name)」\n\(record.startedAt.formatted(date: .abbreviated, time: .shortened))"
+            + " · 专注 \(focusDuration(record.seconds))\n\n删除后，这段专注时长将从统计中移除。"
+    }
+
+    private var category: String { tags.first ?? "未分类" }
+    /// Tags other than the statistics category. The primary is deliberately absent: the
+    /// remove button must never be able to change what a record counts towards.
+    private var otherTags: [String] { Array(tags.dropFirst()) }
+    /// Suggestions the user has not already used, so the menu never lists one twice.
+    private var unusedSuggestions: [String] {
+        Garden.suggestedCategories.filter { suggested in
+            !availableTags.contains { $0.caseInsensitiveCompare(suggested) == .orderedSame }
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text("编辑记录").font(.headline)
-            TextField("事件名称", text: $name).textFieldStyle(.roundedBorder)
-                .accessibilityLabel("修改事件名称")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 11) {
+                    Text("编辑记录").font(.headline)
+                    TextField("事件名称", text: $name).textFieldStyle(.roundedBorder)
+                        .accessibilityLabel("修改事件名称")
+                    categorySection
+                    otherTagsSection
+                }.padding(.bottom, 2)
+            }
+            if let error = error { Text(error).font(.caption).foregroundColor(.red) }
+            HStack(spacing: 8) {
+                Button("删除记录", role: .destructive) { confirmDelete = true }
+                    .foregroundColor(.red).accessibilityLabel("删除记录：\(record.name)")
+                Spacer()
+                Button("取消", action: onCancel).keyboardShortcut(.cancelAction)
+                Button("保存") {
+                    addTag()
+                    error = onSave(name, tags)
+                }.buttonStyle(.borderedProminent)
+                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            Text("时长和完成状态保持不变").font(.caption2).foregroundColor(.secondary)
+        }
+        // role: .destructive keeps macOS from making the delete the default button, and
+        // .cancelAction binds Escape to cancelling, so the safe action is the default one.
+        .alert("删除这段专注记录？", isPresented: $confirmDelete) {
+            Button("取消", role: .cancel) {}.keyboardShortcut(.cancelAction)
+            Button("删除记录", role: .destructive) { error = onDelete() }
+        } message: {
+            Text(Self.confirmationMessage(for: record))
+        }
+    }
+
+    private var categorySection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("统计分类").font(.subheadline).fontWeight(.medium)
+            HStack(spacing: 8) {
+                // Live preview of the day-chart block, so the effect is visible before saving.
+                Image(systemName: Garden.symbol(category))
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(Garden.paper)
+                    .frame(width: 26, height: 26)
+                    .background(Garden.color(category).opacity(0.85))
+                    .cornerRadius(5).accessibilityHidden(true)
+                Menu {
+                    if !availableTags.isEmpty {
+                        Text("已使用的分类和标签").font(.caption)
+                        ForEach(availableTags, id: \.self) { tag in
+                            Button(tag) { setCategory(tag) }
+                        }
+                        Divider()
+                    }
+                    if !unusedSuggestions.isEmpty {
+                        Text("建议分类").font(.caption)
+                        ForEach(unusedSuggestions, id: \.self) { tag in
+                            Button(tag) { setCategory(tag) }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Text(category).lineLimit(1)
+                        Image(systemName: "chevron.down").font(.caption2)
+                    }
+                }.menuStyle(.borderlessButton).frame(maxWidth: 150)
+                    .help("每条记录只计入一个分类")
+                    .accessibilityLabel("统计分类：\(category)")
+            }
+            HStack(spacing: 6) {
+                TextField("自定义分类", text: $newCategory).textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("自定义分类")
+                    .onSubmit { applyCustomCategory() }
+                Button("设为分类", action: applyCustomCategory)
+                    .disabled(newCategory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            Text("统计分类决定图表归属和图标；其他标签用于搜索和筛选。")
+                .font(.caption).foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var otherTagsSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("其他标签").font(.subheadline).fontWeight(.medium)
             HStack {
-                TextField("新标签，例如：学习", text: $newTag)
-                    .textFieldStyle(.roundedBorder).accessibilityLabel("新标签")
-                    .onSubmit { addTag() }
+                TextField("新标签，例如：学习", text: $newTag).textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("新标签").onSubmit { addTag() }
                 Button("添加") { addTag() }
                     .disabled(newTag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-            if tags.count > 1 {
-                Menu("统计分类：\(tags.first ?? "未分类")") {
-                    ForEach(tags, id: \.self) { tag in
-                        Button(tag) { tags = [tag] + tags.filter { $0 != tag } }
-                    }
-                }.help("每条记录只计入一个分类，其余标签仍可用于筛选")
             }
             Menu("选择已有标签") {
                 ForEach(availableTags, id: \.self) { tag in
@@ -216,33 +321,34 @@ struct RecordEditor: View {
                         .disabled(tags.contains { $0.caseInsensitiveCompare(tag) == .orderedSame })
                 }
             }.disabled(availableTags.isEmpty)
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], alignment: .leading, spacing: 6) {
-                    ForEach(tags, id: \.self) { tag in
-                        HStack(spacing: 4) {
-                            Text(tag).lineLimit(1).help(tag)
-                            Spacer(minLength: 0)
-                            Button { tags.removeAll { $0 == tag } } label: {
-                                Image(systemName: "xmark.circle.fill")
-                            }.buttonStyle(.plain).accessibilityLabel("移除标签：\(tag)")
-                        }.font(.caption).padding(5)
-                            .background(Color.accentColor.opacity(0.12)).cornerRadius(5)
-                    }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], alignment: .leading, spacing: 6) {
+                ForEach(otherTags, id: \.self) { tag in
+                    HStack(spacing: 4) {
+                        Text(tag).lineLimit(1).help(tag)
+                        Spacer(minLength: 0)
+                        Button { removeOtherTag(tag) } label: {
+                            Image(systemName: "xmark.circle.fill")
+                        }.buttonStyle(.plain).accessibilityLabel("移除标签：\(tag)")
+                    }.font(.caption).padding(5)
+                        .background(Color.accentColor.opacity(0.12)).cornerRadius(5)
                 }
-                if tags.isEmpty { Text("暂无标签").font(.caption).foregroundColor(.secondary) }
-            }.frame(maxHeight: .infinity)
-            if let error = error { Text(error).font(.caption).foregroundColor(.red) }
-            HStack {
-                Text("时长和完成状态保持不变").font(.caption2).foregroundColor(.secondary)
-                Spacer()
-                Button("取消", action: onCancel)
-                Button("保存") {
-                    addTag()
-                    error = onSave(name, tags)
-                }.buttonStyle(.borderedProminent)
-                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
+            if otherTags.isEmpty { Text("没有其他标签").font(.caption).foregroundColor(.secondary) }
         }
+    }
+
+    private func setCategory(_ category: String) {
+        tags = FocusRecord.tags(withPrimaryCategory: category, in: tags)
+    }
+    private func applyCustomCategory() {
+        setCategory(newCategory)
+        newCategory = ""
+    }
+    /// Only ever touches the tail, so removing a tag cannot silently reassign the record
+    /// to a different statistics category.
+    private func removeOtherTag(_ tag: String) {
+        guard tags.count > 1 else { return }
+        tags = [tags[0]] + tags.dropFirst().filter { $0 != tag }
     }
     private func addTag() {
         tags = FocusRecord.normalizedTags(tags + [newTag])

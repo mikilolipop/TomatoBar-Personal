@@ -105,6 +105,32 @@ final class TBTimer: ObservableObject {
         }
     }
 
+    /// Commit the deletion only after the atomic disk write succeeds, so a failed delete
+    /// never leaves the UI treating the record as gone. Mirrors editRecord.
+    ///
+    /// A failed save deliberately does not set storageError: `state` is assigned only
+    /// after the write succeeds, so memory and disk still agree and nothing is unsaved.
+    /// Setting it would make hasUnsavedChanges true and block quitting over a delete that
+    /// simply did not happen. The caller surfaces the returned message instead.
+    func deleteRecord(id: UUID) -> String? {
+        guard !loadFailed else { return "记录未能读取，暂时无法删除。" }
+        var updated = state
+        do {
+            try updated.deleteRecord(id: id)
+            updated.checkpoint = Date()
+            try store.save(updated)
+            state = updated
+            history.records = updated.records
+            lastSave = updated.checkpoint
+            storageError = nil
+            return nil
+        } catch let error as RecordEditError {
+            return error.localizedDescription
+        } catch {
+            return "保存失败，记录尚未删除。请检查磁盘空间后重试。"
+        }
+    }
+
     /// A failed read and a failed write recover differently, so both the action and its
     /// label depend on which happened. Offering "retry save" after a failed load used to
     /// render a button that could never do anything, because persist() guards on loadFailed.

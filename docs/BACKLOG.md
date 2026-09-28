@@ -646,6 +646,51 @@ rg -n 'loadFailed|store.load' TomatoBar/Timer.swift
 
 ---
 
+## 🟡 P10 — 菜单栏 popover 的删除路径未经 UI 验收
+
+**状态**：新增（2026-09-28，Claude Code 实施删除功能时发现）· 严重性：低 · **需要一次人工点击确认**
+
+三个删除入口中有两个已完成 UI 验收：主窗口记录行的 ⋯ 菜单、以及编辑器内的「删除记录」。
+**菜单栏 popover 的入口没能自动化验证。**
+
+原因是工具限制，不是代码问题：
+
+```
+状态栏项可用动作: 仅 AXPress（无 AXShowMenu），子元素 0
+perform action "AXPress"  → 窗口数仍为 1，popover 未出现
+click at {876,16}（按实测坐标）→ 同样未出现
+```
+
+`popover.behavior = .transient`（`App.swift:29`），在辅助功能控制下焦点状态变化可能让它立即关闭。
+本机也没有屏幕录制权限，无法用截图旁证。
+
+**风险有限**：popover 用的是**同一个 `RecordEditor` 组件**，已在主窗口 sheet 里逐项验证；
+popover 特有的代码只有 4 行 `onDelete` 闭包，与主窗口的结构完全相同且已通过编译。
+但这不等于验证过 —— 需人工点一次：菜单栏图标 → 记录页 → 铅笔 → 删除记录 → 取消 → 再删除 → 确认。
+
+---
+
+## 🟡 P11 — 分类选择器的 accessibilityLabel 被 chevron 图标覆盖
+
+**状态**：新增（2026-09-28，UI 验收时实测发现）· 严重性：低 · 无障碍
+
+`View.swift` 中分类 `Menu` 设了 `.accessibilityLabel("统计分类：\(category)")`，但实测 AX 属性：
+
+```
+name        = [未分类]            ← 来自 label 里的 Text(category)
+description = [向下移动]           ← 来自 chevron.down 图标，覆盖了我的 label
+help        = [每条记录只计入一个分类]
+```
+
+同一控件在另一时刻读到 `name = [统计分类：英语]`，**说明 AX 名称不稳定**，
+取决于 SwiftUI 何时重算 label。VoiceOver 可能读成「向下移动，菜单按钮」而不是分类名。
+
+修法方向：给 chevron 图标单独加 `.accessibilityHidden(true)`，或把 label 换成
+`Text(category)` 单一内容 + 外层 `.accessibilityLabel`。属小改动，但**需要 VoiceOver 实测**，
+本机无法验证读屏结果。
+
+---
+
 ## 评审复现脚本
 
 从仓库根运行；只在临时目录写独立探针，直接编译仓库原始领域代码。
@@ -697,6 +742,8 @@ PYPROBE
 
 | 项 | 内容 | 提交 |
 |---|---|---|
+| **功能** | **单条历史记录删除**：`FocusState.deleteRecord(id:)` 按 UUID 删除、只动 `records`；`TBTimer.deleteRecord` 先落盘成功再更新内存与界面；`RecordEditor` 加红色「删除记录」+ 确认弹窗（名称/日期/时长/「删除后，这段专注时长将从统计中移除」，`role: .destructive` 使其不为默认按钮）；主窗口记录行加 ⋯ 菜单（编辑记录／删除记录），保留铅笔入口；删除后清除失效筛选标签。测试 61 → **90 项** | 见 git log |
+| **功能** | **分类入口清晰化**：`RecordEditor` 始终显示「统计分类」（无分类显示「未分类」），选择器分「已使用的分类和标签」与「建议分类」两组并对已使用者去重，另有自定义分类输入；分类与「其他标签」分区呈现并附说明「统计分类决定图表归属和图标；其他标签用于搜索和筛选。」；选择器带图标+颜色实时预览；日视图提示改为「点击色块，编辑名称、分类和标签。」；`Garden.suggestedCategories` 集中管理（**顺序是 load-bearing，`color()` 按其下标取色**） | 见 git log |
 | **P9** | 读盘失败时「重试保存」按钮必然无效 → 改为 `retryStorage()`，读失败重新读盘、写失败重试保存，按钮标题随场景变化；保留 `loadFailed` 防覆盖保护；错误横幅加「打开记录文件夹」；`openRecordsFolder()` 不再覆写既有错误。测试 55 → **61 项** | `e69be32` |
 | **P7** | 整体替换上游发布 workflow 为无 secret 的「领域测试 + 构建 smoke check」单 job 流程。**首次真实运行 success，46 秒，61 项全过，通用二进制构建通过，产物 bundle id 断言匹配**。同时证实 `branches: '*'` 不匹配开发分支 | `abf55df` |
 | — | `focusDuration()` 此前**零测试**，却被 6 处引用（含 `MainWindow.swift:110` 的 46pt 累计总时长、周/月图悬停提示、分类行、记录行）。补 6 项格式化断言 + 8 项真实数据回归，41 → **55 项** | `8fb1e74` |

@@ -104,6 +104,53 @@ scripts/compare-design.py
 
 ---
 
+## UI 自动化与 QA 隔离
+
+改动 UI 层时，`scripts/test.sh` **完全覆盖不到**（它只编译领域层 3 个文件）。
+验收方式是构建一个隔离 QA 变体：
+
+```sh
+xcodebuild -project TomatoBar.xcodeproj -scheme TomatoBar -configuration Release \
+  -derivedDataPath /tmp/TomatoBar-QA13-build \
+  CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
+  PRODUCT_BUNDLE_IDENTIFIER=com.dilyar.TomatoBarPersonal.QA13 ONLY_ACTIVE_ARCH=NO build
+```
+
+只覆盖 `PRODUCT_BUNDLE_IDENTIFIER` 即可隔离容器。**不要覆盖 `PRODUCT_NAME`** ——
+会与 LaunchAtLogin 的登录辅助 bundle 冲突（`Multiple commands produce …`）。
+
+数据写在
+`~/Library/Containers/com.dilyar.TomatoBarPersonal.QA13/Data/Library/Application Support/TomatoBarPersonal/sessions.json`
+（`scripts/seed-qa.py` 是同类做法，只是它写的是 QA12）。
+
+### 🚨 同名进程陷阱（会静默操作到用户真实数据）
+
+因为不能覆盖 `PRODUCT_NAME`，QA 变体与正式版的**进程名相同**（都是 `TomatoBar Personal`）。
+此时 System Events 的定位不可靠，实测：
+
+- `first process whose bundle identifier is "…QA13"` → 返回**正式版**的 pid
+- `first process whose unix id is <QA13 的 pid>` → 读回的 `bundle identifier` 是**正式版的**
+
+**所以做 UI 自动化前必须**：
+
+1. 确认只剩一个同名进程，或先退出正式版
+2. **操作真实用户数据前先快照** `sessions.json`，事后逐条比对
+3. 每次交互前读回界面文本核验身份（QA 数据与真实数据必须能一眼区分）；
+   看到意料之外的数值立刻停手
+4. 交付时明确区分「已实机验证」与「未验证」，**不得把领域测试通过说成 UI 验收完成**
+
+### 本机环境限制
+
+- **无屏幕录制权限** → `screencapture` 失败，**视觉验收做不了**，只能靠辅助功能树 + 落盘数据比对
+- 有辅助功能权限 → System Events 可枚举与点击，但 NSPopover（`.transient`）打不开：
+  状态栏项只支持 `AXPress`，执行后 popover 不出现，坐标点击同样无效
+- SwiftUI 的 `LazyVStack` 只实体化可见行，`count of menu buttons` 之类按类计数会随渲染时机波动；
+  遍历 `every UI element` 判断 `class of e` 更可靠
+- 短中文字面量在 Swift 里可能是 small string，**不进 cstring 区**，`strings` 搜不到；
+  用 `grep -a` 搜 UTF-8 字节 + `nm` 找符号，并**先用一个已知存在的旧值校准方法**
+
+---
+
 ## 多 AI 协作
 
 本项目由多个 AI 助手接力开发，**彼此之间没有直接通信通道**。唯一的媒介是仓库产物：

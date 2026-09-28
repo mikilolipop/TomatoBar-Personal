@@ -12,6 +12,8 @@ struct MainWindowView: View {
     @State private var historyTab = false
     @State private var search = ""
     @State private var editing: FocusRecord?
+    @State private var pendingDelete: FocusRecord?
+    @State private var deleteError: String?
     @State private var settings = false
     @State private var expandedTimer = false
     private var summary: FocusSummary { FocusSummary(records: history.records, period: period, date: date) }
@@ -38,20 +40,60 @@ struct MainWindowView: View {
                     Rectangle().fill(Garden.line).frame(height: 1)
                 }
                 recordHeader
+                if let message = deleteError {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundColor(Garden.red)
+                        Text(message).font(.caption).foregroundColor(Garden.red)
+                        Spacer()
+                        Button("知道了") { deleteError = nil }.font(.caption)
+                    }.padding(.vertical, 6).padding(.horizontal, 10)
+                        .background(Garden.red.opacity(0.08)).cornerRadius(6)
+                }
                 recordList
             }.padding(.horizontal, 32).padding(.top, 23)
             TimerCard(timer: timer, expanded: $expandedTimer).padding(20)
         }.background(Garden.paper).foregroundColor(Garden.ink).accentColor(Garden.red)
             .preferredColorScheme(.light)
             .sheet(item: $editing) { record in
-                RecordEditor(record: record, availableTags: timer.state.allTags, onCancel: { editing = nil }, onSave: { name, tags in
-                    let error = timer.editRecord(id: record.id, name: name, tags: tags)
-                    if error == nil { editing = nil }
-                    return error
-                }).padding(24).frame(width: 440, height: 350).background(Garden.paper)
+                RecordEditor(record: record, availableTags: timer.state.allTags, onCancel: { editing = nil },
+                    onSave: { name, tags in
+                        let error = timer.editRecord(id: record.id, name: name, tags: tags)
+                        if error == nil { clearStaleFilter(); editing = nil }
+                        return error
+                    }, onDelete: {
+                        let error = timer.deleteRecord(id: record.id)
+                        if error == nil { clearStaleFilter(); editing = nil }
+                        return error
+                    }).padding(24).frame(width: 440, height: 430).background(Garden.paper)
             }
             .sheet(isPresented: $settings) { MainSettings(timer: timer) { settings = false } }
             .sheet(isPresented: $expandedTimer) { ExpandedTimer(timer: timer) { expandedTimer = false } }
+            // Row-level delete needs its own confirmation because the editor sheet is not
+            // open on that path. The wording comes from RecordEditor.confirmationMessage so
+            // both routes warn identically.
+            .alert("删除这段专注记录？", isPresented: deleteConfirmationShown, presenting: pendingDelete) { record in
+                Button("取消", role: .cancel) { pendingDelete = nil }.keyboardShortcut(.cancelAction)
+                Button("删除记录", role: .destructive) { commitDelete(record) }
+            } message: { record in
+                Text(RecordEditor.confirmationMessage(for: record))
+            }
+    }
+    /// `.alert(presenting:)` wants a Bool binding plus the item. Deriving the Bool from
+    /// pendingDelete means dismissing the alert can never leave a stale record behind.
+    private var deleteConfirmationShown: Binding<Bool> {
+        Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })
+    }
+    /// Drop the active category filter when the record just edited or deleted was the last
+    /// one carrying it, so the view never rests on a category that no longer exists.
+    private func clearStaleFilter() {
+        if let category = selectedCategory, !timer.state.records.contains(where: { $0.hasTag(category) }) {
+            selectedCategory = nil
+        }
+    }
+    private func commitDelete(_ record: FocusRecord) {
+        pendingDelete = nil
+        deleteError = timer.deleteRecord(id: record.id)
+        if deleteError == nil { clearStaleFilter() }
     }
     private var header: some View {
         HStack(spacing: 12) {
@@ -150,7 +192,7 @@ struct MainWindowView: View {
                 }.frame(width: 140)
                 TextField("搜索名称或标签", text: $search).textFieldStyle(.roundedBorder).frame(width: 190)
             } else {
-                Text("按时间顺序 · 点击铅笔编辑").font(.caption).foregroundColor(Garden.muted)
+                Text("按时间顺序 · 铅笔编辑，⋯ 可删除").font(.caption).foregroundColor(Garden.muted)
                 GardenArt(name: "PixelPlant", activity: timer.windowActivity).frame(width: 60, height: 28)
             }
         }
@@ -184,7 +226,15 @@ struct MainWindowView: View {
                                 Text(focusDuration(historyTab ? record.seconds : record.seconds(in: summary.interval)))
                                     .font(.system(size: 13).monospacedDigit()).frame(width: 90, alignment: .trailing)
                                 Button { editing = record } label: { Image(systemName: "pencil") }
-                                    .buttonStyle(.plain).foregroundColor(Garden.muted).accessibilityLabel("编辑记录：\(record.name)")
+                                    .buttonStyle(.plain).foregroundColor(Garden.muted)
+                                    .help("编辑记录").accessibilityLabel("编辑记录：\(record.name)")
+                                Menu {
+                                    Button("编辑记录") { editing = record }
+                                    Button("删除记录", role: .destructive) { pendingDelete = record }
+                                } label: {
+                                    Image(systemName: "ellipsis.circle").foregroundColor(Garden.muted)
+                                }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                                    .help("更多操作").accessibilityLabel("更多操作：\(record.name)")
                             }.padding(.vertical, 12)
                             Rectangle().fill(Garden.line.opacity(0.55)).frame(height: 1)
                         }

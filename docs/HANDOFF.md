@@ -2,7 +2,36 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-09-28，by Claude Code（Opus 5）· 实施 P9 + P7
+最后更新：2026-09-28，by Claude Code（Opus 5）· 实施「删除记录」+「分类入口清晰化」
+
+---
+
+## ⚠️ 做 UI 自动化前必读：同名进程陷阱
+
+本机可能同时存在**多个进程名都是 `TomatoBar Personal`** 的实例（正式版 + QA 变体）。
+此时 **System Events 的进程定位完全不可靠**，本轮实测：
+
+```
+first process whose bundle identifier is "…QA13"    →  返回 pid 17294（正式版！）
+first process whose unix id is 40847（QA13 的 pid）  →  读到的 bid 是 com.dilyar.TomatoBarPersonal（正式版的！）
+```
+
+即：**按 bundle id 过滤会串到按名字匹配的第一个进程；连按 pid 定位后读属性也会串。**
+本轮曾因此在不知情的情况下读到正式版界面（`2 段 / 9分钟 / 旧提示文案`），
+**若再往下点一次「删除记录」，删掉的就是用户真实数据。**
+
+**规则**：
+
+1. UI 自动化前**必须先确认只有一个同名进程**，或先退出正式版
+2. 每次交互前**读回界面文本做身份核验** —— QA 数据与正式版数据必须能一眼区分
+   （本轮：QA13 = 6 段/1小时55分/新提示文案；正式版 = 2 段/9分钟/旧提示文案）。
+   看到意料之外的数值立刻停手
+3. 操作真实用户数据前先做快照（本轮：`TomatoBarBuildBackups/sessions-prod-before-UIQA-*.json`）
+4. 更彻底的做法是让 QA 变体**进程名也不同**。本轮试过 `PRODUCT_NAME="TomatoBar QA13"`，
+   与 LaunchAtLogin 的登录辅助 bundle 冲突（`Multiple commands produce …TomatoBar QA13.bundle`），**未解决**
+
+另：本机**没有屏幕录制权限**，`screencapture` 报 `could not create image from display`，
+所以视觉验收做不了，只能靠辅助功能树 + 落盘数据比对。
 
 ---
 
@@ -10,13 +39,14 @@
 
 | 项 | 值 |
 |---|---|
-| ⚠️ **已安装版本** | **3.8.0（V1.2），不含 P9 修复**。P9/P7 只进了 git 和 CI，**尚未重装到 `/Applications`**。产物在 `/tmp/TomatoBar-personal-build/Build/Products/Release/`（注意 `/tmp` 会被系统清理）。建议与下一轮修复合并重装一次，避免反复重装 |
-| HEAD | `abf55df`（P7 换 CI）← `e69be32`（P9 重试按钮）← `bd7c214`（复核 Codex 评审）← `d01bc20`（Codex 评审）← `1f43359`（协作结构）← `8fb1e74`（首次提交 V1.0–V1.2）← `90a77d6`（上游基线） |
+| ⚠️ **已安装版本** | **3.8.0（V1.2），不含本轮任何改动**。删除功能、分类入口、P9 修复都只在源码 + CI 里，`/Applications` 未重装。产物在 `/tmp/TomatoBar-personal-build/`（`/tmp` 会被系统清理，重装前先确认还在，否则重跑 `scripts/build.sh`） |
+| HEAD | 本轮提交 ← `3ea4acc` ← `abf55df`（P7）← `e69be32`（P9）← `bd7c214` ← `d01bc20`（Codex 评审）← `1f43359` ← `8fb1e74` ← `90a77d6`（上游基线） |
 | 工作区 | 干净，与 `origin/feature/personal-focus` 一致 |
-| 测试 | `scripts/test.sh` → **61 项全绿**（P9 新增 6 项） |
-| **CI** | ✅ **已生效**：GitHub Actions `tests` workflow，首次运行 [36431326540](https://github.com/mikilolipop/TomatoBar-Personal/actions/runs/36431326540) **success**，46 秒，61 项全过 + 通用二进制构建 + 产物 bundle id 断言 |
+| 测试 | `scripts/test.sh` → **90 项全绿**（本轮新增 29 项） |
+| **CI** | ✅ `tests` workflow 生效中，前两次运行均 success（[首次运行](https://github.com/mikilolipop/TomatoBar-Personal/actions/runs/36431326540) 46 秒） |
 | 远程 | `origin` = `mikilolipop/TomatoBar-Personal`（私有，默认分支 `feature/personal-focus`）；`upstream` = `ivoronin/TomatoBar` |
-| 用户真实数据 | **1 条**记录、phase=idle；本次会话未触碰 |
+| 用户真实数据 | **2 条**（`测试` 60秒、`未命名专注` 480秒，均带标签 `学习`），phase=idle。UI 验收前后逐条比对，**ID／名称／标签／时长／完成状态全部一致，未被触碰** |
+| QA 隔离环境 | `com.dilyar.TomatoBarPersonal.QA13`，构建于 `/tmp/TomatoBar-QA13-build/`，内含 5 条合成测试数据（原 6 条，验收中删掉 1 条）。**与正式版容器完全隔离** |
 | git 身份 | 本仓库 `--local`：`mikilolipop <207336577+mikilolipop@users.noreply.github.com>`（全局仍未设置） |
 
 ### 原版 TomatoBar 已退役
@@ -50,43 +80,137 @@ tarball 是首次提交前的应急措施。有了 git + 远程后必要性下�
 
 ## 进行中
 
-**无进行中的代码改动。** 本轮用户只授权了 **P9 与 P7**，两项均已实施、验证、提交、推送，CI 首次运行 success。
+**无进行中的代码改动。** 本轮实施了用户指定的两项功能（单条删除、分类入口清晰化），
+已完成领域测试、构建签名、以及**隔离环境 QA13 的真实 UI 验收**（详见下节）。
 
 其余条目状态：
 
 | 条目 | 状态 |
 |---|---|
-| P1 + P2 + P8 | **未授权**。三者必须一起做（Codex 指出方案 B 原形态漏了 P8 会仍抢焦点）。需要用户亲自登出登入验收，两个 AI 都验不了 |
-| P3 | **未授权**。完整修法需持久化 RestKind + 旧 JSON 兼容解码 + 补测，比原估的 3 行大 |
-| P4 / P6 | 建议**跳过**。Codex 双双降级；P4 有真实构建风险（variant group + Resources 引用链），收益接近零 |
-| P5 | **暂不修**。原 13 次 / 416 趟估算已撤回，按 UI 实测排期 |
-| P7 遗留 | main 首次推送为何零运行**仍未证实**，不得写成已查明。现已无关紧要 |
+| **P10** | **新增，待人工点击**。菜单栏 popover 的删除入口无法用辅助功能自动化打开（状态栏项只支持 `AXPress`，执行后 popover 不出现；坐标点击同样无效）。需人工验一次 |
+| **P11** | **新增**。分类选择器的 `accessibilityLabel` 被 chevron 图标的 AX description（`向下移动`）覆盖，且 AX name 不稳定。需 VoiceOver 实测，本机无法验证读屏 |
+| P1 + P2 + P8 | **未授权**。三者必须一起做。需要用户亲自登出登入验收 |
+| P3 | **未授权**。Codex 已否定「比较休息分钟数」的修法；完整方案需持久化 RestKind + 旧 JSON 兼容解码 |
+| P4 / P6 | 建议**跳过**。P4 有真实构建风险（`pbxproj:16/169/217-226` 的 BuildFile + Resources phase + PBXVariantGroup 引用链）；P6 的 `Icons/` 是 `convert.sh` 的源素材，不能删 |
+| P5 | **暂不修**。原「13 次 / 416 趟」估算已被 Codex 推翻并撤回 |
+| P7 遗留 | main 首次推送为何零运行**仍未证实**。现已无关紧要 |
 
 ---
 
 ## 下一步
 
-1. **决定是否重装**。当前 `/Applications` 里是**不含 P9 修复**的 3.8.0。P9 只在
-   sessions.json 损坏这种罕见路径上才可见，**无紧急性**；建议与下一轮修复合并重装一次。
-   若要单独重装，注意产物在 `/tmp/TomatoBar-personal-build/`，`/tmp` 会被系统清理，
-   重装前先确认产物还在，否则重跑 `scripts/build.sh`
-2. **P1 + P2 + P8 是一个不可拆的整体**，实施前应先写 `docs/V1.3验收清单.md`，
-   因为验收必须由用户真人执行：开「登录时启动」→ 登出登入 → 确认不弹窗不抢焦点但菜单栏有「请确认」
-   → 手动启动确认弹窗正常 → 关窗确认 Dock 图标消失 → 从 Dock 重开
-   → **开设置 sheet 时确认图标不消失**（Codex 特别警告：不要在 `windowDidResignKey` 里降级）
-   → 最小化确认图标不消失
-   登录来源判定用 `NSAppleEventManager.shared().currentAppleEvent` 读 `kAEOpenApplication` 的
-   `keyAEPropData` 是否为 `keyAELaunchedAsLogInItem`，在启动事件处理期尽早保存。
-   **`NSApp.launchedAsHidden` 不存在**，已实测编译报错
-3. P3 若要做，先确认是否值得为一个菜单栏图标做领域改动；折中方案是只在 `TBTimer` 上存
-   非持久化标志，代价是**重启后图标可能不准**，需用户接受该缺陷
-4. V1.3 若发版，另写一份验收文档，**不要回头改 `design-qa.md` 里的「41 项检查」**
+1. **人工验收 P10**（约 1 分钟）：菜单栏图标 → 记录页 → 铅笔 → 「删除记录」→ 取消 →
+   再删除 → 确认。这是本轮唯一没验到的入口
+2. **决定是否重装 `/Applications`**。当前安装的仍是 V1.2 原版，**不含删除功能、分类入口和 P9 修复**。
+   重装前注意产物在 `/tmp`，可能已被清理
+3. **P11** 若有 VoiceOver 需求再处理：给 chevron 加 `.accessibilityHidden(true)`
+4. **P1 + P2 + P8** 仍是价值最高的一批，实施前先写 `docs/V1.3验收清单.md`，
+   因为验收必须由用户真人执行（登出登入、关窗看 Dock 图标、开设置 sheet 确认图标不消失、最小化）
+5. V1.3 若发版，另写验收文档，**不要回头改 `design-qa.md` 里的「41 项检查」**
+6. QA13 环境可复用：构建命令见下节，容器 `com.dilyar.TomatoBarPersonal.QA13` 里现有 5 条合成数据
 
 ### V1.3 候选（尚未规划）
 
 - 往 `scripts/seed-qa.py` 加几段**亚分钟记录**，用于视觉验证 `FocusCharts.tileWidth` 的
   `max(44, …)` 最小宽度分支。该分支在 UI 层，`scripts/test.sh` 编译不进去，**只能靠眼睛看**。
   注意：QA12 沙盒容器还在，但 **QA12 的 .app 本体已不存在**，需先造一个 QA12 bundle ID 的构建变体。
+
+---
+
+## 刚做完（2026-09-28，Claude Code 实施「删除记录」+「分类入口清晰化」）
+
+### 代码改动
+
+**领域层（可测）**
+- `FocusState.deleteRecord(id:)`：按 UUID 删除，**只动 `records`** —— 计时、暂停、轮次、
+  休息安排不受影响是结构性保证，不靠事后恢复
+- `FocusRecord.tags(withPrimaryCategory:in:)`：切换分类 = 把选中标签移到首位，其余保留并按
+  大小写不敏感去重。**空分类是 no-op 而不是清空标签** —— 「未分类」只是空标签列表的显示形态，
+  不作为可选项提供，因为清空全部标签会摧毁这个方法要保护的其他标签
+
+**桥接层**
+- `TBTimer.deleteRecord(id:)`：镜像 `editRecord` 的**先落盘成功再更新内存**。
+  保存失败时**故意不设 `storageError`** —— 因为 `state` 只在写成功后才赋值，内存与磁盘仍然一致、
+  没有未保存内容；设了会让 `hasUnsavedChanges` 变真并因一次没发生的删除阻止退出
+
+**UI 层**
+- `RecordEditor` 重写：`onDelete` 闭包、红色「删除记录」+ 确认弹窗（`role: .destructive`
+  使其不为默认按钮，Esc 绑定取消）、**始终显示**的「统计分类」区（含图标+颜色实时预览、
+  已使用/建议两组去重菜单、自定义分类输入）、「其他标签」区、说明文案
+- **主标签刻意不出现在「其他标签」的可移除列表里** —— 否则移除操作会静默改变统计归属
+- 主窗口记录行加 ⋯ 菜单（编辑记录／删除记录），**保留铅笔入口**
+- 两处删除路径共用 `RecordEditor.confirmationMessage(for:)`，文案不会分叉
+- `Garden.suggestedCategories` 集中管理建议分类，`color()` 改用它（**顺序 load-bearing**）
+- 日视图提示改为「点击色块，编辑名称、分类和标签。」；记录区提示改为「铅笔编辑，⋯ 可删除」
+- 编辑器改为 ScrollView + 固定底栏；popover 标签区 270→320pt、sheet 350→430pt
+  （新增内容所需，**这是本轮唯一的既有布局尺寸调整**）
+
+**未做**（按规格）：批量删除、回收站、整库清空、像素插画、素材生成依赖、完整的图案/颜色自定义管理器。
+未动 P1–P7。
+
+### 测试
+
+61 → **90 项**。新增覆盖：按 UUID 删除且顺序不变、未知 ID 抛 `missingRecord` 且列表不变、
+删除后统计正确、分类随最后一条记录消失、删除跨 save/load 持久、
+**删除不改变 phase/paused/rounds/remaining/deadline/name/segmentStart/startedAt**、
+复制体变更不影响原体（这是「先落盘再更新内存」安全的根据）、不可写目标确实抛错、
+分类切换的首标签规则 8 种情形、`category` 取首标签与空标签显示「未分类」。
+
+变异检验 6 个，**全部被对应断言抓到**：按下标 0 删除、顺手清零 rounds、
+不去重、追加到末尾而非首位、大小写敏感去重、空分类清空全部标签。
+其中两个 perl 变异**注入失败**（转义问题），已改用 python 字面替换重做 —— 未把注入失败当成「没抓到」。
+
+### 隔离环境 UI 验收（QA13，实机操作，非静态分析）
+
+环境：`PRODUCT_BUNDLE_IDENTIFIER=com.dilyar.TomatoBarPersonal.QA13` 单独构建，
+容器与正式版完全隔离；灌入 6 条合成数据（含 45 秒无标签记录、1 条提前结束记录、6 个分类）。
+**验收前已快照正式版 sessions.json，验收后逐条比对：ID／名称／标签／时长／完成状态全部一致。**
+
+已验证 ✅
+
+| 项 | 实测结果 |
+|---|---|
+| ⋯ 菜单 | 菜单项为 `[编辑记录] [删除记录]`，6 行各有一个 menu button |
+| 确认弹窗文案 | `删除这段专注记录？`／`「建模作业」`／`2026年9月28日 11:00 · 专注 20分钟`／`删除后，这段专注时长将从统计中移除。` —— 名称、日期、时长、说明齐全 |
+| 取消路径 | 弹窗关闭、数据仍 6 条、`建模作业` 仍在、界面仍 `6 段 / 1小时55分` |
+| 真删除 | 数据 6→5、`建模作业` 移除、剩余 5745 秒 |
+| 统计即时刷新 | **无需重启**，界面立即变 `5 段 / 1小时35分`（两处「段」计数同步） |
+| 分类联动 | 删除后 `建模` 从「已使用」消失并回落到「建议分类」组，证明 `allTags` 已更新 |
+| 分类选择器分组 | `已使用的分类和标签`：材料力学/数学/学习/英语/阅读；`建议分类`：建模/编程/写作 —— **已使用者被去重排除** |
+| 统计分类始终可见 | 无标签记录 `误触测试` 的选择器 `name = [未分类]`（规格二.1） |
+| 说明文案 | `统计分类决定图表归属和图标；其他标签用于搜索和筛选。` 逐字一致（规格二.4） |
+| 分区呈现 | `统计分类` 与 `其他标签` 为两个独立小节，各有标题（规格二.4） |
+| 首标签规则（UI 端到端） | `英语听力` 原 `['英语','学习']`：切换前其他标签区只显示 `[学习]`（**主标签不在可移除列表**）→ 选 `学习` → 分类变 `学习`、其他标签区变 `[英语]`（**旧首标签降级保留未丢失**）→ 保存 → 落盘 `['学习','英语']` ✅ |
+| 自定义/建议分类落盘 | `误触测试` 选 `编程` → 落盘 `tags=['编程']` |
+| 重启持久化 | 重启 QA13 后仍 `5 段 / 1小时35分`，`建模作业` 不存在，行2 显示 `学习 · 英语`，行4 显示 `编程` |
+| 秒级与未分类渲染 | 行5 `误触测试 ¦ 未分类 ¦ 45秒`（`focusDuration` 的 `<60` 分支）；行6 显示 `提前结束` |
+| 小时分支渲染 | 汇总 `1小时55分` → 删除后 `1小时35分`，**`focusDuration` 的小时分支首次在真实 UI 中确认** |
+| 新提示文案 | `每一块是一段专注，按时间排列。点击色块，编辑名称、分类和标签。` 与 `按时间顺序 · 铅笔编辑，⋯ 可删除` 均正确渲染 |
+
+未验证 ❌（**不要把上面的通过当成全部通过**）
+
+- **P10 菜单栏 popover 的删除入口**：状态栏项只支持 `AXPress`，执行后 popover 不出现；
+  按实测坐标 `click at {876,16}` 同样无效。popover 用的是同一个 `RecordEditor`，
+  特有代码只有 4 行 `onDelete` 闭包且已编译通过，但**没有实机点过**
+- **P11 分类选择器的 VoiceOver 读屏结果**：`description = [向下移动]`（chevron 图标）
+  覆盖了我的 `accessibilityLabel`，且 AX `name` 在不同时刻分别读到 `未分类` 和 `统计分类：英语`，
+  **不稳定**。无读屏环境，无法判断实际体验
+- **视觉层面全部未验证**：本机无屏幕录制权限，`screencapture` 失败。
+  图标+颜色预览是否真的渲染、布局是否拥挤、popover 320pt 与 sheet 430pt 是否合适，
+  **全部只验证了辅助功能树结构和落盘数据，没有看过一眼**
+- 删除失败路径（磁盘写失败时的错误提示）未做 UI 复现，只有领域层测试
+
+### QA13 复现方式
+
+```sh
+xcodebuild -project TomatoBar.xcodeproj -scheme TomatoBar -configuration Release \
+  -derivedDataPath /tmp/TomatoBar-QA13-build \
+  CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
+  PRODUCT_BUNDLE_IDENTIFIER=com.dilyar.TomatoBarPersonal.QA13 ONLY_ACTIVE_ARCH=NO build
+# 数据路径：~/Library/Containers/com.dilyar.TomatoBarPersonal.QA13/Data/Library/Application Support/TomatoBarPersonal/sessions.json
+```
+
+**不要覆盖 `PRODUCT_NAME`** —— 会与 LaunchAtLogin 的登录辅助 bundle 冲突。
 
 ---
 
@@ -212,6 +336,10 @@ tarball 是首次提交前的应急措施。有了 git + 远程后必要性下�
 | 用 `strings` 验证 Swift 字面量是否进了产物二进制 | **方法无效**：连 `准备开始`、`正在专注` 这些从未改动的旧字符串也搜不到 —— Swift 把短字符串内联成 small string 存进代码段，不在 cstring 区。改用 `grep -a` 搜 UTF-8 字节 + `nm` 找符号。**用已知存在的旧值校准检测方法**，否则会把「方法失效」误判成「改动没进产物」 |
 | 只改一处抛错点来变异检验 `load()` | **无效变异**。`FocusStore.load()` 有四个抛错点（`Data(contentsOf:)`、`JSONDecoder`、`JSONSerialization`、`copyItem`），只把 decode 改成 `try?` 时其余仍在抛错，可观察行为未变。变异检验的前提是变异**真的改变了行为** |
 | 只看 CI 的绿色勾就认定步骤做了实事 | 本次 46 秒跑完含通用二进制的 Release 构建，快得可疑。必须拉完整日志核实（PASS 行数、SwiftCompile 行数、断言的实际输出）。步骤「成功」不等于步骤「有效」 |
+| 用 System Events 的 `bundle identifier` 或 `unix id` 定位同名进程 | **会静默串到错误进程**，实测 `whose bundle identifier is "…QA13"` 返回正式版 pid，连按 QA13 的 pid 定位后读 `bundle identifier` 也返回正式版的值。做 UI 自动化前必须只剩一个同名进程，且每次交互前读回界面文本核验身份。详见本文件顶部「同名进程陷阱」 |
+| 覆盖 `PRODUCT_NAME` 来造 QA 变体 | 与 LaunchAtLogin 的登录辅助 bundle 冲突：`Multiple commands produce …TomatoBar QA13.bundle`。只覆盖 `PRODUCT_BUNDLE_IDENTIFIER` 即可隔离容器，但进程名会相同（见上一条） |
+| 把「其他标签」列表显示为全部标签（含主标签） | 移除主标签会让 `tags[1]` 顶上来成为新分类，**静默改变统计归属**，正是规格明确禁止的。主标签只能通过「统计分类」选择器更换 |
+| 把「未分类」做成分类选择器里的一个可选项 | 要让记录变成未分类就得清空全部标签，那会摧毁其他标签。它只是空标签列表的显示形态，不是可选值 |
 
 ---
 

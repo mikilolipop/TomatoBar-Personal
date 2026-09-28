@@ -57,6 +57,22 @@ struct FocusRecord: Codable, Identifiable, Equatable {
         return result
     }
 
+    /// The statistics category *is* the first tag, so changing category means moving the
+    /// chosen tag to the front. Every other tag is kept, and the previous first tag stays
+    /// on as an ordinary tag the user can remove separately — removing a tag and changing
+    /// the category must stay visibly different operations. Dedupe is case-insensitive,
+    /// matching normalizedTags.
+    ///
+    /// An empty category is a no-op, not a way to clear tags: "未分类" is merely what an
+    /// empty tag list displays as, so it is never offered as a choice. Clearing every tag
+    /// to reach it would destroy the other tags this method exists to preserve.
+    static func tags(withPrimaryCategory category: String, in tags: [String]) -> [String] {
+        let primary = category.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = normalizedTags(tags)
+        guard !primary.isEmpty else { return normalized }
+        return [primary] + normalized.filter { $0.caseInsensitiveCompare(primary) != .orderedSame }
+    }
+
     func hasTag(_ tag: String) -> Bool {
         tags.contains { $0.caseInsensitiveCompare(tag) == .orderedSame }
     }
@@ -103,6 +119,15 @@ struct FocusState: Codable {
         }
         records[index].name = trimmed
         records[index].tags = canonicalTags
+    }
+
+    /// Deletes by UUID only — never by index or name, both of which shift as the list
+    /// changes. Touches `records` and nothing else, so the running timer, pause state,
+    /// round count and rest schedule are untouched by construction rather than by
+    /// remembering to restore them.
+    mutating func deleteRecord(id: UUID) throws {
+        guard let index = records.firstIndex(where: { $0.id == id }) else { throw RecordEditError.missingRecord }
+        records.remove(at: index)
     }
 
     var isTiming: Bool { phase == .work || phase == .rest }
