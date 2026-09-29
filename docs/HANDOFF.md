@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-09-30，by Claude Code · 外部 AI 经 Drive 的 UI 重构已核验集成（allCategories 契约本地补齐），领域 174 / 桥接 35 / 启动 8 全绿
+最后更新：2026-09-30，by Claude Code · 外部 AI 经 Drive 的 UI 重构已核验集成（allCategories 契约本地补齐），领域 174 / 桥接 35 / 启动 8 全绿；新增 scripts/dev-run.sh 统一开发闭环并端到端实跑通过
 
 ---
 
@@ -154,6 +154,13 @@ V1.3 已按用户决定定稿上线，不再往这个版本里加东西。后续
 **未做/待人工**：本次视觉重构（米白弹层、非系统 Tab、图标即菜单、Dark Mode 强制 light）
 纯观感项，`test.sh`/bridge 编译不进眼 —— **用户需构建安装后目测**，重点：Dark Mode 下弹层
 是否还与主程序一致、图标角标会不会显得拥挤、34pt 图标按钮的可点性。本轮**未重新构建安装**。
+
+**同轮补充：新增 `scripts/dev-run.sh` 统一开发闭环**（外部 AI 建议的 killall+build+open
+三步脚本不可原样用,原因见 AGENTS 命令节——进程名带空格、CODE_SIGNING_ALLOWED=NO 打死沙盒、
+强杀绕过退出闸门）。脚本改为:AppleEvent 优雅退出（有未落盘记录会被闸门拦下并**中止不强杀**）
+→ test.sh 闸门 → scripts/build.sh（ad-hoc 签名+严格校验）→ 从 /tmp 产物启动,容器数据共用。
+已端到端实跑一次：旧实例（/Applications, pid 12930）退出 → 174 全绿 → BUILD SUCCEEDED →
+新版从 /private/tmp 启动,sessions.json（673B）原样。**当前菜单栏跑的就是最新构建,可直接目测新 UI。**
 
 ## 刚做完（2026-09-29，Claude Code 修外部 Code Review 第三轮 P24–P27 + P16 + 文档清理）
 
