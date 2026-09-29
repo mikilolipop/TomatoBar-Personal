@@ -259,10 +259,16 @@ struct RecordEditor: View {
     }
     /// Only the keys this draft changed, so saving never replays a stale whole-map
     /// snapshot over overrides another editor saved in the meantime.
-    private var styleChanges: [String: String?] {
+    private var styleChanges: [String: String?] { RecordEditor.styleDelta(initial: initialStyles, current: localStyles) }
+
+    /// `dict[key] = nil` on a `[Key: Value?]` REMOVES the key instead of storing a nil
+    /// value, which silently dropped every "恢复自动图标" removal (the domain layer only
+    /// deletes an override when the delta carries the key with a nil value). Removals
+    /// must be written as `.some(nil)`. Exposed as a static for bridge-level regression.
+    static func styleDelta(initial: [String: String], current: [String: String]) -> [String: String?] {
         var delta: [String: String?] = [:]
-        for (key, value) in localStyles where initialStyles[key] != value { delta[key] = value }
-        for key in initialStyles.keys where localStyles[key] == nil { delta[key] = nil }
+        for (key, value) in current where initial[key] != value { delta[key] = value }
+        for key in initial.keys where current[key] == nil { delta[key] = .some(nil) }
         return delta
     }
     /// Tags other than the statistics category. The primary is deliberately absent: the

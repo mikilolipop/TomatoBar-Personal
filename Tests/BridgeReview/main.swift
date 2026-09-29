@@ -56,5 +56,35 @@ check(!failing.hasUnsavedChanges, "failed deletion does not invent an unsaved-ch
 check(failing.editRecord(id: a.id, name: "changed", tags: ["数学"], styleChanges: ["数学": "star"]) != nil,
       "actual bridge edit also returns write failure")
 check(failing.state.records == initial.records && failing.state.categoryStyles.isEmpty, "failed edit preserves records and styles")
+
+// P1 regression: the UI delta builder must keep removed keys with an explicit nil
+// value; a bare `delta[key] = nil` on [Key: Value?] removes the key and the domain
+// layer never learns the override should go away.
+let delta = RecordEditor.styleDelta(initial: ["数学": "star", "阅读": "leaf"], current: ["阅读": "book"])
+check(delta.keys.contains("数学") && delta["数学"] == .some(nil), "styleDelta keeps removals as explicit nil")
+check(delta["阅读"] == "book" && delta.keys.count == 2, "styleDelta carries changes and nothing else")
+
+// P3 regression: a completed-but-unsaved focus must not advance into rest.
+let gateDir = scratch.appendingPathComponent("restgate")
+let gateStore = FocusStore(url: gateDir.appendingPathComponent("sessions.json"))
+var gate = FocusState()
+gate.phase = .workFinished
+gate.rounds = 1
+gate.records = [record("复习")]
+try gateStore.save(gate)
+let gated = TBTimer(store: gateStore)
+try FileManager.default.removeItem(at: gateDir)
+try Data("QA13 rest gate".utf8).write(to: gateDir)
+gated.pause()
+check(gated.storageError != nil, "rest-gate probe reached the failed-save state")
+gated.startRest()
+check(gated.state.phase == .workFinished, "startRest blocked while the completion is unsaved")
+try FileManager.default.removeItem(at: gateDir)
+gated.retryStorage()
+check(gated.storageError == nil, "retryStorage recovers once the disk is writable again")
+gated.startRest()
+check(gated.state.phase == .rest, "startRest proceeds after the record is on disk")
+let gateOnDisk = try gateStore.load()
+check(gateOnDisk.phase == .rest && gateOnDisk.records.count == 1, "rest advance persisted with the saved completion")
 print("PASS: \(checks) actual TBTimer bridge checks; isolated QA13 IO, no UI interaction")
 withExtendedLifetime(observation) {}

@@ -25,6 +25,10 @@ final class TBTimer: ObservableObject {
     private let store: FocusStore
     private var ticker: Foundation.Timer?
     private var lastSave = Date.distantPast
+    // After a failed write the 0.25s tick would otherwise re-attempt persist() four times
+    // a second forever (lastSave never advances, so the 5s condition stays true). The
+    // auto path backs off 30s between failures; the user's 「重试保存」 button bypasses this.
+    private var lastFailedSave = Date.distantPast
     private var loadFailed = false
     var onAttention: (() -> Void)?
 
@@ -75,6 +79,11 @@ final class TBTimer: ObservableObject {
         change { $0.startWork(name: eventName, seconds: Double(max(1, workIntervalLength) * 60), at: $1) }
     }
     func startRest() {
+        // Same storageError gate as startWork: if the just-completed focus is still only
+        // in memory, advancing into rest would let a crash bury it under a stale disk
+        // checkpoint. The user must 「重试保存」 (or explicitly discard via 结束本组→stop)
+        // before the cycle may move on.
+        guard storageError == nil else { return }
         let seconds = Double(max(1, restMinutes) * 60)
         change { $0.startRest(seconds: seconds, at: $1) }
     }
@@ -191,7 +200,7 @@ final class TBTimer: ObservableObject {
         let previous = state.phase
         now = Date()
         state.tick(at: now)
-        if previous != state.phase || (state.isTiming && now.timeIntervalSince(lastSave) >= 5) { persist() }
+        if previous != state.phase || (state.isTiming && now.timeIntervalSince(lastSave) >= 5 && now.timeIntervalSince(lastFailedSave) >= 30) { persist() }
         updateStatus()
         if state.needsAttention && previous != state.phase { onAttention?() }
     }
@@ -200,7 +209,7 @@ final class TBTimer: ObservableObject {
         if history.records != state.records { history.records = state.records }
         state.checkpoint = now
         do { try store.save(state); storageError = nil; lastSave = now }
-        catch { storageError = "记录保存失败，请检查磁盘空间。当前记录仍保留在内存中。" }
+        catch { storageError = "记录保存失败，请检查磁盘空间。当前记录仍保留在内存中。"; lastFailedSave = now }
     }
     func updateStatus() {
         if windowActivity.paused != state.paused { windowActivity.paused = state.paused }
