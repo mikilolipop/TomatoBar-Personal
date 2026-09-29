@@ -76,10 +76,11 @@ struct TBPopoverView: View {
     private var history: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let record = editingRecord {
-                RecordEditor(record: record, availableTags: timer.state.allTags, onCancel: {
+                RecordEditor(record: record, availableTags: timer.state.allTags,
+                             styles: timer.state.categoryStyles, onCancel: {
                     editingRecord = nil
-                }, onSave: { name, tags in
-                    let error = timer.editRecord(id: record.id, name: name, tags: tags)
+                }, onSave: { name, tags, styles in
+                    let error = timer.editRecord(id: record.id, name: name, tags: tags, styles: styles)
                     if error == nil { clearStaleFilter(); editingRecord = nil }
                     return error
                 }, onDelete: {
@@ -182,7 +183,7 @@ struct TBPopoverView: View {
 struct RecordEditor: View {
     let availableTags: [String]
     let onCancel: () -> Void
-    let onSave: (String, [String]) -> String?
+    let onSave: (String, [String], [String: String]) -> String?
     /// Returns an error message, or nil once the deletion has been committed to disk.
     /// The caller dismisses the editor, because it also owns the filter selection that may
     /// need clearing when the deleted record was the last one carrying that tag.
@@ -192,11 +193,16 @@ struct RecordEditor: View {
     @State private var tags: [String]
     @State private var newTag = ""
     @State private var newCategory = ""
+    /// Icon overrides edited in this session; committed only when 保存 succeeds, so
+    /// cancelling discards them like every other field here.
+    @State private var localStyles: [String: String]
     @State private var error: String?
     @State private var confirmDelete = false
 
-    init(record: FocusRecord, availableTags: [String], onCancel: @escaping () -> Void,
-         onSave: @escaping (String, [String]) -> String?, onDelete: @escaping () -> String?) {
+    init(record: FocusRecord, availableTags: [String], styles: [String: String],
+         onCancel: @escaping () -> Void,
+         onSave: @escaping (String, [String], [String: String]) -> String?,
+         onDelete: @escaping () -> String?) {
         self.record = record
         self.availableTags = availableTags
         self.onCancel = onCancel
@@ -204,6 +210,7 @@ struct RecordEditor: View {
         self.onDelete = onDelete
         _name = State(initialValue: record.name)
         _tags = State(initialValue: record.tags)
+        _localStyles = State(initialValue: styles)
     }
 
     /// Shared with the record-row menu in MainWindowView so deleting from either place
@@ -214,6 +221,8 @@ struct RecordEditor: View {
     }
 
     private var category: String { tags.first ?? "未分类" }
+    private var previewSymbol: String { localStyles[category.lowercased()] ?? Garden.symbol(category) }
+    private var hasStyleOverride: Bool { localStyles[category.lowercased()] != nil }
     /// Tags other than the statistics category. The primary is deliberately absent: the
     /// remove button must never be able to change what a record counts towards.
     private var otherTags: [String] { Array(tags.dropFirst()) }
@@ -243,7 +252,7 @@ struct RecordEditor: View {
                 Button("取消", action: onCancel).keyboardShortcut(.cancelAction)
                 Button("保存") {
                     addTag()
-                    error = onSave(name, tags)
+                    error = onSave(name, tags, localStyles)
                 }.buttonStyle(.borderedProminent)
                     .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
@@ -264,7 +273,7 @@ struct RecordEditor: View {
             Text("统计分类").font(.subheadline).fontWeight(.medium)
             HStack(spacing: 8) {
                 // Live preview of the day-chart block, so the effect is visible before saving.
-                Image(systemName: Garden.symbol(category))
+                Image(systemName: previewSymbol)
                     .font(.system(size: 15, weight: .medium))
                     .foregroundColor(Garden.paper)
                     .frame(width: 26, height: 26)
@@ -292,6 +301,23 @@ struct RecordEditor: View {
                 }.menuStyle(.borderlessButton).frame(maxWidth: 150)
                     .help("每条记录只计入一个分类")
                     .accessibilityLabel("统计分类：\(category)")
+                Menu {
+                    ForEach(Garden.palette) { choice in
+                        Button {
+                            localStyles[category.lowercased()] = choice.symbol
+                        } label: {
+                            Label(choice.label, systemImage: choice.symbol)
+                        }
+                    }
+                    Divider()
+                    Button("恢复自动图标") { localStyles.removeValue(forKey: category.lowercased()) }
+                        .disabled(!hasStyleOverride)
+                } label: {
+                    Image(systemName: "paintpalette").foregroundColor(Garden.muted)
+                }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                    .help("为这个分类选一个图标；不选则按分类名自动取")
+                    .accessibilityLabel("选择分类图标")
+                    .disabled(category == "未分类")
             }
             HStack(spacing: 6) {
                 TextField("自定义分类", text: $newCategory).textFieldStyle(.roundedBorder)
@@ -315,12 +341,10 @@ struct RecordEditor: View {
                 Button("添加") { addTag() }
                     .disabled(newTag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-            Menu("选择已有标签") {
-                ForEach(availableTags, id: \.self) { tag in
-                    Button(tag) { tags = FocusRecord.normalizedTags(tags + [tag]) }
-                        .disabled(tags.contains { $0.caseInsensitiveCompare(tag) == .orderedSame })
-                }
-            }.disabled(availableTags.isEmpty)
+            // No "pick an existing tag" menu here: the category picker above already lists
+            // every tag in use, and this section's job is the *other* tags. Two menus with
+            // identical contents read as a bug. Typing an existing name still reuses it,
+            // because normalizedTags dedupes case-insensitively to the known spelling.
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], alignment: .leading, spacing: 6) {
                 ForEach(otherTags, id: \.self) { tag in
                     HStack(spacing: 4) {

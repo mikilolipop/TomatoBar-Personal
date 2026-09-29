@@ -99,6 +99,39 @@ struct FocusState: Codable {
     var rounds = 0
     var records: [FocusRecord] = []
     var checkpoint = Date()
+    /// Per-category icon overrides, keyed by lowercased category name. Absent from files
+    /// written before this field existed, so init(from:) must tolerate the missing key;
+    /// a category without an entry falls back to the automatic glyph.
+    var categoryStyles: [String: String] = [:]
+
+    private enum CodingKeys: String, CodingKey {
+        case phase, paused, name, startedAt, segmentStart, deadline, remaining, planned,
+             segments, rounds, records, checkpoint, categoryStyles
+    }
+
+    /// Declaring any init suppresses the implicit memberwise one, and every property has
+    /// a default, so this restores the `FocusState()` callers rely on.
+    init() {}
+
+    /// Hand-written so `categoryStyles` can be optional on decode. A synthesized decoder
+    /// would require the key and fail on every pre-existing sessions.json, which would
+    /// surface as a corrupt file and block all timing.
+    init(from decoder: Decoder) throws {
+        let v = try decoder.container(keyedBy: CodingKeys.self)
+        phase = try v.decode(FocusPhase.self, forKey: .phase)
+        paused = try v.decode(Bool.self, forKey: .paused)
+        name = try v.decode(String.self, forKey: .name)
+        startedAt = try v.decodeIfPresent(Date.self, forKey: .startedAt)
+        segmentStart = try v.decodeIfPresent(Date.self, forKey: .segmentStart)
+        deadline = try v.decodeIfPresent(Date.self, forKey: .deadline)
+        remaining = try v.decode(TimeInterval.self, forKey: .remaining)
+        planned = try v.decode(TimeInterval.self, forKey: .planned)
+        segments = try v.decode([FocusSegment].self, forKey: .segments)
+        rounds = try v.decode(Int.self, forKey: .rounds)
+        records = try v.decode([FocusRecord].self, forKey: .records)
+        checkpoint = try v.decode(Date.self, forKey: .checkpoint)
+        categoryStyles = try v.decodeIfPresent([String: String].self, forKey: .categoryStyles) ?? [:]
+    }
 
     var allTags: [String] {
         FocusRecord.normalizedTags(records.flatMap(\.tags)).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
@@ -109,7 +142,10 @@ struct FocusState: Codable {
         return records.filter { $0.hasTag(tag) }
     }
 
-    mutating func editRecord(id: UUID, name: String, tags: [String]) throws {
+    /// `categoryStyles` defaults to nil so callers that only rename or retag leave the
+    /// icon overrides untouched.
+    mutating func editRecord(id: UUID, name: String, tags: [String],
+                             categoryStyles: [String: String]? = nil) throws {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw RecordEditError.emptyName }
         guard let index = records.firstIndex(where: { $0.id == id }) else { throw RecordEditError.missingRecord }
@@ -119,6 +155,7 @@ struct FocusState: Codable {
         }
         records[index].name = trimmed
         records[index].tags = canonicalTags
+        if let categoryStyles = categoryStyles { self.categoryStyles = categoryStyles }
     }
 
     /// Deletes by UUID only — never by index or name, both of which shift as the list

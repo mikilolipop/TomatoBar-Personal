@@ -34,7 +34,7 @@ struct MainWindowView: View {
                     heading
                     HStack(alignment: .top, spacing: 36) {
                         summaryPanel.frame(width: 340)
-                        FocusChart(summary: filtered, activity: timer.windowActivity, period: period, onDay: { date = $0; period = .day }, onRecord: { editing = $0 })
+                        FocusChart(summary: filtered, styles: timer.state.categoryStyles, activity: timer.windowActivity, period: period, onDay: { date = $0; period = .day }, onRecord: { editing = $0 })
                             .frame(maxWidth: .infinity)
                     }.frame(height: 280)
                     Rectangle().fill(Garden.line).frame(height: 1)
@@ -55,9 +55,10 @@ struct MainWindowView: View {
         }.background(Garden.paper).foregroundColor(Garden.ink).accentColor(Garden.red)
             .preferredColorScheme(.light)
             .sheet(item: $editing) { record in
-                RecordEditor(record: record, availableTags: timer.state.allTags, onCancel: { editing = nil },
-                    onSave: { name, tags in
-                        let error = timer.editRecord(id: record.id, name: name, tags: tags)
+                RecordEditor(record: record, availableTags: timer.state.allTags,
+                    styles: timer.state.categoryStyles, onCancel: { editing = nil },
+                    onSave: { name, tags, styles in
+                        let error = timer.editRecord(id: record.id, name: name, tags: tags, styles: styles)
                         if error == nil { clearStaleFilter(); editing = nil }
                         return error
                     }, onDelete: {
@@ -192,7 +193,7 @@ struct MainWindowView: View {
                 }.frame(width: 140)
                 TextField("搜索名称或标签", text: $search).textFieldStyle(.roundedBorder).frame(width: 190)
             } else {
-                Text("按时间顺序 · 铅笔编辑，⋯ 可删除").font(.caption).foregroundColor(Garden.muted)
+                Text("按时间顺序").font(.caption).foregroundColor(Garden.muted)
                 GardenArt(name: "PixelPlant", activity: timer.windowActivity).frame(width: 60, height: 28)
             }
         }
@@ -225,16 +226,13 @@ struct MainWindowView: View {
                                 if !record.completed { Text("提前结束").font(.caption2).foregroundColor(Garden.muted) }
                                 Text(focusDuration(historyTab ? record.seconds : record.seconds(in: summary.interval)))
                                     .font(.system(size: 13).monospacedDigit()).frame(width: 90, alignment: .trailing)
-                                Button { editing = record } label: { Image(systemName: "pencil") }
-                                    .buttonStyle(.plain).foregroundColor(Garden.muted)
-                                    .help("编辑记录").accessibilityLabel("编辑记录：\(record.name)")
                                 Menu {
                                     Button("编辑记录") { editing = record }
                                     Button("删除记录", role: .destructive) { pendingDelete = record }
                                 } label: {
                                     Image(systemName: "ellipsis.circle").foregroundColor(Garden.muted)
                                 }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-                                    .help("更多操作").accessibilityLabel("更多操作：\(record.name)")
+                                    .help("编辑或删除").accessibilityLabel("更多操作：\(record.name)")
                             }.padding(.vertical, 12)
                             Rectangle().fill(Garden.line.opacity(0.55)).frame(height: 1)
                         }

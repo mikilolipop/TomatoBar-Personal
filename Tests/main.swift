@@ -280,4 +280,29 @@ let primaryRecord = FocusRecord(id: UUID(), name: "分类", startedAt: base, end
 check(primaryRecord.category == "数学", "the statistics category is the first tag")
 check(FocusRecord(id: UUID(), name: "无", startedAt: base, endedAt: base, plannedSeconds: 60,
                   completed: true, segments: []).category == "未分类", "no tags displays as 未分类")
+// Per-category icon overrides. The field did not exist in earlier files, so its absence
+// must decode; and editing must not disturb it unless the caller passes a new map.
+var styleState = FocusState()
+styleState.records = [delC]
+styleState.categoryStyles = ["学习": "star"]
+let styleEncoded = try JSONEncoder().encode(styleState)
+var styleObject = try JSONSerialization.jsonObject(with: styleEncoded) as! [String: Any]
+styleObject.removeValue(forKey: "categoryStyles")
+let styleLegacyData = try JSONSerialization.data(withJSONObject: styleObject)
+var styleDecoded = try JSONDecoder().decode(FocusState.self, from: styleLegacyData)
+check(styleDecoded.categoryStyles.isEmpty && styleDecoded.records.count == 1,
+      "files without categoryStyles still decode; overrides default to empty")
+let styleRound = try JSONDecoder().decode(FocusState.self, from: styleEncoded)
+check(styleRound.categoryStyles == ["学习": "star"], "overrides survive a save/load round trip")
+// The untouched-overrides check must start from a state that HAS an override, otherwise
+// "left alone" and "wiped to empty" are indistinguishable — a mutation that resets the
+// map on every edit passes a check written against an already-empty map.
+var styleRenamed = styleRound
+check(styleRenamed.categoryStyles == ["学习": "star"], "fixture starts with an override in place")
+try styleRenamed.editRecord(id: delC.id, name: delC.name, tags: delC.tags)
+check(styleRenamed.categoryStyles == ["学习": "star"], "a rename without styles leaves overrides untouched")
+try styleRenamed.editRecord(id: delC.id, name: delC.name, tags: delC.tags, categoryStyles: ["数学": "globe"])
+check(styleRenamed.categoryStyles == ["数学": "globe"], "passing styles replaces the map in the same atomic edit")
+try styleRenamed.deleteRecord(id: delC.id)
+check(styleRenamed.categoryStyles == ["数学": "globe"], "deleting a record keeps the style map")
 print("PASS: \(checks) total checks including deletion and category switching")

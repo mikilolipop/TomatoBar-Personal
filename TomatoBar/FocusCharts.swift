@@ -18,7 +18,37 @@ enum Garden {
     /// reordering or inserting an entry would silently recolour records the user has
     /// already tagged. Append new suggestions at the end only.
     static let suggestedCategories = ["材料力学", "建模", "英语", "编程", "阅读", "数学", "写作"]
+    /// FNV-1a over the lowercased name, shared by color() and symbol() so a category's
+    /// colour and fallback glyph are both stable for a given name.
+    private static func hashOf(_ name: String) -> UInt64 {
+        name.lowercased().utf8.reduce(UInt64(14695981039346656037)) { ($0 ^ UInt64($1)) &* 1099511628211 }
+    }
+    /// Glyphs for categories outside the named set. Hashing means different custom
+    /// categories look different; before this, every one of them collapsed onto a single
+    /// grid glyph, which made the day tiles and the editor preview carry no information.
+    /// Deliberately disjoint from the named symbols so a custom tag never looks like one
+    /// of the seven.
+    static let symbolFallbacks = ["tag", "book", "paintbrush", "figure.walk", "music.note",
+                                  "globe", "camera", "cup.and.saucer", "gamecontroller", "star"]
+    /// Offered by the editor's icon picker. `symbol` is what gets stored per category in
+    /// FocusState.categoryStyles; `label` exists only for the menu.
+    struct SymbolChoice: Identifiable {
+        let symbol: String
+        let label: String
+        var id: String { symbol }
+    }
+    static let palette: [SymbolChoice] = [
+        SymbolChoice(symbol: "book.closed", label: "书本"), SymbolChoice(symbol: "leaf", label: "叶子"),
+        SymbolChoice(symbol: "headphones", label: "耳机"), SymbolChoice(symbol: "laptopcomputer", label: "电脑"),
+        SymbolChoice(symbol: "function", label: "函数"), SymbolChoice(symbol: "pencil", label: "铅笔"),
+        SymbolChoice(symbol: "tag", label: "标签"), SymbolChoice(symbol: "book", label: "书"),
+        SymbolChoice(symbol: "paintbrush", label: "画笔"), SymbolChoice(symbol: "figure.walk", label: "步行"),
+        SymbolChoice(symbol: "music.note", label: "音乐"), SymbolChoice(symbol: "globe", label: "地球"),
+        SymbolChoice(symbol: "camera", label: "相机"), SymbolChoice(symbol: "cup.and.saucer", label: "杯子"),
+        SymbolChoice(symbol: "gamecontroller", label: "游戏"), SymbolChoice(symbol: "star", label: "星星")
+    ]
     static func symbol(_ name: String) -> String {
+        if name == "未分类" { return "square.grid.2x2" }
         switch name {
         case "材料力学", "阅读": return "book.closed"
         case "建模": return "leaf"
@@ -26,14 +56,13 @@ enum Garden {
         case "编程": return "laptopcomputer"
         case "数学": return "function"
         case "写作": return "pencil"
-        default: return "square.grid.2x2"
+        default: return symbolFallbacks[Int(hashOf(name) % UInt64(symbolFallbacks.count))]
         }
     }
     static func color(_ name: String) -> Color {
         if name == "未分类" { return muted }
         if let index = suggestedCategories.firstIndex(of: name) { return colors[index] }
-        let hash = name.lowercased().utf8.reduce(UInt64(14695981039346656037)) { ($0 ^ UInt64($1)) &* 1099511628211 }
-        return colors[Int(hash % UInt64(colors.count))]
+        return colors[Int(hashOf(name) % UInt64(colors.count))]
     }
 }
 
@@ -55,6 +84,7 @@ struct GardenArt: View {
 
 struct FocusChart: View {
     let summary: FocusSummary
+    let styles: [String: String]
     @ObservedObject var activity: WindowActivity
     @AppStorage("gentleAnimations") private var animations = true
     let period: FocusPeriod
@@ -103,7 +133,7 @@ struct FocusChart: View {
                         HStack(spacing: 8) {
                             ForEach(row) { record in
                                 Button { onRecord(record) } label: {
-                                    Image(systemName: Garden.symbol(record.category)).font(.system(size: 22, weight: .medium))
+                                    Image(systemName: styles[record.category.lowercased()] ?? Garden.symbol(record.category)).font(.system(size: 22, weight: .medium))
                                         .foregroundColor(Garden.paper)
                                         .frame(width: tileWidth(record, available: geometry.size.width - 8), height: 68)
                                         .background(Garden.color(record.category).opacity(0.85))
