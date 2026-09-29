@@ -137,15 +137,22 @@ V1.3 已按用户决定定稿上线，不再往这个版本里加东西。后续
 - 开源前隐私自查：无 secrets（`DEVELOPMENT_TEAM` 为空、CI 不用密钥）；
   QA 截图与备份图在 `.gitignore` 内不会发布；历史提交仅含 noreply 公开邮箱；
   `export_options.plist` 无账号信息；`main` 分支为冻结上游基线
-- **未做（无 gh CLI 且无 brew，GitHub API 路径被安全策略拦下）**：仓库 About 描述、topics、
-  social preview 图需在网页 Settings 手工填，或在有 gh 的机器上执行（文案见本条下方"给用户的设置建议"）
+- **GitHub 元信息已用 gh CLI 直接设置完成**（会话后半段从 Releases 装了 gh 2.101.0 到 `~/bin/gh`，
+  复用钥匙串里已有的登录态，token scopes 含 repo）：
+  Description（中英双语）、10 个 topics 均已生效；
+  仓库**不是 GitHub fork**（无父仓库横幅），默认分支已是 `feature/personal-focus`
+- **社交预览图无法用 API 设置**（`/social_preview` 端点 404，属网页专属）：
+  已生成 1200×630 成品在 `/tmp/og.png`（完整窗口+白边），待用户在
+  Settings → General → Social preview 手工上传
 - **未转 public**——发布开关留给用户
 
 ## 给用户的设置建议（GitHub 网页 Settings → General）
 
-- Description：`TomatoBar 的个人定制 fork：完全无声的 macOS 菜单栏番茄钟，专注事件记录、标签分类与日/周/月复盘（MIT）`
-- Topics：`pomodoro` `macos` `menu-bar` `swiftui` `focus-timer` `productivity` `time-tracking` `pomodoro-timer`
-- Social preview：1200×630，可直接用 `screenshot.png` 裁剪（网页 Settings 底部上传）
+- ~~Description、Topics~~ 已通过 gh CLI 设置完成
+- Social preview：上传 `/tmp/og.png`（已生成，1200×630）；若 /tmp 被清，
+  可用 `sips -z 610 813 screenshot.png --out /tmp/og2.png && sips --padToHeightWidth 630 1200 --padColor FFFFFF /tmp/og2.png --out /tmp/og.png` 重新生成
+- 转 public 前建议：打 `v1.3` tag 并在 GitHub Releases 附上 .app（用户决定中）
+- gh 装在 `~/bin/gh`，不在默认 PATH；要用可直接 `~/bin/gh …`，或在 `~/.zshrc` 加 `export PATH="$HOME/bin:$PATH"`
 
 ---
 
