@@ -35,8 +35,8 @@ struct MainWindowView: View {
                     HStack(alignment: .top, spacing: 36) {
                         summaryPanel.frame(width: 340)
                         FocusChart(summary: filtered, styles: timer.state.categoryStyles, activity: timer.windowActivity, period: period, onDay: { date = $0; period = .day }, onRecord: { editing = $0 })
-                            .frame(maxWidth: .infinity)
-                    }.frame(height: 280)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }.frame(minHeight: 170, idealHeight: 280, maxHeight: 280)
                     Rectangle().fill(Garden.line).frame(height: 1)
                 }
                 recordHeader

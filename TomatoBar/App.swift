@@ -22,7 +22,7 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let reminder = TBReminder()
     private var launchContext = LaunchContext()
     static var shared: TBStatusItem?
-    private static let mainWindowMinContent = NSSize(width: 920, height: 740)
+    private static let mainWindowMinContent = NSSize(width: 780, height: 620)
 
     func applicationWillFinishLaunching(_: Notification) {
         launchContext.observe(NSAppleEventManager.shared().currentAppleEvent)
