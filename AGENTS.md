@@ -15,7 +15,7 @@ macOS 菜单栏番茄钟，是 [ivoronin/TomatoBar](https://github.com/ivoronin/
 |---|---|
 | 产品名 | TomatoBar Personal |
 | Bundle ID | `com.dilyar.TomatoBarPersonal`（与上游共存，不迁移原版数据） |
-| 当前版本 | 3.8.0（对外称 V1.2） |
+| 当前版本 | 3.9.0（对外称 V1.3） |
 | 默认分支 | `feature/personal-focus` |
 | `main` 分支 | 上游基线 `90a77d6`，仅用于对比 diff，**不要在上面开发** |
 | `origin` | `mikilolipop/TomatoBar-Personal`（**私有**） |
