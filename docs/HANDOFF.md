@@ -137,7 +137,10 @@ V1.3 已按用户决定定稿上线，不再往这个版本里加东西。后续
 **修复**：把 `window.contentMinSize` 移到 `contentViewController` 赋值之后重新设置，
 并加注释说明该 AppKit 陷阱（代码里已有防回归注释）。`scripts/test.sh` 153 项全绿。
 
-**遗留**：本机尚未实机验证"拖窗口到 920×740 即停住"（需要重新构建安装后肉眼确认）。
+**验证**：新构建已安装并运行（替换 3.9.0 旧产物）。实测把 autosave frame 写成 500×400，
+重启后恢复被钳制为 920×772（内容 920×740 + 标题栏），且正常写回 autosave。
+注意：System Events 的 AX 强制 resize 会绕过 minSize（曾污染 autosave 为 600×714，已恢复），
+不能用它测试最小尺寸；拖拽路径与 frame 恢复共用同一 clamp 逻辑，以此为准。
 
 ---
 
