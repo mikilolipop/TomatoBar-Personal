@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-09-28，by Claude Code（Opus 5）· 实施「删除记录」+「分类入口清晰化」
+最后更新：2026-09-29，by Claude Code（Opus 5）· 修三处 UI 重复 + 分类图标可手动选
 
 ---
 
@@ -40,13 +40,13 @@ first process whose unix id is 40847（QA13 的 pid）  →  读到的 bid 是 c
 | 项 | 值 |
 |---|---|
 | ⚠️ **已安装版本** | **3.8.0（V1.2），不含本轮任何改动**。删除功能、分类入口、P9 修复都只在源码 + CI 里，`/Applications` 未重装。产物在 `/tmp/TomatoBar-personal-build/`（`/tmp` 会被系统清理，重装前先确认还在，否则重跑 `scripts/build.sh`） |
-| HEAD | 本轮提交 ← `3ea4acc` ← `abf55df`（P7）← `e69be32`（P9）← `bd7c214` ← `d01bc20`（Codex 评审）← `1f43359` ← `8fb1e74` ← `90a77d6`（上游基线） |
+| HEAD | `ef50b45`（分类图标可手动选）← 上一提交（修三处 UI 重复）← `3ea4acc` ← `abf55df`（P7）← `e69be32`（P9）← `bd7c214` ← `d01bc20`（Codex 评审）← `1f43359` ← `8fb1e74` ← `90a77d6`（上游基线） |
 | 工作区 | 干净，与 `origin/feature/personal-focus` 一致 |
-| 测试 | `scripts/test.sh` → **90 项全绿**（本轮新增 29 项） |
+| 测试 | `scripts/test.sh` → **96 项全绿** |
 | **CI** | ✅ `tests` workflow 生效中，前两次运行均 success（[首次运行](https://github.com/mikilolipop/TomatoBar-Personal/actions/runs/36431326540) 46 秒） |
 | 远程 | `origin` = `mikilolipop/TomatoBar-Personal`（私有，默认分支 `feature/personal-focus`）；`upstream` = `ivoronin/TomatoBar` |
 | 用户真实数据 | **2 条**（`测试` 60秒、`未命名专注` 480秒，均带标签 `学习`），phase=idle。UI 验收前后逐条比对，**ID／名称／标签／时长／完成状态全部一致，未被触碰** |
-| QA 隔离环境 | `com.dilyar.TomatoBarPersonal.QA13`，构建于 `/tmp/TomatoBar-QA13-build/`，内含 5 条合成测试数据（原 6 条，验收中删掉 1 条）。**与正式版容器完全隔离** |
+| QA 隔离环境 | `com.dilyar.TomatoBarPersonal.QA13`，构建于 `/tmp/TomatoBar-QA13-build/`，内含 5 条合成数据 + `categoryStyles` 一条 override。**与正式版容器完全隔离** |
 | git 身份 | 本仓库 `--local`：`mikilolipop <207336577+mikilolipop@users.noreply.github.com>`（全局仍未设置） |
 
 ### 原版 TomatoBar 已退役
@@ -114,6 +114,47 @@ tarball 是首次提交前的应急措施。有了 git + 远程后必要性下�
 - 往 `scripts/seed-qa.py` 加几段**亚分钟记录**，用于视觉验证 `FocusCharts.tileWidth` 的
   `max(44, …)` 最小宽度分支。该分支在 UI 层，`scripts/test.sh` 编译不进去，**只能靠眼睛看**。
   注意：QA12 沙盒容器还在，但 **QA12 的 .app 本体已不存在**，需先造一个 QA12 bundle ID 的构建变体。
+
+---
+
+## 刚做完（2026-09-29，Claude Code 修三处 UI 重复 + 分类图标可手动选）
+
+用户对上一轮的界面提出两处实质批评，均成立，均为我照规格逐字实现、没有发现规格条目在
+同一界面上互相冲突所致：
+
+1. **记录行铅笔与 ⋯ 菜单功能重复**，且表头还写了一句图例「铅笔编辑，⋯ 可删除」。
+   → 删掉铅笔，⋯ 菜单保留「编辑记录／删除记录」；表头只留「按时间顺序」。
+   用户已确认此形态（选项「只留 ⋯ 菜单」）。
+2. **编辑器里两个下拉内容完全相同**：分类菜单的「已使用的分类和标签」组
+   与「选择已有标签」菜单都列 `availableTags`。
+   → 删掉「选择已有标签」。想复用已有标签作为次标签，直接在输入框键入即可，
+   `normalizedTags` 会按大小写不敏感归一到既有写法。
+3. **顺带发现的第三个问题**：截图里三块日视图色块图标完全相同 ——
+   `Garden.symbol` 只认 7 个硬编码名字，其余一律落到同一个网格图标，
+   预览和色块因此毫无信息量。→ 未命名的分类改为按名字哈希取 10 个不同的
+   fallback 图标（与颜色共用同一个 FNV-1a），七个命名分类和「未分类」不变。
+
+**新需求：分类图标可手动选**（用户在「自动派生 / 手动选图标 / 图标+颜色都可选」中
+选了中间项）。实现：
+
+- `FocusState.categoryStyles: [String: String]`，键为小写分类名，值为 SF Symbol 名。
+  是**展示元数据**，不是平行分类字段 —— 首标签规则不变
+- **向后兼容是承重墙**：旧 sessions.json 没有这个键，合成 Codable 解码会把缺键当失败，
+  而本应用把解码失败表现为「文件损坏并锁死全部计时」。因此 `FocusState` 手写
+  `init(from:)`，新键用 `decodeIfPresent`。测试会剥掉该键后断言仍能解码；
+  把 `decodeIfPresent` 换成 `decode` 的变异会以**正是那个会锁死应用的 keyNotFound** 失败
+- 声明该 init 会抑制隐式成员初始化器，首次构建即让所有 `FocusState()` 调用点报错。
+  已补显式 `init()` 并加注释 —— 这类东西下次改动很容易再悄悄弄坏
+- `editRecord` 的 `categoryStyles` 参数默认为 nil：改名改标签不碰 override；
+  编辑器在**同一次原子写入**里提交图标选择，取消则一并丢弃
+- 测试 90 → **96**
+
+UI 验收（QA13 实机）：调色板列出 16 个带中文名的图标 + 「恢复自动图标」；
+给「材料力学」选「星星」→ 落盘 `categoryStyles = {"材料力学": "star"}`；重启后仍在；
+**正式版那份完全没有 categoryStyles 键的 sessions.json 在新构建下正常加载运行**。
+
+未验证：「恢复自动图标」的点击本身 —— 调色板菜单在辅助功能控制下打不开
+（与 P10 同一类 SwiftUI 引用失效），那一行 `removeValue` 记为未验证，见 BACKLOG P10。
 
 ---
 
