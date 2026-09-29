@@ -140,7 +140,8 @@ V1.3 已按用户决定定稿上线，不再往这个版本里加东西。后续
   API 失败（限流等）时兜底链接仍可下载。
 - **Pages**：分支 + `/site` 路径方案被 API 拒（只允许 `/` 或 `/docs`），改为独立孤儿分支
   **`gh-pages`**（站点文件在其根目录，与开发分支历史无关）。
-  **以后更新官网：改 `site/` 后把内容重新提交进 `gh-pages` 分支并推送**；
+  **以后更新官网：改 `site/` 后跑 `scripts/deploy-site.sh`**（幂等，临时 worktree 同步 site/→gh-pages，
+  不碰工作区；无变更时 no-op，分支缺失时自动创建）；
   仓库 homepage 字段已设为 `https://mikilolipop.github.io/TomatoBar-Personal/`
 - 遗留：社交预览图仍是空窗版，可基于 `site/hero-day.png` 重新生成一张供网页端换
 
