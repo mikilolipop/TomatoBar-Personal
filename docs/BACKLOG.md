@@ -1011,6 +1011,90 @@ PYPROBE
 
 ---
 
+## 评审轮（2026-09-29，外部 Code Review 报告）—— 新增 P16–P23
+
+> 该报告自带一套 P1–P12 编号，**与本文件编号冲突**（如报告"P3 数据一致性"≠本文件 P3 长休息图标）。
+> 以下按本文件序列重编号，括号内为报告原编号。
+
+---
+
+## 🟠 P16（报告 P4）— 主窗口与弹层的分类筛选互不感知，可停留在已不存在的分类上
+
+**状态**：未修（2026-09-29 登记，严重性：低-中）
+
+`MainWindow.swift` 的 `selectedCategory` 与 `View.swift` 弹层的 `selectedTag` 是各自视图的
+`@State`；`clearStaleFilter()` 只在本视图发生编辑/删除时触发。两窗并开时，一边删掉某分类的
+最后一条记录，另一边筛选芯片仍指向该分类、列表显示为空的"没有匹配"。
+
+**核验**：两窗并开 → 主窗口删掉分类 X 的最后一条 → 弹层仍停在 X 的空列表。
+修向：谓词已有（`categoryFilterStillMatches`，P14 引入），缺的只是跨视图失效通知
+（挂到 `FocusHistory` 的 publisher 上重算），属于小改造不是 bug 修补。
+
+---
+
+## 🟢 P17（报告 P10）— 悬停垃圾桶的 accessibility 状态不干净
+
+**状态**：未修（2026-09-29 登记，严重性：低）
+
+`MainWindow.swift` recordList 的垃圾桶用 `opacity(0) + allowsHitTesting(false)` 隐藏；
+opacity 不承诺把元素移出 VoiceOver 树（`accessibilityHidden` 才是契约）。
+建议直接 `.accessibilityHidden(true)`：⋯ 菜单里有同动作的「删除记录」，垃圾桶对
+非鼠标用户本来就是冗余通道。
+
+## 🟢 P18（报告 P12）— cancel() 后 name/planned 字段残留
+
+**状态**：未修（2026-09-29 登记，严重性：极低，暂无可观察症状）
+
+`State.swift cancel(at:)` 只清计时相关字段，`name`/`planned` 留着上一次的值。
+所有读取方都以 `phase`/`startedAt` 为准，故无 bug；登记是为字段演进时别踩活尸数据。
+
+---
+
+## 🔴 P19（报告 P1）— 「恢复自动图标」的移除差集被 Dictionary 双 Optional 吞掉
+
+**状态**：✅ 已修复 @ 033ec69
+
+**修复方式**：P13 引入的 delta 协议里，UI 侧 `delta[key] = nil` 在 `[String: String?]` 上
+**是删键不是存 nil**（Swift subscript 语义），移除永远发不出去；P13 的领域测试用字面量
+`["数学": nil]` 构造了合法差集，恰好测不到真实 UI 路径。现改 `.some(nil)` 并把差集构建
+提取为 `RecordEditor.styleDelta(initial:current:)`，桥接层新增 2 项直接测该函数。
+（教训：**测试构造与生产构造语义不同 = 没测**。）
+
+## 🔴 P20（报告 P2）— 保存失败后每 0.25s 疯狂重试
+
+**状态**：✅ 已修复 @ 033ec69
+
+**修复方式**：`persist()` 失败时 `lastFailedSave = now`，tick 的 5s 自动保存分支加
+`now - lastFailedSave >= 30` 退避；用户手动「重试保存」不经该门（直接 persist）。
+
+## 🔴 P21（报告 P3）— 完成记录未落盘时仍可进入休息
+
+**状态**：✅ 已修复 @ 033ec69
+
+**修复方式**：`startRest()` 补上与 `startWork()` 同款的 `storageError` 门槛；
+桥接层用真实链路回归（预置 workFinished → 断盘 → pause 触发失败 → startRest 被拒 →
+修盘 → retryStorage → startRest 放行，7 项）。报告建议的 PersistenceState 状态机
+（healthy/dirty/loadFailed）是更好的长期形态，登记为后续改造方向，本轮先用最小门槛。
+
+## 🟠 P22（报告 P5）— 取消确认框与倒计时到点的竞态
+
+**状态**：✅ 已修复 @ 0bcf00d
+
+**修复方式**：采纳报告方案——打开确认框先 `pause()`（记录原暂停态），「继续专注」再
+`togglePause()` 恢复，「放弃这段」面对的是冻结的钟，`phase == .work` 恒成立。
+两入口（弹层/展开）同修。**确认框开着时窗口若失焦被 transient 关闭 → 钟停在暂停态**，
+可见可恢复，无数据风险。
+
+## 🟠 P23（报告 P6）— CI 只跑领域测试，bridge / launch-context 从未进 CI
+
+**状态**：✅ 已修复 @ fcd3466（首次 CI 运行 36581862625 全部 7 步绿，bridge 在 CI runner 上验证通过）
+
+**修复方式**：main.yml 在 Build Release 后新增两步：
+`TOMATOBAR_BUILD_DIR=build sh scripts/test-bridge.sh`（复用 CI 自己的构建产物）与
+`sh scripts/test-launch-context.sh`（自给自足，无需产物）。
+
+---
+
 ## 记录规则
 
 - 新问题追加到对应严重性分区，**必须附 file:line 证据和可独立执行的核验命令**
