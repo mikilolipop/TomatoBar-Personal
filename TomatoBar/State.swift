@@ -275,6 +275,22 @@ struct FocusState: Codable {
         rounds = 0
     }
 
+    /// Aborts the running focus without keeping anything. Unlike stop, no record is
+    /// written and `rounds` survives: an abandoned session was never a completed round,
+    /// so the rest schedule stays untouched. Paused work is included — `paused` is only
+    /// a flag, `phase` stays `.work`.
+    mutating func cancel(at now: Date) {
+        guard phase == .work else { return }
+        phase = .idle
+        startedAt = nil
+        segments = []
+        deadline = nil
+        segmentStart = nil
+        remaining = 0
+        paused = false
+        checkpoint = now
+    }
+
     /// Never count time while the application was not running as focused work.
     mutating func recover() {
         if isTiming && !paused { pause(at: checkpoint) }

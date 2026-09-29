@@ -9,6 +9,7 @@ struct TBPopoverView: View {
     @State private var tab = 0
     @State private var editingRecord: FocusRecord?
     @State private var selectedTag: String?
+    @State private var showCancelConfirm = false
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -29,6 +30,11 @@ struct TBPopoverView: View {
                     Button(timer.state.paused ? "继续" : "暂停") { timer.togglePause() }
                         .buttonStyle(.borderedProminent).frame(maxWidth: .infinity)
                     Button(timer.state.phase == .work ? "结束并记录" : "结束休息") { timer.stop() }
+                    if timer.state.phase == .work {
+                        Button("取消") { showCancelConfirm = true }
+                            .buttonStyle(.borderless).foregroundColor(Garden.red)
+                            .help("丢弃这段专注，不保存为记录")
+                    }
                 }.frame(maxWidth: .infinity)
             } else if timer.state.needsAttention {
                 Button("查看到时提醒") { timer.onAttention?() }
@@ -71,6 +77,10 @@ struct TBPopoverView: View {
                 Button("退出") { NSApp.terminate(nil) }.buttonStyle(.plain)
             }
         }.padding(18).frame(width: 350)
+            .alert("取消这段专注？", isPresented: $showCancelConfirm) {
+                Button("继续专注", role: .cancel) { }.keyboardShortcut(.cancelAction)
+                Button("放弃这段", role: .destructive) { timer.cancel() }
+            } message: { Text(cancelFocusMessage(timer.state)) }
     }
 
     private var history: some View {
@@ -178,6 +188,14 @@ struct TBPopoverView: View {
             Spacer(minLength: 0)
         }.padding(.top, 4)
     }
+}
+
+/// Shared by the popover and the expanded timer so cancelling always warns identically.
+/// Deliberately shows no elapsed time: the live focused-so-far figure would drift with
+/// pauses, and the point of the dialog is "nothing will be saved", not a measurement.
+func cancelFocusMessage(_ state: FocusState) -> String {
+    let started = state.startedAt.map { "开始于 \($0.formatted(date: .abbreviated, time: .shortened))" } ?? ""
+    return "「\(state.name)」\(started.isEmpty ? "" : "\n\(started)")\n\n取消后，这段专注将被丢弃，不会保存为记录。"
 }
 
 struct RecordEditor: View {

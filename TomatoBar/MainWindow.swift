@@ -13,6 +13,7 @@ struct MainWindowView: View {
     @State private var search = ""
     @State private var editing: FocusRecord?
     @State private var pendingDelete: FocusRecord?
+    @State private var hoverDelete: UUID?
     @State private var deleteError: String?
     @State private var settings = false
     @State private var expandedTimer = false
@@ -229,6 +230,12 @@ struct MainWindowView: View {
                                 if !record.completed { Text("提前结束").font(.caption2).foregroundColor(Garden.muted) }
                                 Text(focusDuration(historyTab ? record.seconds : record.seconds(in: summary.interval)))
                                     .font(.system(size: 13).monospacedDigit()).frame(width: 90, alignment: .trailing)
+                                Button { pendingDelete = record } label: {
+                                    Image(systemName: "trash").foregroundColor(Garden.red)
+                                }.buttonStyle(.plain)
+                                    .opacity(hoverDelete == record.id ? 1 : 0)
+                                    .allowsHitTesting(hoverDelete == record.id)
+                                    .help("删除记录").accessibilityLabel("删除记录：\(record.name)")
                                 Menu {
                                     Button("编辑记录") { editing = record }
                                     Button("删除记录", role: .destructive) { pendingDelete = record }
@@ -237,6 +244,10 @@ struct MainWindowView: View {
                                 }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                                     .help("编辑或删除").accessibilityLabel("更多操作：\(record.name)")
                             }.padding(.vertical, 12)
+                            .onHover { inside in
+                                if inside { hoverDelete = record.id }
+                                else if hoverDelete == record.id { hoverDelete = nil }
+                            }
                             Rectangle().fill(Garden.line.opacity(0.55)).frame(height: 1)
                         }
                     }.padding(.trailing, 12)
@@ -282,6 +293,7 @@ struct TimerCard: View {
 struct ExpandedTimer: View {
     @ObservedObject var timer: TBTimer
     let close: () -> Void
+    @State private var showCancelConfirm = false
     var body: some View {
         VStack(spacing: 22) {
             HStack { Spacer(); Button("收起", action: close).keyboardShortcut(.cancelAction) }
@@ -294,9 +306,18 @@ struct ExpandedTimer: View {
             HStack(spacing: 20) {
                 Button(timer.state.isTiming ? (timer.state.paused ? "继续专注" : "暂停") : timer.state.needsAttention ? "查看提醒" : "开始专注") { timer.primaryAction() }.buttonStyle(.borderedProminent)
                 if timer.state.isTiming { Button(timer.state.phase == .work ? "结束并记录" : "结束休息") { timer.stop() } }
+                if timer.state.phase == .work {
+                    Button("取消专注") { showCancelConfirm = true }
+                        .buttonStyle(.borderless).foregroundColor(Garden.red)
+                        .help("丢弃这段专注，不保存为记录")
+                }
             }
             Text("收起或关闭主窗口后，菜单栏会继续陪你专注。").font(.caption).foregroundColor(Garden.muted)
         }.padding(28).frame(width: 540, height: 460).background(Garden.paper).foregroundColor(Garden.ink).accentColor(Garden.red)
+            .alert("取消这段专注？", isPresented: $showCancelConfirm) {
+                Button("继续专注", role: .cancel) { }.keyboardShortcut(.cancelAction)
+                Button("放弃这段", role: .destructive) { timer.cancel() }
+            } message: { Text(cancelFocusMessage(timer.state)) }
     }
 }
 

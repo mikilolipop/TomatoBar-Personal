@@ -34,6 +34,14 @@ check(timer.state.records.map(\.id) == [b.id] && timer.history.records.map(\.id)
 let disk = try store.load()
 check(disk.records.map(\.id) == [b.id] && disk.rounds == 3, "persisted delete preserves rounds")
 check(timer.deleteRecord(id: a.id) != nil && timer.state.records.map(\.id) == [b.id], "repeated delete cannot remove another record")
+timer.startWork()
+check(timer.state.phase == .work && timer.state.startedAt != nil, "bridge starts a real work session")
+timer.cancel()
+check(timer.state.phase == .idle && timer.state.records.map(\.id) == [b.id] && timer.state.rounds == 3,
+      "bridge cancel leaves no record and keeps rounds")
+let diskAfterCancel = try store.load()
+check(diskAfterCancel.phase == .idle && diskAfterCancel.records.map(\.id) == [b.id] && diskAfterCancel.rounds == 3
+    && diskAfterCancel.startedAt == nil && diskAfterCancel.segments.isEmpty, "cancelled session persists as clean idle")
 
 let failureParent = scratch.appendingPathComponent("failure")
 let failingStore = FocusStore(url: failureParent.appendingPathComponent("sessions.json"))

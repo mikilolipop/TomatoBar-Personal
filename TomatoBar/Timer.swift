@@ -85,6 +85,9 @@ final class TBTimer: ObservableObject {
     }
     func pause() { change { $0.pause(at: $1) } }
     func stop() { change { $0.stop(at: $1) } }
+    // Not gated on storageError like startWork: cancelling only leaves the running state,
+    // so it must work even when the disk is unwritable (persist() handles the failure).
+    func cancel() { change { $0.cancel(at: $1) } }
     /// Commit edits only after the atomic disk write succeeds; a failed edit stays in the editor.
     func editRecord(id: UUID, name: String, tags: [String], styleChanges: [String: String?]? = nil) -> String? {
         guard !loadFailed else { return "记录未能读取，暂时无法编辑。" }

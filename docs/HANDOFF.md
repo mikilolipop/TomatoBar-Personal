@@ -124,6 +124,32 @@ V1.3 已按用户决定定稿上线，不再往这个版本里加东西。后续
 
 ---
 
+## 刚做完（2026-09-29，Claude Code 实施「取消专注」+ 行内删除（用户反馈轮））
+
+用户转达两条反馈：① 开始后没法直接取消——只能"结束并记录"，必然留下"提前结束"记录再删；
+② 删除要 3 步（⋯ → 删除记录 → 确认）。产品决策经 AskUserQuestion 确认：
+取消=直接丢弃不留记录（带轻确认）；删除=悬停垃圾桶+**保留**确认弹窗（3→2 步）。
+
+- **领域层**（`State.swift`，stop 之后）：新增 `cancel(at:)`——只处理 `.work`（含 paused，
+  因为 paused 只是标志位），丢弃 segments/startedAt、**不动 rounds**（取消不算完成轮次）、
+  置 checkpoint=now。非 work 态 no-op。与 stop 的差异全在"不落记录、不清轮次"
+- **桥接**（`Timer.swift`）：`cancel()` 走 `change{}`（persist+updateStatus）；
+  **不受 storageError 门槛限制**（用户要的是逃离当前态；loadFailed 时内存本来就是 idle，天然 no-op）
+- **UI 三个入口**：popover「结束并记录」旁 + ExpandedTimer 同位置，均只在 `.work` 显示；
+  共用 `cancelFocusMessage`（`View.swift`，RecordEditor 上方）；确认弹窗复制既有删除 alert 的
+  键盘安全模式（「继续专注」= role .cancel + cancelAction；「放弃这段」= destructive）
+- **行内删除**（`MainWindow.swift` recordList）：悬停显示垃圾桶（opacity+allowsHitTesting 同步，
+  空间常留防行抖动），动作就是现成的 `pendingDelete = record`——确认/commitDelete/clearStaleFilter
+  全复用，**零新删除逻辑**；⋯ 菜单原样保留（编辑入口 + 键盘/VoiceOver 替代路径）
+- **TimerCard 折叠态不加按钮**（避免挤），展开即有
+- **测试**：领域 153→**160**（cancel 丢弃/幂等/paused 中取消/取消后重开/rest 忽略/rounds 保留
+  与 stop 对照）；桥接 12→**15**（真 TBTimer：start→cancel→无记录、rounds 保留、落盘为干净 idle）
+
+**UI 部分未经人眼验收**（test.sh 编译不进 UI 层，老规矩）：垃圾桶悬停、两处取消弹窗、
+放弃后弹层/展开卡回到空闲态——构建安装后需人工点一遍。
+
+---
+
 ## 刚做完（2026-09-29，Claude Code 建 GitHub Pages 下载落地页）
 
 用户要求：一个带直接下载按钮的介绍页；README/宣传图改用"以前测试数据"的截图（空态太素）。
