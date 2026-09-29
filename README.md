@@ -1,54 +1,88 @@
-> **V1.3**：支持删除单条历史记录；统计分类入口改为始终可见、可自定义、可选图标。见 [更新说明](docs/V1.3更新说明.md)。
+<div align="center">
 
-> **V1.2**：新增原生主窗口、日／周／月复盘、紧凑与大倒计时、轻微像素动画。见 [更新说明](docs/V1.2更新说明.md)。
+<img src="TomatoBar/Assets.xcassets/AppIcon.appiconset/icon_128x128%402x.png" width="128" height="128"/>
 
-> **V1.1 已安装**：支持记录改名、多标签与标签筛选。见 [更新说明](docs/V1.1更新说明.md)。
+# TomatoBar Personal
 
-> **个人定制版 TomatoBar Personal**：事件记录、暂停/继续、完全无声及到时确认提醒。
-> 使用和验证状态见 [个人版使用与验证](docs/个人版使用与验证.md)。以下为上游项目说明，声音和原版 URL 等描述不适用于个人版。
+macOS 菜单栏番茄钟 · [TomatoBar](https://github.com/ivoronin/TomatoBar) 的个人定制 fork
 
-<p align="center">
-<img src="https://raw.githubusercontent.com/ivoronin/TomatoBar/main/TomatoBar/Assets.xcassets/AppIcon.appiconset/icon_128x128%402x.png" width="128" height="128"/>
-<p>
- 
-<h1 align="center">TomatoBar</h1>
-<p align="center">
-<img src="https://img.shields.io/github/actions/workflow/status/ivoronin/TomatoBar/main.yml?branch=main"/> <img src="https://img.shields.io/github/downloads/ivoronin/TomatoBar/total"/> <img src="https://img.shields.io/github/v/release/ivoronin/TomatoBar?display_name=tag"/> <img src="https://img.shields.io/homebrew/cask/v/tomatobar"/>
-</p>
+完全无声 · 事件记录 · 日／周／月复盘
 
-<img
-  src="https://github.com/ivoronin/TomatoBar/raw/main/screenshot.png?raw=true"
-  alt="Screenshot"
-  width="50%"
-  align="right"
-/>
+[![tests](https://github.com/mikilolipop/TomatoBar-Personal/actions/workflows/main.yml/badge.svg?branch=feature/personal-focus)](https://github.com/mikilolipop/TomatoBar-Personal/actions/workflows/main.yml)
+![macOS](https://img.shields.io/badge/macOS-12.3%2B-blue)
+![Swift](https://img.shields.io/badge/Swift-SwiftUI%20%2B%20AppKit-orange)
+[![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-## Overview
-Have you ever heard of Pomodoro? It’s a great technique to help you keep track of time and stay on task during your studies or work. Read more about it on <a href="https://en.wikipedia.org/wiki/Pomodoro_Technique">Wikipedia</a>.
+</div>
 
-TomatoBar is world's neatest Pomodoro timer for the macOS menu bar. All the essential features are here - configurable
-work and rest intervals, optional sounds, discreet actionable notifications, global hotkey.
+![screenshot](screenshot.png)
 
-TomatoBar is fully sandboxed with no entitlements.
+## 这是什么
 
-Download the latest release <a href="https://github.com/ivoronin/TomatoBar/releases/latest/">here</a> or install using Homebrew:
+[TomatoBar](https://github.com/ivoronin/TomatoBar) 是一款优秀的 macOS 菜单栏番茄钟。
+这个 fork 在保留其轻量风格的基础上，把它改造成一个**安静、可回溯的专注记录工具**：
+
+- **完全无声** — 移除了全部音频播放代码与素材，休息也从不发出声音
+- **事件记录** — 每段专注可以填写名称、多个标签与分类，结束后仍可编辑或删除
+- **暂停／继续** — 工作与休息均可暂停，睡眠与退出自动暂停
+- **无声置顶提醒** — 时段结束弹出置顶确认窗，不依赖系统通知授权
+- **本地持久化** — 历史记录原子写入 `~/Library/Application Support/TomatoBarPersonal/sessions.json`，
+  无网络请求、无遥测，数据不出这台 Mac
+- **原生主窗口** — 日／周／月三种视图复盘：色块流、堆叠柱、热力日历，像素风动画
+- **可与原版共存** — 独立 Bundle ID（`com.dilyar.TomatoBarPersonal`）与独立数据目录
+
+界面文案目前为硬编码中文。
+
+## 版本
+
+| 版本 | 内容 |
+|---|---|
+| V1.3（3.9.0） | 删除单条记录；分类入口常驻、可选图标。[更新说明](docs/V1.3更新说明.md) |
+| V1.2（3.8.0） | 原生主窗口，日／周／月复盘，紧凑与大倒计时。[更新说明](docs/V1.2更新说明.md) |
+| V1.1（3.7.1） | 记录改名、多标签与标签筛选。[更新说明](docs/V1.1更新说明.md) |
+| V1.0（3.7.0） | 事件记录、暂停/继续、完全无声、到时确认提醒。[使用与验证](docs/个人版使用与验证.md) |
+
+## 安装
+
+本仓库暂未发布安装包，从源码构建（需要 Xcode 与 Command Line Tools）：
+
+```sh
+git clone https://github.com/mikilolipop/TomatoBar-Personal.git
+cd TomatoBar-Personal
+./scripts/build.sh                 # Release 构建 + 严格签名校验
+open "/tmp/TomatoBar-personal-build/Build/Products/Release/TomatoBar Personal.app"
 ```
-brew install --cask tomatobar
+
+构建产物为 ad-hoc 签名。若从其他位置拷贝后被 Gatekeeper 拦截：
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/TomatoBar Personal.app"
 ```
 
-If the app doesn't start, install using the `--no-quarantine` flag:
+## 开发
+
+```sh
+./scripts/test.sh                  # 领域层测试（无需签名，CI 同款）
+./scripts/test-bridge.sh           # 桥接层测试（真实依赖 + 临时 QA 目录）
+./scripts/build.sh                 # Release 构建
 ```
-brew install --cask --no-quarantine tomatobar
+
+- 领域层（状态机、存储、统计）与 UI 分离，`test.sh` 只编译领域层，秒级完成
+- 默认分支为 **`feature/personal-focus`**；`main` 是冻结的上游基线，只用于 diff
+- 提交前 `scripts/test.sh` 必须全绿
+- 更多约定见 [`AGENTS.md`](AGENTS.md)，演进记录见 [`docs/HANDOFF.md`](docs/HANDOFF.md) 与 [`docs/BACKLOG.md`](docs/BACKLOG.md)
+
+## 与外部工具的集成
+
+可以用 URL scheme 从命令行或自动化工具启停计时：
+
+```sh
+open tomatobar-personal://startStop
 ```
 
-## Integration with other tools
-### Event log
-TomatoBar logs state transitions in JSON format to `~/Library/Containers/com.github.ivoronin.TomatoBar/Data/Library/Caches/TomatoBar.log`. Use this data to analyze your productivity and enrich other data sources.
-### Starting and stopping the timer
-TomatoBar can be controlled using `tomatobar://` URLs. To start or stop the timer from the command line, use `open tomatobar://startStop`.
+## 许可与致谢
 
-## Older versions
-Touch bar integration and older macOS versions (earlier than Big Sur) are supported by TomatoBar versions prior to 3.0
-
-## Licenses
- - Timer sounds are licensed from buddhabeats
+- 基于 [Ilya Voronin 的 TomatoBar](https://github.com/ivoronin/TomatoBar)（[MIT License](LICENSE)），
+  个人版改动同样以 MIT 发布；上游的全部提交者贡献保留在 Git 历史中
+- 像素插画与动画为本 fork 制作的资源（上游项目中不存在）
+- 感谢 [ivoronin](https://github.com/ivoronin) 创造了干净的起点

@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-09-29，by Claude Code · 主窗口最小尺寸两轮修复：contentMinSize 顺序 + delegate 兜底（拖拽外的缩窗路径）
+最后更新：2026-09-29，by Claude Code · 开源准备：README 重写、封面截图替换、隐私自查；最小窗口 780×620
 
 ---
 
@@ -121,6 +121,31 @@ V1.3 已按用户决定定稿上线，不再往这个版本里加东西。后续
   QA13 已经在本轮建过并可用（见「QA13 复现方式」），不必复用 QA12。
 
 ---
+
+---
+
+## 刚做完（2026-09-29，Claude Code 开源准备：README 重写 + 封面截图替换）
+
+用户计划公开此仓库，要求美化 GitHub 侧内容。
+
+- **README.md 全部重写**为个人 fork 定位（中文、开源仓库口吻）：徽章（CI/macOS 12.3+/Swift/MIT）、
+  功能一览、版本表（V1.0=3.7.0、V1.1=**3.7.1**、V1.2=3.8.0、V1.3=3.9.0，已逐一对照更新说明核实）、
+  源码构建与 Gatekeeper 说明、开发入口、`tomatobar-personal://startStop`、上游 MIT 致谢
+- **删除了"TomatoBar.log 事件日志"段落**——grep 确认个人版源码里不存在该写入，这是上游描述，不可照搬
+- **根目录 `screenshot.png` 由上游旧界面（带 Sounds 页）替换为个人版 V1.3 概览空态截图**
+  （用户提供，2502×1878，零记录零时长，无个人信息）
+- 开源前隐私自查：无 secrets（`DEVELOPMENT_TEAM` 为空、CI 不用密钥）；
+  QA 截图与备份图在 `.gitignore` 内不会发布；历史提交仅含 noreply 公开邮箱；
+  `export_options.plist` 无账号信息；`main` 分支为冻结上游基线
+- **未做（无 gh CLI 且无 brew，GitHub API 路径被安全策略拦下）**：仓库 About 描述、topics、
+  social preview 图需在网页 Settings 手工填，或在有 gh 的机器上执行（文案见本条下方"给用户的设置建议"）
+- **未转 public**——发布开关留给用户
+
+## 给用户的设置建议（GitHub 网页 Settings → General）
+
+- Description：`TomatoBar 的个人定制 fork：完全无声的 macOS 菜单栏番茄钟，专注事件记录、标签分类与日/周/月复盘（MIT）`
+- Topics：`pomodoro` `macos` `menu-bar` `swiftui` `focus-timer` `productivity` `time-tracking` `pomodoro-timer`
+- Social preview：1200×630，可直接用 `screenshot.png` 裁剪（网页 Settings 底部上传）
 
 ---
 
