@@ -138,8 +138,10 @@ V1.3 已按用户决定定稿上线，不再往这个版本里加东西。后续
   （paper/ink/red/muted 取自 `FocusCharts.swift`）。下载按钮为静态兜底链接（v3.9.0 完整 URL）
   + JS 从 GitHub API `/releases/latest` 动态刷新版本、链接与体积——**发新版无需改页面**；
   API 失败（限流等）时兜底链接仍可下载。
-- **Pages**：gh api 启用，源 = `feature/personal-focus` 分支 `/site` 目录；
-  仓库 homepage 字段同步设为 `https://mikilolipop.github.io/TomatoBar-Personal/`
+- **Pages**：分支 + `/site` 路径方案被 API 拒（只允许 `/` 或 `/docs`），改为独立孤儿分支
+  **`gh-pages`**（站点文件在其根目录，与开发分支历史无关）。
+  **以后更新官网：改 `site/` 后把内容重新提交进 `gh-pages` 分支并推送**；
+  仓库 homepage 字段已设为 `https://mikilolipop.github.io/TomatoBar-Personal/`
 - 遗留：社交预览图仍是空窗版，可基于 `site/hero-day.png` 重新生成一张供网页端换
 
 ## 刚做完（2026-09-29，Claude Code 发布 V1.3 GitHub Release + 下载包）
