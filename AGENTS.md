@@ -79,6 +79,7 @@ scripts/test-bridge.sh # 先 build.sh，再运行 12 项真实 TBTimer 检查；
 scripts/build.sh    # Release 构建到 /tmp/TomatoBar-personal-build，ad-hoc 签名 + codesign --verify --deep --strict
 scripts/seed-qa.py  # 只写入隔离的 QA12 沙盒，运行前先退出该 App
 scripts/compare-design.py
+scripts/deploy-site.sh # 把 site/ 发布到 gh-pages 分支（GitHub Pages）；幂等，用临时 worktree 不碰工作区
 ```
 
 `scripts/test.sh` **不需要 Xcode 项目、不需要签名、几秒跑完**。没有 XCTest target，
