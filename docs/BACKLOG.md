@@ -993,6 +993,9 @@ PYPROBE
 
 | 项 | 内容 | 提交 |
 |---|---|---|
+| **P24+P25+P26+P27** | 第三轮评审四项：写成功清退避（三路径统一）、`freezeForCancel` 收拢"恰好到点"边界并拒绝非 work 弹窗、`expected` 快照守卫消灭同记录 lost update、「结束本组」落盘失败不关窗+注释纠错。测试 160→**169**、桥接 22→**35**；变异 M1/M2/M3/M5/M7 被抓，M4 不可达已如实登记 | `60706a5` |
+| **P16** | 跨视图筛选失效通知：两视图 `onChange` 重算 `clearStaleFilter`，弹层谓词统一入 `categoryFilterStillMatches`。谓词已测，SwiftUI 调用点需人工验收 | `60706a5` |
+| **文档一致性** | AGENTS/CLAUDE/HANDOFF 对齐真实状态：仓库 public（GitHub API 实测）、测试计数 169/35/8、HEAD、P1/P2/P8 已在生效路径仅欠真人验收 | 见 git log |
 | **功能** | **单条历史记录删除**：`FocusState.deleteRecord(id:)` 按 UUID 删除、只动 `records`；`TBTimer.deleteRecord` 先落盘成功再更新内存与界面；`RecordEditor` 加红色「删除记录」+ 确认弹窗（名称/日期/时长/「删除后，这段专注时长将从统计中移除」，`role: .destructive` 使其不为默认按钮）；主窗口记录行加 ⋯ 菜单（编辑记录／删除记录），保留铅笔入口；删除后清除失效筛选标签。测试 61 → **90 项** | 见 git log |
 | **功能** | **分类图标可手动选**：`FocusState.categoryStyles`（小写分类名 → SF Symbol），手写 `init(from:)` 保证旧文件无此键仍可解码；编辑器调色板 16 图标 + 恢复自动；日视图色块与预览优先取 override。测试 90 → **96 项** | 见 git log |
 | **修正** | **三处 UI 重复**（用户指出）：记录行铅笔与 ⋯ 重复 → 只留 ⋯；表头图例删除；编辑器「选择已有标签」与分类菜单内容相同 → 删除前者；另修复所有非命名分类共用同一网格图标的问题（哈希取 10 种 fallback） | 见 git log |
@@ -1020,7 +1023,7 @@ PYPROBE
 
 ## 🟠 P16（报告 P4）— 主窗口与弹层的分类筛选互不感知，可停留在已不存在的分类上
 
-**状态**：未修（2026-09-29 登记，严重性：低-中）
+**状态**：✅ 已修复（2026-09-29 第三轮评审随 P24–P27 一并修完）
 
 `MainWindow.swift` 的 `selectedCategory` 与 `View.swift` 弹层的 `selectedTag` 是各自视图的
 `@State`；`clearStaleFilter()` 只在本视图发生编辑/删除时触发。两窗并开时，一边删掉某分类的
@@ -1029,6 +1032,18 @@ PYPROBE
 **核验**：两窗并开 → 主窗口删掉分类 X 的最后一条 → 弹层仍停在 X 的空列表。
 修向：谓词已有（`categoryFilterStillMatches`，P14 引入），缺的只是跨视图失效通知
 （挂到 `FocusHistory` 的 publisher 上重算），属于小改造不是 bug 修补。
+
+### 修复方式（2026-09-29，Claude Code）
+
+- 两个视图各加 `.onChange(of: 共享记录列表) { clearStaleFilter() }`：主窗口挂
+  `history.records`（它本来就观察 `FocusHistory`），弹层挂 `timer.state.records`。
+  对侧窗口一编辑/删除，本视图立刻重算筛选 —— 正是登记时说的"挂到 publisher 上"的小改造。
+- 弹层的 `clearStaleFilter` 从手写 `contains(hasTag:)` 统一改用共享谓词
+  `categoryFilterStillMatches(_:primaryOnly: false)`，与主窗口历史页同一语义（P14 的谓词，
+  领域测试已覆盖）。
+- **边界诚实**：谓词有测试，`onChange` 的 SwiftUI 调用点自动化覆盖不到（同 P15 的处境），
+  已编译进 Release 构建。人工验收项：两窗并开 → 一边删掉分类最后一条 → 另一边空列表
+  应自动回到"全部记录"。
 
 ---
 
@@ -1095,11 +1110,132 @@ opacity 不承诺把元素移出 VoiceOver 树（`accessibilityHidden` 才是契
 
 ---
 
+## 评审轮（2026-09-29，外部 Code Review 第三轮）—— 新增 P24–P28
+
+> 本轮报告确认 P19–P23 全部闭环（含拉 CI 36581862625 完整日志逐项核验），
+> 并在其上找到四个残余问题与一项文档漂移。全部逐条对照源码核实成立后才动手。
+> 报告建议的修复顺序为 P24 → P25 → P26 → P16 → 文档一致性，本轮按此执行，
+> P27 与代码同轮处理。**测试基线：领域 160→169，桥接 22→35，合成启动 8。**
+
+---
+
+## 🟠 P24（报告第 1 条）— P20 的 30s 退避在保存成功后没有清零
+
+**状态**：✅ 已修复 @ `60706a5`（2026-09-29，Claude Code）· 报告坐实、确定存在 · 严重性：中
+
+**证据**：`Timer.swift` 三处写成功路径（`persist()`、`editRecord()`、`deleteRecord()`）都只清
+`storageError` 和推进 `lastSave`，没有清 `lastFailedSave`。用户在失败后 5 秒点「重试保存」
+成功，自动 checkpoint 仍被 `now - lastFailedSave >= 30` 挡到 30 秒 —— "最多丢约 5 秒"的
+设计保证在恢复后暂时退化为"最多丢 25～30 秒"。
+
+**修复方式**：三个成功路径统一补 `lastFailedSave = .distantPast`。`lastFailedSave` 改为
+`private(set)`（getter internal），桥接层直接断言清零，不靠 30 秒真实等待。
+
+**测试**：桥接 +6 项真实链路（断盘→失败置位→修复→「重试保存」清零；再断盘→再失败→改由
+`editRecord` 落盘成功→同样清零）。变异 M1（persist 漏清）、M2（edit/delete 漏清）都被抓。
+
+---
+
+## 🟠 P25（报告第 3 条）— P22 的残余：点击恰好落在 deadline 到达的瞬间
+
+**状态**：✅ 已修复 @ `60706a5`（2026-09-29，Claude Code）· 报告坐实（约 0.25s 窗口）· 严重性：中低
+
+**证据**：`State.pause(at:)` 第一行是 `tick(at: now)`。0.25s ticker 尚未到点的窗口内点
+「取消专注」，`pause()` 自己发现 `now >= deadline` → 直接完成记录、phase→`.workFinished`，
+而 UI 无条件 `showConfirm = true`；「放弃这段」面对 `guard phase == .work` 静默 no-op，
+把用户正要丢弃的那条记录留了下来。P22 消灭的是"弹窗开着时后台到点"，没防"点击当场到点"。
+
+**修复方式**：`TBTimer.freezeForCancel()` 收拢逻辑 —— 先 `guard phase == .work`（idle/rest
+拒绝且不碰状态），再 `pause()`，**pause 之后复查 `phase == .work`** 才允许开框。到点完成时
+`change{}` 已按正常路径触发到点提醒，无需弹窗。弹层与 ExpandedTimer 两个入口改为
+`if timer.freezeForCancel() { showCancelConfirm = true }`。
+
+**测试与边界（诚实记录）**：桥接 +4 项（work 中→true 且已暂停；cancel 后 idle→拒绝；
+rest→拒绝且**不会把休息误暂停**）；领域 +1 项钉住"恰好到点的 pause 会完成而非暂停"这一
+根据。变异 M7（删前置守卫→rest 被冻结）被抓；**M4（末行复查改成恒 true）在桥接真实
+时钟下够不到** —— `startWork` 最短 60 秒，探针无法构造"到点瞬间"。该行的依据语义已由
+领域测试覆盖，UI 路径需人工验收：**在 00:00 附近连点「取消专注」**，应看到完成提醒而不是
+失效的确认框。不声称全覆盖。
+
+---
+
+## 🟠 P26（报告第 2 条）— 同一条记录在主窗口 + 弹层并发编辑仍互相覆盖（lost update）
+
+**状态**：✅ 已修复 @ `60706a5`（2026-09-29，Claude Code）· 报告坐实、确定存在 · 严重性：中，
+**优先级高于 P16**（报告判断，同意；两者本轮都已修）
+
+**证据**：P13 只保护了 `categoryStyles` 的并发（delta 合并），`records[index].name/tags` 仍是
+整字段覆盖，且没有任何"我这个草稿打开后这条记录变过吗"的概念。不是纯理论：
+`App.swift:36` 的 popover root view 只在启动时创建一次，`showMainWindow()` 只
+`performClose` 不销毁视图，所以弹层 `@State editingRecord` 可以真的长期持有陈旧快照。
+
+**修复方式**：`FocusState.editRecord` 增加 `expected: FocusRecord?`（编辑器打开时的快照），
+stored 记录的 `name`/`tags` 与快照不一致即抛 `RecordEditError.concurrentEdit`
+（"这条记录刚在另一个窗口被修改。请关闭编辑器并重新打开，以免覆盖对方的修改。"）。
+守卫位于**所有写入之前**：被拒的草稿连 style delta 都不许落地。两个编辑器入口的 `onSave`
+传打开快照。不做存储格式迁移、不加锁。
+
+**测试**：领域 +9（新快照照常保存；tags 差异与 name 差异的陈旧草稿分别被拒；被拒编辑对
+记录和图标覆盖都零改动；纯 style 并发保存不触发守卫——与 P13 分工一致；missingRecord 优先
+于 concurrentEdit；错误消息可展示）。桥接 +3（真实 TBTimer：新快照落盘、陈旧快照返回错误、
+磁盘不变）。变异 M3（删守卫块）、M5（只比 name）都被抓。
+
+**已否决的替代**：`FocusRecord` 加整数 `revision` 做版本化 —— 需要迁移存储格式，收益相同，
+留作长期选项。报告建议的最小快照比对方案零迁移，采纳。
+
+---
+
+## 🟡 P27（报告第 4 条）— 「结束本组」旁路 + `startRest` 注释失实
+
+**状态**：✅ 已修复 @ `60706a5`（2026-09-29，Claude Code）· 报告坐实、风险有限 · 严重性：中低
+
+**事实**：提醒面板「结束本组」`timer.stop(); dismiss()` 无条件关窗；而 `Timer.swift:84`
+注释声称可用它"显式丢弃"未完成保存的 completion —— **注释是错的**：`stop()` 在
+`.workFinished` 下不把记录丢弃，它只是转 idle、继续留在内存并再次尝试 persist。数据本身
+没有立即丢失风险（`hasUnsavedChanges` 挡退出、`startWork` 门槛挡下一轮），问题是提醒窗
+一关，"记录还没落盘"的显著信号缩回菜单栏。
+
+**修复方式**：注释按事实重写（「结束本组」不是丢弃路径）。`stop()` 后仅当
+`storageError == nil` 才 `dismiss()`，失败则面板留在屏上显示红字；错误行补
+「重试保存」按钮（与弹层/主窗口横幅同款 `storageRetryTitle`/`retryStorage`）。
+
+**未测**：两处均为 SwiftUI 闭包，桥接覆盖不到提醒面板。人工验收：断盘 → 跑完一段专注 →
+点「结束本组」→ 面板不应关闭且红字+重试可见；盘修好后点「重试保存」再点「结束本组」→ 正常关。
+
+---
+
+## ⚪ P28 — `TBTimer` 仍不是 `@MainActor`（长期架构建议）
+
+**状态**：登记（2026-09-29 第三轮评审）· **不修**。0.25s ticker、键盘快捷键回调
+（现已包 `DispatchQueue.main.async`）、`NSWorkspace` 睡眠通知都在主线程，靠约定而非编译期
+保证。加 `@MainActor` 牵连 NSHostingController 注入与桥接探针的构造方式，与 P21 登记的
+PersistenceState 状态机同属"下次结构性改造"，单独排期，不顺手做。
+
+---
+
+## 本轮文档一致性修复（报告工程项，2026-09-29）
+
+三份文档互相矛盾且与事实不符，全部对齐到当前代码/远程：
+
+- **仓库可见性**：GitHub API 匿名实测 `private: false, visibility: public` —— AGENTS/CLAUDE/
+  HANDOFF 里的"私有"已全部改为 public 并改写相关红线（保留"不提交真实个人使用数据"；
+  可见性再变更需用户明确决定）。**用户需要确认这次转公开是本意**（原红线写着"含真实
+  个人使用数据，不要改变可见性"；公开前的隐私自查记录见 HANDOFF 开源准备一节）。
+- **测试计数**：AGENTS `138`/`12` → `169`/`35`；CLAUDE 会话协议 `基线 55` → 以 test.sh 末行
+  为准并写明当前值；HANDOFF 当前状态表 HEAD `4b3bd52`/`153/12/8` → 本轮值。
+- **P1/P2/P8 生效状态**：HANDOFF 写"候选补丁尚未合入生效路径"已过时 —— `App.swift:27-54`
+  的 `launchContext.observe` + `shouldShowInitialWindows` 门控与 `windowWillClose` 的
+  accessory 降级**都在生效路径上**，缺的只是真人登录验收。两处表述已改。
+- 新增规则建议：**易变数字（测试计数、HEAD）以脚本输出和 git 为准，文档只写"当前值 +
+  以何为准"**，防止三份文档三个版本。
+
+---
+
 ## 记录规则
 
 - 新问题追加到对应严重性分区，**必须附 file:line 证据和可独立执行的核验命令**
 - **P 编号是问题 ID，不当严重性等级用**（Codex 评审提出）。严重性写在每条的「状态」行里，可随评审调整
-- 修完的：把该条**状态行改成 `✅ 已修复 @ <hash>` 并原地补「修复方式」小节**，同时在「已修完」表加一行。
+- 修完的：把该条**状态行改成 `✅ 已修复 @ 60706a5` 并原地补「修复方式」小节**，同时在「已修完」表加一行。
   **不要删除原条目和评审意见** —— 分析过程和被推翻的判断本身就是资产
 - 被否决的移到 [`HANDOFF.md`](HANDOFF.md) 的「已否决的方案」并写明理由 —— 不要直接删掉，
   否则后续 AI 会重新提出同一个方案

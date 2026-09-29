@@ -18,7 +18,7 @@ macOS 菜单栏番茄钟，是 [ivoronin/TomatoBar](https://github.com/ivoronin/
 | 当前版本 | 3.9.0（对外称 V1.3） |
 | 默认分支 | `feature/personal-focus` |
 | `main` 分支 | 上游基线 `90a77d6`，仅用于对比 diff，**不要在上面开发** |
-| `origin` | `mikilolipop/TomatoBar-Personal`（**私有**） |
+| `origin` | `mikilolipop/TomatoBar-Personal`（**public**，2026-09-29 GitHub API 实测确认） |
 | `upstream` | `ivoronin/TomatoBar` |
 
 与上游的核心差异：**完全无声**（删除 Player.swift 与三个 wav）、事件记录 + 标签、暂停/继续、
@@ -73,9 +73,9 @@ macOS 菜单栏番茄钟，是 [ivoronin/TomatoBar](https://github.com/ivoronin/
 ## 命令
 
 ```sh
-scripts/test.sh     # 138 项领域检查（原 96 项 + 42 项解码兼容性/ASCII 样式检查）
+scripts/test.sh     # 领域检查（当前 169 项，**以末行 PASS 数为准**，历轮修复一直在加）
 scripts/test-launch-context.sh # 8 项 AppKit 合成启动事件检查，不访问用户数据
-scripts/test-bridge.sh # 先 build.sh，再运行 12 项真实 TBTimer 检查；只使用 QA13 新建临时子目录
+scripts/test-bridge.sh # 先 build.sh，再运行真实 TBTimer 检查（当前 35 项）；只使用 QA13 新建临时子目录
 scripts/build.sh    # Release 构建到 /tmp/TomatoBar-personal-build，ad-hoc 签名 + codesign --verify --deep --strict
 scripts/seed-qa.py  # 只写入隔离的 QA12 沙盒，运行前先退出该 App
 scripts/compare-design.py
@@ -104,7 +104,8 @@ scripts/deploy-site.sh # 把 site/ 发布到 gh-pages 分支（GitHub Pages）�
   这三个版本的全部源码曾长期只存在于工作区（HEAD 停在上游 `90a77d6`），一条命令就能归零且不可恢复。
 - 🚫 **会话结束不得留下未提交的工作。** 提交并推送。
 - 🚫 **不要向 `upstream` 推送任何东西。** `origin` 才是本项目的远程。
-- 🚫 **仓库是私有的，不要改变可见性**，其中含真实个人使用数据。
+- 🚫 **仓库现为 public**（2026-09-29 用户决定并实测确认；曾为私有）。**不要把真实个人使用数据
+  提交进仓库**（文档、测试、截图里的分类/事件名注意脱敏）；可见性再变更必须用户明确决定。
 - 🚫 不要动 `~/Library/Containers/com.github.ivoronin.TomatoBar`（原版数据，用户明确保留作为后续测试数据源）。
 
 ---
