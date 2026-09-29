@@ -317,7 +317,7 @@ struct MainSettings: View {
             LaunchAtLogin.Toggle("登录时启动")
             KeyboardShortcuts.Recorder("开始 / 暂停 / 继续", name: .startStopTimer)
             Text("时长调整从下一段生效。暂停与休息不计入专注；到时显示无声提醒。每条记录的第一个标签用于统计分类，可在编辑时更改。").font(.caption).foregroundColor(Garden.muted)
-            HStack { Button("打开记录文件夹") { timer.openRecordsFolder() }; Spacer(); Text("Personal · V1.2").font(.caption).foregroundColor(Garden.muted) }
+            HStack { Button("打开记录文件夹") { timer.openRecordsFolder() }; Spacer(); Text("Personal · V1.3").font(.caption).foregroundColor(Garden.muted) }
         }.padding(28).frame(width: 460).background(Garden.paper).foregroundColor(Garden.ink).accentColor(Garden.red)
     }
 }
