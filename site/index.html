@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TomatoBar Personal · 专注时光</title>
+<meta name="description" content="完全无声的 macOS 菜单栏番茄钟：专注事件记录、标签分类、日/周/月复盘。TomatoBar 的个人定制 fork，开源 MIT。">
+<meta property="og:title" content="TomatoBar Personal · 专注时光">
+<meta property="og:description" content="完全无声的 macOS 菜单栏番茄钟：专注事件记录、标签分类、日/周/月复盘。">
+<meta property="og:image" content="https://mikilolipop.github.io/TomatoBar-Personal/hero-day.png">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/png" href="icon.png">
+<style>
+:root{
+  --paper:#f7f0e2; --card:#fffaf0; --ink:#4a3326; --muted:#8c7861;
+  --red:#b34d3d; --red-deep:#9a4234; --green:#879c6e; --gold:#cfA657; --line:#dbcfb5;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;line-height:1.6}
+a{color:var(--red);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{max-width:1060px;margin:0 auto;padding:0 24px}
+header{display:flex;align-items:center;gap:12px;padding:20px 0}
+header img{width:36px;height:36px}
+header .name{font-size:18px;font-weight:700;color:var(--ink)}
+header nav{margin-left:auto;display:flex;gap:18px;font-size:14px}
+.hero{display:grid;grid-template-columns:1fr;gap:28px;padding:36px 0 8px;text-align:center}
+.hero h1{font-size:clamp(30px,5vw,46px);font-weight:700;letter-spacing:.01em}
+.hero h1 em{font-style:normal;color:var(--red)}
+.hero p.sub{color:var(--muted);font-size:clamp(15px,2vw,18px);max-width:640px;margin:0 auto}
+.pills{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.pills span{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 12px}
+.dl{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:6px}
+.btn{display:inline-flex;align-items:center;gap:8px;border-radius:12px;padding:13px 26px;font-size:16px;font-weight:600;border:1px solid transparent;transition:transform .12s ease, box-shadow .12s ease}
+.btn:hover{text-decoration:none;transform:translateY(-1px)}
+.btn.primary{background:var(--red);color:#fdf7ec;box-shadow:0 6px 18px rgba(179,77,61,.28)}
+.btn.primary:hover{background:var(--red-deep)}
+.btn.ghost{background:var(--card);color:var(--ink);border-color:var(--line)}
+.btn small{font-weight:400;opacity:.75;font-size:12px}
+.dlmeta{margin-top:10px;font-size:13px;color:var(--muted);text-align:center;min-height:20px}
+.shot{margin:34px auto 10px;max-width:920px}
+.shot img{width:100%;border-radius:14px;box-shadow:0 24px 60px rgba(74,51,38,.22),0 2px 8px rgba(74,51,38,.12)}
+.shot figcaption{text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px}
+section{padding:52px 0 8px}
+h2{font-size:24px;margin-bottom:22px;text-align:center}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
+.card h3{font-size:16px;display:flex;align-items:center;gap:9px;margin-bottom:6px}
+.card h3 svg{flex:none}
+.card p{font-size:14px;color:var(--muted)}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;counter-reset:s}
+.step{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;font-size:14.5px;color:var(--muted)}
+.step b{display:block;color:var(--ink);margin-bottom:6px;font-size:15.5px}
+.step code{display:block;background:rgba(179,77,61,.08);border-radius:8px;padding:9px 10px;margin-top:8px;font-size:12px;color:var(--ink);overflow-x:auto;white-space:nowrap}
+footer{margin-top:64px;border-top:1px solid var(--line);padding:26px 0 34px;font-size:13.5px;color:var(--muted);text-align:center}
+footer .links{display:flex;gap:18px;justify-content:center;margin-bottom:8px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="icon.png" alt="TomatoBar Personal 图标">
+    <span class="name">TomatoBar Personal</span>
+    <nav>
+      <a href="#features">功能</a>
+      <a href="#install">安装</a>
+      <a href="https://github.com/mikilolipop/TomatoBar-Personal" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <h1>让专注，<em>慢慢生长</em></h1>
+    <p class="sub">完全无声的 macOS 菜单栏番茄钟。每一段专注都留下名字与分类，日／周／月随时回顾时间去向。</p>
+    <div class="pills">
+      <span>macOS 12.3+</span><span>Apple Silicon &amp; Intel</span><span>约 3 MB</span><span>MIT 开源</span><span>数据不离开本机</span>
+    </div>
+    <div class="dl">
+      <a class="btn primary" id="btn-dmg" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.9.0/TomatoBarPersonal-3.9.0.dmg">下载 .dmg <small id="dmg-size"></small></a>
+      <a class="btn ghost" id="btn-zip" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.9.0/TomatoBarPersonal-3.9.0.zip">下载 .zip <small id="zip-size"></small></a>
+    </div>
+    <div class="dlmeta" id="dl-meta"><a href="https://github.com/mikilolipop/TomatoBar-Personal/releases/latest">查看全部版本与更新说明 →</a></div>
+  </div>
+
+  <figure class="shot">
+    <img src="hero-day.png" alt="TomatoBar Personal 主窗口：日视图专注足迹与专注记录（示例数据）">
+    <figcaption>原生主窗口 · 日／周／月三种复盘视图（截图为示例数据）</figcaption>
+  </figure>
+
+  <section id="features">
+    <h2>为什么是它</h2>
+    <div class="grid">
+      <div class="card"><h3><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="none" stroke="#b34d3d" stroke-width="1.6"/><path d="M5 9h8M9 5v8" stroke="#b34d3d" stroke-width="1.6" transform="rotate(45 9 9)"/></svg>完全无声</h3><p>移除了全部音频代码与素材。休息到点弹出的是无声置顶提醒窗，连系统通知权限都不需要。</p></div>
+      <div class="card"><h3><svg width="18" height="18" viewBox="0 0 18 18"><rect x="2.5" y="2" width="13" height="14" rx="2.5" fill="none" stroke="#879c6e" stroke-width="1.6"/><path d="M5.5 6.5h7M5.5 9.5h7M5.5 12.5h4" stroke="#879c6e" stroke-width="1.6"/></svg>有名字的记录</h3><p>开始前写下「这次做什么」，结束后可改名、打多个标签、分统计类别——每段专注都可回溯、可删除。</p></div>
+      <div class="card"><h3><svg width="18" height="18" viewBox="0 0 18 18"><path d="M9 2v14M2 9h14" stroke="#cfa657" stroke-width="1.6" opacity="0"/><rect x="4" y="4" width="3.5" height="10" rx="1.2" fill="#cfa657"/><rect x="10.5" y="4" width="3.5" height="10" rx="1.2" fill="#cfa657"/></svg>暂停与继续</h3><p>工作和休息都能暂停。电脑睡眠、退出应用自动暂停，中断恢复最多只差 5 秒检查点。</p></div>
+      <div class="card"><h3><svg width="18" height="18" viewBox="0 0 18 18"><rect x="2" y="9" width="3.5" height="7" rx="1" fill="#7d9e9e"/><rect x="7.2" y="5" width="3.5" height="11" rx="1" fill="#b58a68"/><rect x="12.4" y="2" width="3.5" height="14" rx="1" fill="#a797b8"/></svg>日 / 周 / 月复盘</h3><p>色块流看一天的节奏，堆叠柱看一周的积累，热力日历看一个月的坚持。统计分类由你定义。</p></div>
+      <div class="card"><h3><svg width="18" height="18" viewBox="0 0 18 18"><path d="M9 2l6 2.5v4c0 3.5-2.4 6.5-6 7.5-3.6-1-6-4-6-7.5v-4L9 2z" fill="none" stroke="#b34d3d" stroke-width="1.6"/></svg>数据只在你手里</h3><p>无网络请求、无遥测。记录原子写入本机 sessions.json，损坏保护 + 读盘恢复，界面可直接打开数据文件夹。</p></div>
+      <div class="card"><h3><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="6.5" cy="9" r="4" fill="none" stroke="#8c7861" stroke-width="1.6"/><circle cx="11.5" cy="9" r="4" fill="none" stroke="#b34d3d" stroke-width="1.6"/></svg>与原版共存</h3><p>独立 Bundle ID 与数据目录，TomatoBar 原版可以同时装。基于上游改造，代码开源、版本可追溯。</p></div>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>三步开始</h2>
+    <div class="steps">
+      <div class="step"><b>1 · 下载</b>点上方按钮，选 dmg 或 zip（同一个 universal 版本，Intel / M 系列芯片通用）。</div>
+      <div class="step"><b>2 · 安装</b>dmg 打开后把番茄拖进 Applications；zip 解压后移入 Applications。</div>
+      <div class="step"><b>3 · 首次打开</b>本应用为 ad-hoc 签名（未做付费公证），若被 Gatekeeper 拦截，终端执行一次：<code>xattr -dr com.apple.quarantine "/Applications/TomatoBar Personal.app"</code></div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="links">
+      <a href="https://github.com/mikilolipop/TomatoBar-Personal">源码仓库</a>
+      <a href="https://github.com/mikilolipop/TomatoBar-Personal/releases">发布记录</a>
+      <a href="https://github.com/mikilolipop/TomatoBar-Personal/blob/feature/personal-focus/docs/V1.3%E6%9B%B4%E6%96%B0%E8%AF%B4%E6%98%8E.md">更新说明</a>
+      <a href="https://github.com/ivoronin/TomatoBar">上游 TomatoBar</a>
+    </div>
+    <p>基于 <a href="https://github.com/ivoronin/TomatoBar">ivoronin/TomatoBar</a>（MIT）的个人定制 fork · 本仓库与全部改动同为 MIT 许可</p>
+    <p>🍅 种自己的番茄，让别人说去吧</p>
+  </footer>
+</div>
+<script>
+// 自动指向最新 Release：静态链接是兜底，脚本负责刷新版本、链接与体积
+fetch("https://api.github.com/repos/mikilolipop/TomatoBar-Personal/releases/latest", {headers: {Accept: "application/vnd.github+json"}})
+  .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+  .then(function (rel) {
+    var mb = function (n) { return (n / 1048576).toFixed(1) + " MB"; };
+    rel.assets.forEach(function (a) {
+      var size = document.getElementById(a.name.endsWith(".dmg") ? "dmg-size" : a.name.endsWith(".zip") ? "zip-size" : null);
+      var btn = a.name.endsWith(".dmg") ? "btn-dmg" : a.name.endsWith(".zip") ? "btn-zip" : null;
+      if (btn) { document.getElementById(btn).href = a.browser_download_url; }
+      if (size) { size.textContent = "· " + mb(a.size); }
+    });
+    document.getElementById("dl-meta").textContent = "最新版本 " + rel.tag_name + " · 发布于 " + rel.published_at.slice(0, 10) + " · ";
+    var more = document.createElement("a");
+    more.href = "https://github.com/mikilolipop/TomatoBar-Personal/releases/latest";
+    more.textContent = "查看全部版本与更新说明 →";
+    document.getElementById("dl-meta").appendChild(more);
+  })
+  .catch(function () { /* 拉取失败时静态兜底链接仍然可用 */ });
+</script>
+</body>
+</html>

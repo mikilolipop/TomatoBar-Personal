@@ -124,6 +124,24 @@ V1.3 已按用户决定定稿上线，不再往这个版本里加东西。后续
 
 ---
 
+## 刚做完（2026-09-29，Claude Code 建 GitHub Pages 下载落地页）
+
+用户要求：一个带直接下载按钮的介绍页；README/宣传图改用"以前测试数据"的截图（空态太素）。
+
+- **宣传图来源**：`docs/design-v1.2/qa/day-native.png`（V1.2 时代 QA13 原生窗口实拍，
+  14 段 / 5小时10分示例数据）。该图左上角有系统窗口管理悬浮控件残影，
+  用 PIL 以标题栏底色硬替换 `x<160, y<60` 区域清除（4 轮迭代，逐块检查确认干净）。
+  鼠标残留在"暂停"按钮处，判定为可接受未处理。
+- 替换根目录 `screenshot.png`（README 封面）；README 加"官网"徽章 + 截图下注明"示例数据"。
+  历史验收图（design-v1.2 下的 qa 原图）**未改动**，只改了产物副本。
+- **`site/`**：单文件 `index.html` + `hero-day.png` + `icon.png`。视觉沿用 Garden 配色
+  （paper/ink/red/muted 取自 `FocusCharts.swift`）。下载按钮为静态兜底链接（v3.9.0 完整 URL）
+  + JS 从 GitHub API `/releases/latest` 动态刷新版本、链接与体积——**发新版无需改页面**；
+  API 失败（限流等）时兜底链接仍可下载。
+- **Pages**：gh api 启用，源 = `feature/personal-focus` 分支 `/site` 目录；
+  仓库 homepage 字段同步设为 `https://mikilolipop.github.io/TomatoBar-Personal/`
+- 遗留：社交预览图仍是空窗版，可基于 `site/hero-day.png` 重新生成一张供网页端换
+
 ## 刚做完（2026-09-29，Claude Code 发布 V1.3 GitHub Release + 下载包）
 
 - **universal 构建**：`ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO` 另跑一次 Release 构建

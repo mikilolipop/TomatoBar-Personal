@@ -10,6 +10,7 @@ macOS 菜单栏番茄钟 · [TomatoBar](https://github.com/ivoronin/TomatoBar) �
 
 [![tests](https://github.com/mikilolipop/TomatoBar-Personal/actions/workflows/main.yml/badge.svg?branch=feature/personal-focus)](https://github.com/mikilolipop/TomatoBar-Personal/actions/workflows/main.yml)
 [![download](https://img.shields.io/badge/下载-V1.3-orange)](https://github.com/mikilolipop/TomatoBar-Personal/releases/latest)
+[![website](https://img.shields.io/badge/官网-mikilolipop.github.io-8a6d3b)](https://mikilolipop.github.io/TomatoBar-Personal/)
 ![macOS](https://img.shields.io/badge/macOS-12.3%2B-blue)
 ![Swift](https://img.shields.io/badge/Swift-SwiftUI%20%2B%20AppKit-orange)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -17,6 +18,8 @@ macOS 菜单栏番茄钟 · [TomatoBar](https://github.com/ivoronin/TomatoBar) �
 </div>
 
 ![screenshot](screenshot.png)
+
+*主窗口日视图（截图为示例数据）*
 
 ## 这是什么
 
