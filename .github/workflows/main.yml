@@ -50,3 +50,13 @@ jobs:
           codesign --verify --deep --strict "$app"
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist" \
             | grep -x 'com.dilyar.TomatoBarPersonal'
+
+      # The Release build above already produced the SwiftPM module artifacts the
+      # bridge needs; TOMATOBAR_BUILD_DIR repoints the script at the runner's path.
+      # This is the only suite that compiles App/Timer/View/MainWindow and runs
+      # real TBTimer IO — until now it existed only as a local ritual.
+      - name: Bridge checks (real TBTimer + UI compile, isolated QA13 IO)
+        run: TOMATOBAR_BUILD_DIR=build sh scripts/test-bridge.sh
+
+      - name: Launch-context checks (synthetic events)
+        run: sh scripts/test-launch-context.sh
