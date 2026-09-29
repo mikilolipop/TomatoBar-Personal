@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-09-29，by Claude Code · 定版 V1.3（3.9.0）并安装；P12/P13/P14 已修
+最后更新：2026-09-29，by Claude Code · 修主窗口可缩到布局地板以下导致的裁切（App.swift 窗口初始化顺序）
 
 ---
 
@@ -121,6 +121,23 @@ V1.3 已按用户决定定稿上线，不再往这个版本里加东西。后续
   QA13 已经在本轮建过并可用（见「QA13 复现方式」），不必复用 QA12。
 
 ---
+
+---
+
+## 刚做完（2026-09-29，Claude Code 修主窗口最小尺寸失效）
+
+用户报告：主窗口缩小到某个尺寸以下后内容不再自适应，而是被裁切（番茄图标被切一半）。
+
+**根因**：`App.swift` `showMainWindow()` 里 `contentMinSize = 920×740` 设在
+`window.contentViewController = hosting` **之前**，而赋值 `contentViewController` 会用
+视图控制器自己的最小尺寸覆盖窗口 `contentMinSize`；又因 `hosting.sizingOptions = []`
+禁掉了尺寸传播，覆盖后最小尺寸≈0，920×740 从未生效。窗口因此能缩到 SwiftUI 布局地板
+（约 900pt 宽）以下，此时定宽内容无法压缩，只能居中溢出被裁。
+
+**修复**：把 `window.contentMinSize` 移到 `contentViewController` 赋值之后重新设置，
+并加注释说明该 AppKit 陷阱（代码里已有防回归注释）。`scripts/test.sh` 153 项全绿。
+
+**遗留**：本机尚未实机验证"拖窗口到 920×740 即停住"（需要重新构建安装后肉眼确认）。
 
 ---
 

@@ -81,12 +81,15 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
             window.title = "TomatoBar · 专注时光"
             window.titlebarAppearsTransparent = true
             window.backgroundColor = NSColor(Garden.paper)
-            window.contentMinSize = NSSize(width: 920, height: 740)
             window.isReleasedWhenClosed = false
             window.delegate = self
             let hosting = NSHostingController(rootView: MainWindowView(timer: model, history: model.history))
             if #available(macOS 13.0, *) { hosting.sizingOptions = [] }
             window.contentViewController = hosting
+            // Assigning contentViewController overwrites contentMinSize with the view
+            // controller's own minimum (≈0 once sizingOptions is cleared), so this must
+            // run after the assignment or the window can shrink past the layout's floor.
+            window.contentMinSize = NSSize(width: 920, height: 740)
             window.setContentSize(NSSize(width: 1120, height: 800))
             window.center()
             window.setFrameAutosaveName("TomatoBarMainWindow")
