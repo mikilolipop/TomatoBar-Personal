@@ -72,13 +72,21 @@ struct GardenArt: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("gentleAnimations") private var animations = true
     var body: some View {
-        TimelineView(.animation(minimumInterval: 0.16, paused: !activity.visible || activity.paused || reduceMotion || !animations)) { context in
-            let moving = activity.visible && !activity.paused && !reduceMotion && animations
-            let wave = moving ? sin(context.date.timeIntervalSinceReferenceDate * 1.5) : 0
+        // The tomato is always static. Its breathing scaleEffect re-rasterised the
+        // hard-edged art a few percent every 0.16s; nearest-neighbour resampling made
+        // the pixel grid visibly crawl. Plants keep a light base-anchored sway, which
+        // survives resampling gracefully.
+        if name == "PixelTomato" {
             Image(name).resizable().interpolation(.none).scaledToFit()
-                .rotationEffect(.degrees(name == "PixelTomato" ? 0 : wave * 1.8), anchor: .bottom)
-                .scaleEffect(name == "PixelTomato" ? 1 + wave * 0.012 : 1, anchor: .bottom)
-        }.accessibilityHidden(true)
+                .accessibilityHidden(true)
+        } else {
+            TimelineView(.animation(minimumInterval: 0.16, paused: !activity.visible || activity.paused || reduceMotion || !animations)) { context in
+                let moving = activity.visible && !activity.paused && !reduceMotion && animations
+                let wave = moving ? sin(context.date.timeIntervalSinceReferenceDate * 1.5) : 0
+                Image(name).resizable().interpolation(.none).scaledToFit()
+                    .rotationEffect(.degrees(wave * 1.8), anchor: .bottom)
+            }.accessibilityHidden(true)
+        }
     }
 }
 
