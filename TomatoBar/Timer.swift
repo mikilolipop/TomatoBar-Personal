@@ -28,7 +28,10 @@ final class TBTimer: ObservableObject {
     // After a failed write the 0.25s tick would otherwise re-attempt persist() four times
     // a second forever (lastSave never advances, so the 5s condition stays true). The
     // auto path backs off 30s between failures; the user's 「重试保存」 button bypasses this.
-    private var lastFailedSave = Date.distantPast
+    // Every successful write — here or in editRecord/deleteRecord — must clear the backoff,
+    // or recovery silently costs up to 30s of checkpoints anyway (P24). Getter is internal
+    // so the bridge suite can assert the reset without waiting out the 30s window.
+    private(set) var lastFailedSave = Date.distantPast
     private var loadFailed = false
     var onAttention: (() -> Void)?
 
@@ -81,8 +84,10 @@ final class TBTimer: ObservableObject {
     func startRest() {
         // Same storageError gate as startWork: if the just-completed focus is still only
         // in memory, advancing into rest would let a crash bury it under a stale disk
-        // checkpoint. The user must 「重试保存」 (or explicitly discard via 结束本组→stop)
-        // before the cycle may move on.
+        // checkpoint. The user must clear the error via 「重试保存」 before the cycle may
+        // move on. 「结束本组」→stop is NOT a way around this: stop() does not discard the
+        // completed record — it keeps it in memory and retries the write, and
+        // hasUnsavedChanges still guards quitting until the record lands on disk.
         guard storageError == nil else { return }
         let seconds = Double(max(1, restMinutes) * 60)
         change { $0.startRest(seconds: seconds, at: $1) }
@@ -97,17 +102,33 @@ final class TBTimer: ObservableObject {
     // Not gated on storageError like startWork: cancelling only leaves the running state,
     // so it must work even when the disk is unwritable (persist() handles the failure).
     func cancel() { change { $0.cancel(at: $1) } }
+    /// Freezes the clock while the user decides in the 「取消专注」 dialog, and reports
+    /// whether the session is still cancellable. `FocusState.pause()` ticks first, so
+    /// clicking exactly at the deadline completes the focus instead of pausing it; the
+    /// dialog must not open over a phase where 「放弃这段」 would be a silent no-op that
+    /// keeps the record anyway (P22's residual boundary, closed by P25). When this
+    /// returns false the caller shows nothing — the completion already raises the
+    /// reminder through change().
+    @discardableResult
+    func freezeForCancel() -> Bool {
+        guard state.phase == .work else { return false }
+        if !state.paused { pause() }
+        return state.phase == .work
+    }
     /// Commit edits only after the atomic disk write succeeds; a failed edit stays in the editor.
-    func editRecord(id: UUID, name: String, tags: [String], styleChanges: [String: String?]? = nil) -> String? {
+    /// `expected` is the record the editor loaded when it opened — see FocusState.editRecord (P26).
+    func editRecord(id: UUID, name: String, tags: [String], styleChanges: [String: String?]? = nil,
+                    expected: FocusRecord? = nil) -> String? {
         guard !loadFailed else { return "记录未能读取，暂时无法编辑。" }
         var updated = state
         do {
-            try updated.editRecord(id: id, name: name, tags: tags, styleChanges: styleChanges)
+            try updated.editRecord(id: id, name: name, tags: tags, styleChanges: styleChanges, expected: expected)
             updated.checkpoint = Date()
             try store.save(updated)
             state = updated
             history.records = updated.records
             lastSave = updated.checkpoint
+            lastFailedSave = .distantPast
             storageError = nil
             return nil
         } catch let error as RecordEditError {
@@ -134,6 +155,7 @@ final class TBTimer: ObservableObject {
             state = updated
             history.records = updated.records
             lastSave = updated.checkpoint
+            lastFailedSave = .distantPast
             storageError = nil
             return nil
         } catch let error as RecordEditError {
@@ -208,7 +230,7 @@ final class TBTimer: ObservableObject {
         guard !loadFailed else { return }
         if history.records != state.records { history.records = state.records }
         state.checkpoint = now
-        do { try store.save(state); storageError = nil; lastSave = now }
+        do { try store.save(state); storageError = nil; lastSave = now; lastFailedSave = .distantPast }
         catch { storageError = "记录保存失败，请检查磁盘空间。当前记录仍保留在内存中。"; lastFailedSave = now }
     }
     func updateStatus() {

@@ -471,3 +471,48 @@ let asciiRoundTrip = try JSONDecoder().decode(FocusState.self, from: JSONEncoder
 check(asciiRoundTrip.categoryStyles[asciiRoundTrip.records[0].category.lowercased()] == "star",
       "ASCII category override survives canonicalization and persistence")
 print("PASS: \(checks) total checks including independent legacy decoding review")
+
+// P26 (2026-09-29 external review): same-record lost-update guard. An editor snapshot
+// that predates another window's save must be REFUSED, not silently revert that save.
+var conflict = FocusState()
+let sharedRec = FocusRecord(id: UUID(), name: "线性代数", startedAt: base, endedAt: base.addingTimeInterval(60),
+    plannedSeconds: 60, completed: true, segments: [], tags: ["数学"])
+conflict.records = [sharedRec]
+let popoverSnapshot = conflict.records[0]
+try conflict.editRecord(id: sharedRec.id, name: popoverSnapshot.name, tags: ["学习", "数学"], expected: popoverSnapshot)
+check(conflict.records[0].tags == ["学习", "数学"], "an up-to-date snapshot still saves normally")
+do { try conflict.editRecord(id: sharedRec.id, name: "只改名字", tags: popoverSnapshot.tags, expected: popoverSnapshot)
+     fatalError("stale draft overwrote another window's tag change") }
+catch RecordEditError.concurrentEdit { checks += 1 }
+let windowSnapshot = conflict.records[0]
+try conflict.editRecord(id: sharedRec.id, name: "作业改名", tags: windowSnapshot.tags, expected: windowSnapshot)
+var staleNameCopy = popoverSnapshot
+staleNameCopy.tags = windowSnapshot.tags
+do { try conflict.editRecord(id: sharedRec.id, name: "再改一次", tags: windowSnapshot.tags, expected: staleNameCopy)
+     fatalError("stale draft with an old name was accepted") }
+catch RecordEditError.concurrentEdit { checks += 1 }
+let freshSnapshot = conflict.records[0]
+try conflict.editRecord(id: sharedRec.id, name: freshSnapshot.name, tags: freshSnapshot.tags,
+                        styleChanges: ["学习": "globe"], expected: freshSnapshot)
+check(conflict.categoryStyles["学习"] == "globe", "concurrent style-only saves pass the record guard")
+do { try conflict.editRecord(id: sharedRec.id, name: "旧草稿", tags: popoverSnapshot.tags,
+                              styleChanges: ["学习": "star"], expected: popoverSnapshot)
+     fatalError("conflicting draft slipped through") }
+catch RecordEditError.concurrentEdit { checks += 1 }
+check(conflict.categoryStyles["学习"] == "globe" && conflict.records[0].name == "作业改名",
+      "a refused edit changes neither the record nor the icon overrides")
+try conflict.deleteRecord(id: sharedRec.id)
+do { try conflict.editRecord(id: sharedRec.id, name: "x", tags: [], expected: freshSnapshot)
+     fatalError("unknown record accepted") }
+catch RecordEditError.missingRecord { checks += 1 }
+check(RecordEditError.concurrentEdit.errorDescription?.isEmpty == false, "conflict error carries a presentable message")
+
+// P25 rationale, domain level: pause() ticks first, so a 「取消专注」 click at the exact
+// deadline COMPLETES the focus instead of pausing it. The dialog must not open in that
+// case — cancel() guards on phase == .work and would silently keep the fresh record.
+var exactDeadline = FocusState()
+exactDeadline.startWork(name: "卡点", seconds: 10, at: base)
+exactDeadline.pause(at: base.addingTimeInterval(10))
+check(exactDeadline.phase == .workFinished && exactDeadline.records.count == 1,
+      "pause at the exact deadline completes instead of pausing")
+print("PASS: \(checks) total checks including same-record lost-update guard")

@@ -41,13 +41,25 @@ private struct ReminderView: View {
             Text("等待你确认后，才会开始下一段计时。")
                 .font(.caption).foregroundColor(.secondary)
             HStack(spacing: 14) {
-                Button("结束本组") { timer.stop(); dismiss() }
+                Button("结束本组") {
+                    timer.stop()
+                    // stop() persists the newly idle state through change(). If that write
+                    // failed the completed record is still memory-only, so keep the panel
+                    // open with its red warning instead of dismissing into a bare menu-bar
+                    // dot (P27). Clicking again after the disk recovers dismisses normally.
+                    if timer.storageError == nil { dismiss() }
+                }
                 Button(timer.state.phase == .workFinished ? "开始休息 · \(timer.restMinutes) 分钟" : "开始下一轮") {
                     if timer.state.phase == .workFinished { timer.startRest() } else { timer.startWork() }
                     if !timer.state.needsAttention { dismiss() }
                 }.buttonStyle(.borderedProminent)
             }
-            if let error = timer.storageError { Text(error).font(.caption).foregroundColor(.red) }
+            if let error = timer.storageError {
+                HStack(spacing: 10) {
+                    Text(error).font(.caption).foregroundColor(.red)
+                    Button(timer.storageRetryTitle) { timer.retryStorage() }.font(.caption)
+                }
+            }
         }.padding(30).frame(width: 420)
     }
 }

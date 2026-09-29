@@ -144,11 +144,25 @@ struct FocusState: Codable {
 
     /// `categoryStyles` defaults to nil so callers that only rename or retag leave the
     /// icon overrides untouched.
+    ///
+    /// `expected` is the record snapshot the editor loaded when it opened. When present,
+    /// a mismatch in name or tags against the stored record means another surface saved
+    /// this record in the meantime, and this draft would silently revert it (a lost
+    /// update) — refuse the write instead. Style-only edits never trip it: overrides live
+    /// in `categoryStyles`, and P13's key-level delta merge already makes them concurrent
+    /// safe without touching these two fields.
     mutating func editRecord(id: UUID, name: String, tags: [String],
-                             styleChanges: [String: String?]? = nil) throws {
+                             styleChanges: [String: String?]? = nil,
+                             expected: FocusRecord? = nil) throws {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw RecordEditError.emptyName }
         guard let index = records.firstIndex(where: { $0.id == id }) else { throw RecordEditError.missingRecord }
+        if let expected = expected {
+            let current = records[index]
+            guard current.name == expected.name, current.tags == expected.tags else {
+                throw RecordEditError.concurrentEdit
+            }
+        }
         let known = allTags
         let canonicalTags = FocusRecord.normalizedTags(tags).map { tag in
             known.first { $0.caseInsensitiveCompare(tag) == .orderedSame } ?? tag
@@ -313,11 +327,12 @@ struct FocusState: Codable {
 }
 
 enum RecordEditError: LocalizedError {
-    case emptyName, missingRecord
+    case emptyName, missingRecord, concurrentEdit
     var errorDescription: String? {
         switch self {
         case .emptyName: return "事件名称不能为空。"
         case .missingRecord: return "这条记录已不存在，请重新打开记录列表。"
+        case .concurrentEdit: return "这条记录刚在另一个窗口被修改。请关闭编辑器并重新打开，以免覆盖对方的修改。"
         }
     }
 }

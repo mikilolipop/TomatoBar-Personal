@@ -59,7 +59,9 @@ struct MainWindowView: View {
                 RecordEditor(record: record, availableTags: timer.state.allTags,
                     styles: timer.state.categoryStyles, onCancel: { editing = nil },
                     onSave: { name, tags, styleChanges in
-                        let error = timer.editRecord(id: record.id, name: name, tags: tags, styleChanges: styleChanges)
+                        // `record` is the sheet's snapshot at open; the expected check
+                        // turns a stale draft into a refusal instead of a lost update (P26).
+                        let error = timer.editRecord(id: record.id, name: name, tags: tags, styleChanges: styleChanges, expected: record)
                         if error == nil { clearStaleFilter(); editing = nil }
                         return error
                     }, onDelete: {
@@ -79,6 +81,10 @@ struct MainWindowView: View {
             } message: { record in
                 Text(RecordEditor.confirmationMessage(for: record))
             }
+            // P16: the popover is the other half of this pair — its edits and deletes can
+            // empty out the category this window's filter points at. Re-check against the
+            // shared list whenever it changes, not only after this view's own save.
+            .onChange(of: history.records) { _ in clearStaleFilter() }
     }
     /// `.alert(presenting:)` wants a Bool binding plus the item. Deriving the Bool from
     /// pendingDelete means dismissing the alert can never leave a stale record behind.
@@ -319,8 +325,7 @@ struct ExpandedTimer: View {
                         if timer.state.phase == .work {
                             Button {
                                 cancelWasPaused = timer.state.paused
-                                if !timer.state.paused { timer.pause() }
-                                showCancelConfirm = true
+                                if timer.freezeForCancel() { showCancelConfirm = true }
                             } label: {
                                 Text("取消专注").frame(maxWidth: .infinity)
                             }.buttonStyle(.bordered).foregroundColor(Garden.muted)

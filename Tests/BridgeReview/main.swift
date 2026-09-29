@@ -86,5 +86,60 @@ gated.startRest()
 check(gated.state.phase == .rest, "startRest proceeds after the record is on disk")
 let gateOnDisk = try gateStore.load()
 check(gateOnDisk.phase == .rest && gateOnDisk.records.count == 1, "rest advance persisted with the saved completion")
+
+// P24 regression: a successful write must CLEAR the 30s failure backoff. Without the
+// reset, the designed "≤5s of checkpoints lost on crash" guarantee silently degrades to
+// ~30s right after the user recovers from a storage failure.
+let backoffDir = scratch.appendingPathComponent("backoff")
+let backoffStore = FocusStore(url: backoffDir.appendingPathComponent("sessions.json"))
+var backoffSeed = FocusState()
+backoffSeed.records = [record("复盘")]
+try backoffStore.save(backoffSeed)
+let recovering = TBTimer(store: backoffStore)
+recovering.startWork()
+check(recovering.state.phase == .work, "backoff probe started a work session")
+try FileManager.default.removeItem(at: backoffDir)
+try Data("QA13 backoff".utf8).write(to: backoffDir)
+recovering.pause()
+check(recovering.storageError != nil && recovering.lastFailedSave != .distantPast, "failed persist armed the 30s backoff")
+try FileManager.default.removeItem(at: backoffDir)
+recovering.retryStorage()
+check(recovering.storageError == nil && recovering.lastFailedSave == .distantPast, "manual retry success clears the backoff")
+try FileManager.default.removeItem(at: backoffDir)
+try Data("QA13 backoff".utf8).write(to: backoffDir)
+recovering.cancel()
+check(recovering.storageError != nil && recovering.lastFailedSave != .distantPast, "second failure re-armed the backoff")
+try FileManager.default.removeItem(at: backoffDir)
+let backoffRecord = recovering.state.records[0]
+check(recovering.editRecord(id: backoffRecord.id, name: "重命名", tags: backoffRecord.tags, expected: backoffRecord) == nil,
+      "direct edit write succeeds once the disk is writable again")
+check(recovering.lastFailedSave == .distantPast && recovering.storageError == nil, "editRecord success also clears the backoff")
+
+// P25 regression: the cancel dialog may only open while the session is still .work.
+// pause() ticks first, so clicking at the exact deadline completes instead — the bridge
+// must refuse to raise a dialog whose 「放弃这段」 would be a silent no-op.
+let freezeDir = scratch.appendingPathComponent("freeze")
+let freezeStore = FocusStore(url: freezeDir.appendingPathComponent("sessions.json"))
+var freezeSeed = FocusState()
+freezeSeed.records = [record("复盘")]
+try freezeStore.save(freezeSeed)
+let freezable = TBTimer(store: freezeStore)
+freezable.startWork()
+check(freezable.freezeForCancel(), "cancel dialog opens for live work")
+check(freezable.state.phase == .work && freezable.state.paused, "freeze pauses without leaving the work phase")
+freezable.cancel()
+check(!freezable.freezeForCancel(), "idle session refuses the dialog")
+check(gated.state.phase == .rest && !gated.freezeForCancel() && !gated.state.paused,
+      "rest session refuses the dialog without freezing the rest")
+
+// P26 regression across the real bridge: the UI hands its open-time snapshot to
+// editRecord; a stale one returns the conflict message and nothing moves on disk.
+let staleDraft = freezable.state.records[0]
+check(freezable.editRecord(id: staleDraft.id, name: "另一窗口改名", tags: staleDraft.tags, expected: staleDraft) == nil,
+      "bridge accepts a fresh snapshot edit")
+check(freezable.editRecord(id: staleDraft.id, name: "旧草稿覆盖", tags: staleDraft.tags, expected: staleDraft) != nil,
+      "bridge refuses the stale draft with an error")
+let p26Disk = try freezeStore.load()
+check(p26Disk.records[0].name == "另一窗口改名", "a refused bridge edit never reaches the disk")
 print("PASS: \(checks) actual TBTimer bridge checks; isolated QA13 IO, no UI interaction")
 withExtendedLifetime(observation) {}

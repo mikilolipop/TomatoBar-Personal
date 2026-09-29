@@ -43,8 +43,7 @@ struct TBPopoverView: View {
                         if timer.state.phase == .work {
                             Button {
                                 cancelWasPaused = timer.state.paused
-                                if !timer.state.paused { timer.pause() }
-                                showCancelConfirm = true
+                                if timer.freezeForCancel() { showCancelConfirm = true }
                             } label: {
                                 Text("取消专注").frame(maxWidth: .infinity)
                             }.buttonStyle(.bordered).foregroundColor(Garden.muted)
@@ -97,6 +96,10 @@ struct TBPopoverView: View {
                 Button("继续专注", role: .cancel) { if !cancelWasPaused { timer.togglePause() } }.keyboardShortcut(.cancelAction)
                 Button("放弃这段", role: .destructive) { timer.cancel() }
             } message: { Text(cancelFocusMessage(timer.state)) }
+            // P16: the other window's edit or delete can empty out the tag this filter
+            // points at. Re-check it whenever the shared record list changes, not only
+            // after this view's own save.
+            .onChange(of: timer.state.records) { _ in clearStaleFilter() }
     }
 
     private var history: some View {
@@ -106,7 +109,10 @@ struct TBPopoverView: View {
                              styles: timer.state.categoryStyles, onCancel: {
                     editingRecord = nil
                 }, onSave: { name, tags, styleChanges in
-                    let error = timer.editRecord(id: record.id, name: name, tags: tags, styleChanges: styleChanges)
+                    // `record` is the snapshot this editor opened with; passing it as
+                    // `expected` makes a stale draft refuse instead of silently reverting
+                    // the other window's saved change (P26 lost-update guard).
+                    let error = timer.editRecord(id: record.id, name: name, tags: tags, styleChanges: styleChanges, expected: record)
                     if error == nil { clearStaleFilter(); editingRecord = nil }
                     return error
                 }, onDelete: {
@@ -172,9 +178,11 @@ struct TBPopoverView: View {
         }
     }
     /// Drop the active filter when the record just edited or deleted was the last one
-    /// carrying it, so the list never rests on a tag that no longer exists.
+    /// carrying it, so the list never rests on a tag that no longer exists. The popover
+    /// filters by ANY tag, so this asks the shared predicate for the primaryOnly=false
+    /// semantics (same one the main window uses for its overview, P14/P16).
     private func clearStaleFilter() {
-        if let tag = selectedTag, !timer.state.records.contains(where: { $0.hasTag(tag) }) {
+        if let tag = selectedTag, !timer.state.categoryFilterStillMatches(tag, primaryOnly: false) {
             selectedTag = nil
         }
     }
