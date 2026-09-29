@@ -20,9 +20,14 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var statusBarItem: NSStatusItem?
     private var model: TBTimer!
     private let reminder = TBReminder()
+    private var launchContext = LaunchContext()
     static var shared: TBStatusItem?
 
+    func applicationWillFinishLaunching(_: Notification) {
+        launchContext.observe(NSAppleEventManager.shared().currentAppleEvent)
+    }
     func applicationDidFinishLaunching(_: Notification) {
+        launchContext.observe(NSAppleEventManager.shared().currentAppleEvent)
         Self.shared = self
         LaunchAtLogin.migrateIfNeeded()
         model = TBTimer()
@@ -40,8 +45,12 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
         model.updateStatus()
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(willSleep),
             name: NSWorkspace.willSleepNotification, object: nil)
-        showMainWindow()
-        if model.state.needsAttention { reminder.show(timer: model) }
+        // Suppress both restored windows on login; retain needsAttention so the user
+        // can explicitly open the reminder from the menu bar after signing in.
+        if launchContext.shouldShowInitialWindows {
+            showMainWindow()
+            if model.state.needsAttention { reminder.show(timer: model) }
+        }
     }
     @objc private func willSleep() { model.pause() }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -83,7 +92,9 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
             window.setFrameAutosaveName("TomatoBarMainWindow")
             mainWindow = window
         }
-        NSApp.setActivationPolicy(.regular)
+        if !NSApp.setActivationPolicy(.regular) {
+            NSLog("TomatoBar: failed to show the running Dock icon")
+        }
         mainWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         model.windowActivity.visible = true
@@ -93,7 +104,13 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func windowDidResignKey(_ notification: Notification) { model.windowActivity.visible = false }
     func windowDidMiniaturize(_ notification: Notification) { model.windowActivity.visible = false }
     func windowDidDeminiaturize(_ notification: Notification) { model.windowActivity.visible = true }
-    func windowWillClose(_ notification: Notification) { model.windowActivity.visible = false }
+    func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow, window === mainWindow else { return }
+        model.windowActivity.visible = false
+        if !NSApp.setActivationPolicy(.accessory) {
+            NSLog("TomatoBar: failed to hide the running Dock icon")
+        }
+    }
     func setTitle(title: String?) {
         statusBarItem?.button?.attributedTitle = NSAttributedString(string: title.map { " \($0)" } ?? "",
             attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)])

@@ -22,6 +22,13 @@
 
 ---
 
+> **2026-09-29 Codex 第二轮评审**：基于 `ef50b45` 及交接提交 `58638f3`。
+> 新增独立兼容性断言（96 → 138）、真实 TBTimer 桥接探针（12 项）、合成登录事件检查（8 项）。
+> 未访问正式容器；桥接 IO 只在 QA13 的新建 review-UUID 子目录，退出时清理自己的目录。
+> 样式/删除/编辑生产代码本轮保持原样；P12–P14 已复现并记录，尚未修复。
+> P1/P2/P8 已有候选补丁，但真人登录、焦点、Dock 和 UI 布局验收仍未完成。
+> 较早源码行号属于原提交；本轮新证据行号以此评审提交为准。
+
 ## 严重性定义
 
 | 级别 | 含义 |
@@ -34,7 +41,7 @@
 
 ## 🔴 P1 — 「登录时启动」会导致每次登录弹大窗口并抢焦点
 
-**状态**：待评审 · **潜伏中**（该开关目前是关的，所以现在还不会发生）
+**状态**：2026-09-29 候选补丁完成，真人登录待验。下方保留原分析；本轮未检查正式版登录开关。
 
 ### 证据
 
@@ -102,11 +109,19 @@ osascript -e 'tell application "System Events" to get the name of every login it
 [锁定版本源码](https://github.com/sindresorhus/LaunchAtLogin/blob/9a894d799269cb591037f9f9cb0961510d4dca81/Sources/LaunchAtLogin/LaunchAtLogin.swift)。
 **限制**：以上是官方契约与源码核验，尚无本机真实登录事件样本。实施后须在 macOS 27 验证登录、手动冷启动、已有进程重开、会话恢复；不能声称平台可靠性已验收。
 
+### 2026-09-29 补丁复核（Codex）
+
+**同意实施，维持高优先级；状态改为候选补丁完成、真人验收待办。**
+`LaunchContext.swift:9-18` 核对 core/open-app 事件和 lgit 标记；App.swift 的 willFinish / didFinish
+同步采样，任一次确认登录即保留该结果。只抑制最初显示，不改用户主动 reopen。
+合成 nil/普通启动/错误 class/reopen/service/login/后续 nil 共 8 项通过，但无法证明系统真实登录时一定在这两个回调提供标记。
+见 `scripts/test-launch-context.sh`、`docs/V1.3验收清单.md`。LSUIElement 保留，未改任何登录项。
+
 ---
 
 ## 🔴 P2 — `LSUIElement = YES` 与 `setActivationPolicy(.regular)` 矛盾，Dock 图标永久残留
 
-**状态**：待评审 · **当前即可复现**
+**状态**：2026-09-29 候选补丁完成，Dock 生命周期实机验收待办。下方保留原分析。
 
 ### 证据
 
@@ -165,6 +180,13 @@ Apple 支持运行期切换，但不能据此保证 macOS 27 的 sheet、提醒 
 ```sh
 xcrun swift -e 'import AppKit; for a in NSWorkspace.shared.runningApplications where a.bundleIdentifier == "com.dilyar.TomatoBarPersonal" { print(a.activationPolicy.rawValue) }'
 ```
+
+### 2026-09-29 补丁复核（Codex）
+
+**同意补齐生命周期，严重性仍为中等体验问题；候选补丁完成。**
+App.swift 的 windowWillClose 先核对关闭对象就是 mainWindow，再切 accessory 并检查返回值。
+失焦、最小化回调不降级；打开主窗口切 regular，手动 reopen 不受登录来源标记限制。
+构建已通过，**未实测 Dock/Space/sheet 行为**；不能将此条移到已验收完成。用户固定在 Dock 的快捷方式不由应用删除。
 
 ---
 
@@ -570,7 +592,7 @@ git reflog show --date=iso refs/remotes/origin/feature/personal-focus
 
 ## 🔴 P8 — 登录静默方案还遗漏恢复提醒的激活路径
 
-**状态**：Codex 新增，领域恢复已复现；UI 激活由源码确认，真实登录未复现。**严重性：高，与 P1 一并处理。**
+**状态**：2026-09-29 与 P1 一起完成候选补丁；真人登录未验收。**严重性：高，与 P1 一并处理。**
 
 证据：`App.swift:44` 在启动时对 needsAttention 无条件 `reminder.show`；
 `Notifications.swift:22-24` 会 activate / makeKeyAndOrderFront / orderFrontRegardless。
@@ -587,6 +609,12 @@ sed -n '6,24p' TomatoBar/Notifications.swift
 sed -n '184,187p' TomatoBar/State.swift
 # 下方复现脚本包含编码/解码/恢复探针，不碰任何用户 sessions.json。
 ```
+
+## 评审意见（Codex）
+
+2026-09-29：**同意，保留与 P1 联动的高优先级。** 当前候选补丁把初始主窗口和恢复提醒放在同一个
+shouldShowInitialWindows 分支；不清 needsAttention、不自动确认下一阶段。后续由用户主动查看或正常到时的提醒路径不变。
+已检查 recovered paused / workFinished 不会因首次普通 tick 被当作新完成再次提醒；真实登录恢复提醒仍待清单第 6–8 步。
 
 ---
 
@@ -644,6 +672,12 @@ rg -n 'loadFailed|store.load' TomatoBar/Timer.swift
 # loadFailed 只在初始化设定；retrySave 不包含 reload。
 ```
 
+## 评审意见（Codex）
+
+2026-09-29：**同意 P9 的修复方向，维持已修状态，不以本轮领域测试冒充 reload UI 验收。**
+Timer.swift:144-165 区分 loadFailed 并重新读盘；坏文件保护仍在 persist guard。
+本轮另外实测真实 TBTimer 编辑/删除的失败返回与内存保留，没有修改这段已经验证的恢复代码。
+
 ---
 
 ## 🟡 P10 — 菜单栏 popover 的删除路径未经 UI 验收
@@ -668,6 +702,32 @@ click at {876,16}（按实测坐标）→ 同样未出现
 popover 特有的代码只有 4 行 `onDelete` 闭包，与主窗口的结构完全相同且已通过编译。
 但这不等于验证过 —— 需人工点一次：菜单栏图标 → 记录页 → 铅笔 → 删除记录 → 取消 → 再删除 → 确认。
 
+## 评审意见（Codex）
+
+2026-09-29：**部分同意。维持中低验收风险，不把“未验”当成功能必坏。**
+
+- `MainWindow.swift:75-97`：取消按钮清 nil，Binding 被系统置 false 时也清 nil；确认动作先清 pendingDelete，
+  再用 presenting 闭包捕获的 record 删除。没有发现“先清 pendingDelete 就丢 UUID”的错误。
+  模态期间第二次点击不应产生并发写；即使重复调用，UUID 第二次缺失只返回错误，不会删下一行。
+  真实桥接探针已证实这一点；系统关闭/Return/Esc/连续点击的实际事件顺序未验。
+- `View.swift:263-270`：confirmDelete 由 alert 的 isPresented 生命周期复位，取消不调用 onDelete；
+  删除失败编辑器保留并显示错误，成功由父级关闭。shared editor 不等于 popover 的焦点和 alert 生命周期也验过。
+- **不同意源码注释及原交接中“destructive role 保证不是默认按钮”的确定性断言。** role 标记危险操作，
+  `.cancelAction` 指定 Escape，并不能单独证明 Return 默认指向取消；
+  [Apple defaultAction](https://developer.apple.com/documentation/swiftui/keyboardshortcut/defaultaction)
+  才是指定主要键盘操作的接口。当前没有 Return 实测证据，不能反向断言“现在 Return 必然删除”。
+  后续应显式指定取消为 defaultAction 并验证 Esc 仍取消；本轮不凭推测修改已验过的 alert。
+- 真实桥接 `scripts/test-bridge.sh` 12 项：UUID 删除、重复删除、落盘、轮次保留、编辑/删除写失败与 history 一致性。
+  这比值类型复制测试更接近实际，但不覆盖 SwiftUI 弹窗或交互。
+
+**布局结论：部分同意结构改善；没有证据证明不会裁切，也没有证据证明滚动死锁。**
+`View.swift:237-260` 只有一个编辑内容 ScrollView，标签用 LazyVGrid，不存在嵌套纵向 ScrollView 的必然争抢。
+底栏与错误提示在滚动区外，320pt 的 popover 编辑区和 440×430 sheet（MainWindow.swift:68）会压缩内容，
+长错误/最大文字设置下底栏可达性需实机测；主窗口 920×740 不能保证所有内容天然合适。
+大量 `.font(.system(size: ...))` 固定字号不会简单随 dynamicTypeSize 放大，不能用 iOS 大字号假设判断 macOS。
+本轮曾编译真实视图做 NSHostingView 离屏栅格化，但得到缺失文字/控件的图像，**舍弃为无效验收证据**。
+没有为绕过同名进程风险退出或操作正式版；P10 popover、图标恢复自动、实际滚动和大字号保持待验。
+
 ---
 
 ## 🟡 P11 — 分类选择器的 accessibilityLabel 被 chevron 图标覆盖
@@ -688,6 +748,104 @@ help        = [每条记录只计入一个分类]
 修法方向：给 chevron 图标单独加 `.accessibilityHidden(true)`，或把 label 换成
 `Text(category)` 单一内容 + 外层 `.accessibilityLabel`。属小改动，但**需要 VoiceOver 实测**，
 本机无法验证读屏结果。
+
+## 评审意见（Codex）
+
+2026-09-29：**部分同意，维持低严重性且未验收。** `View.swift:297-304` 的 chevron 没有 accessibilityHidden，
+隐藏装饰图标是合理方向。但从 AX description/name 两次采样不能推导“被覆盖必由重算时机导致”，
+也不能等同 VoiceOver 实际播报。原因结论应降为待证实；真人 VoiceOver 验收后再判定修复。
+
+---
+
+## 本轮已实现功能的交叉评审（2026-09-29）
+
+### 解码与初始化契约
+
+## 评审意见（Codex）
+
+**同意兼容实现；未发现阻断级解码回归。** `State.swift:107-134` 的 CodingKeys 包含所有旧字段；
+三个 Optional<Date> 使用 decodeIfPresent 与旧合成解码器一致：缺键/null 为 nil，有效数值解码，错误类型仍抛错。
+categoryStyles 缺键/null 为 [:]，已存在且类型错误则抛错；这不会影响合法旧文件，不应把非可选旧字段缺失也容错成空状态。
+FocusRecord.tags 的缺键/null 兼容在嵌套 records 中仍有效，日期策略沿用 JSONEncoder/Decoder 默认值。
+
+新增 LegacyFocusState（旧字段形状的独立合成 Codable）作为 oracle，逐字段比较重编码值；覆盖 5 个 phase、
+三种可选日期、必需旧字段缺失/null、旧 records 无 tags 与新样式字段缺失的组合、错误样式类型。
+`Tests/main.swift:311` 起新增 42 项，`scripts/test.sh` 共 **138** 项通过。
+显式 init() 恢复零参构造；旧 memberwise initializer 确实不再合成，但全库 `rg 'FocusState\(' --glob '*.swift'`
+只发现零参调用，完整 UI 构建也通过。它是内部 app 类型，没有发现其他被悄悄破坏的现有初始化路径。
+
+### 逐文件与刻意设计反向检查
+
+| 文件 | 结论与边界 |
+|---|---|
+| State.swift | 兼容解码同意；删除只动 records 同意；普通 ASCII 大小写已通过，Unicode 不完全自洽见 P12；全量样式替换见 P13 |
+| Timer.swift | 原子写入后才发 state/history 同意；写失败返回局部错误而不制造全局退出阻断是刻意设计。已有 storageError 也不会在失败 catch 被清掉。实际桥接已测 |
+| View.swift | 首标签不进入其他标签可移除列表、删除成功由父级关闭、取消丢弃样式草稿均同意；alert 默认键不能仅凭 role 保证；整份 localStyles 快照见 P13 |
+| MainWindow.swift | pendingDelete 派生 Binding 与捕获 record 的顺序同意；history/timer 观察分层保留；概览/历史复用清理条件有语义漏洞见 P14 |
+| FocusCharts.swift | styles 值传入日图且 style-only edit 会发布 history，实测有通知，不能误报“仅改图标不刷新”；周/月不用图标符合现有图表意图；有限哈希集不保证分类图标互不重复 |
+| Log.swift / Analytics.swift | 本次功能没有修改它们，重读后未发现删除集成新回归；统计只认首标签与历史筛选认全部标签是不同且合理的语义，P14 清理必须区分 |
+| App.swift / Notifications.swift | 原版本与删除/图标无关；本轮按任务三改启动/关闭展示策略，未修改提醒确认后的计时路径，候选补丁待真人验收 |
+
+删除最后一条分类记录后仍保留 categoryStyles，是方便复用分类的刻意设计，不应报成无引用字典泄漏。
+图标覆盖是分类共享设置，不是每条记录的独立图标；界面未来可明确提醒这一点。
+本轮未把建议分类灌入用户记录，也未把“未分类”重新作为清空标签的选择项。
+
+---
+
+## 🟡 P12 — Unicode 大小写规范化后图标覆盖失配
+
+**状态**：新增，领域探针已复现，未修。**严重性：中等，特定自定义分类的视觉设置丢失。**
+
+证据：`State.swift:153-158` 用 caseInsensitiveCompare 采用既有标签写法；
+`View.swift:223-225,305-314` 用编辑草稿 category.lowercased() 做样式键；
+`Timer.swift:137-138`、`FocusCharts.swift:136` 又以保存后的首标签 lowercased 查询。
+`Straße` / `STRASSE` 和希腊 `ΟΣ` / `ος` 可以比较相等，但小写字符串不相同。
+先有 Straße，编辑器输入 STRASSE 并选 star，会写 strasse 键，标签保存成 Straße，查询 straße 得 nil。
+
+## 评审意见（Codex）
+
+**部分同意原“自洽”判断：Swift/swift 已独立通过，但对所有允许输入的 Unicode 不成立。**
+应由最终规范分类名决定写入键，并统一预览/解析时的别名回退；不能粗暴批量改旧字典键。
+见分类视觉设计。独立核验：
+
+```sh
+xcrun swift -e 'import Foundation; for (a,b) in [("Swift","swift"),("Straße","STRASSE"),("ΟΣ","ος")] { print(a,b,a.caseInsensitiveCompare(b) == .orderedSame,a.lowercased() == b.lowercased()) }'
+# true/true, true/false, true/false；端到端领域复现见下方新增问题探针。
+```
+
+---
+
+## 🟡 P13 — 两处编辑器的全量样式快照会覆盖另一处已保存设置
+
+**状态**：新增，状态层保存序列已复现；双窗口 UI 序列未实机验证。**严重性：中等，展示元数据丢失。**
+
+证据：`View.swift:198-213` 在初始化抓取全量 localStyles；`:253-255` 每次保存传整个字典；
+`State.swift:158` 无条件替换全局 map。主窗口 sheet 与菜单栏 popover 是两个入口（MainWindow.swift:57-68、View.swift:78-93），
+源码没有共享编辑锁或增量合并。A/B 同时从空字典开始，A 保存 a=star，B 保存 b=globe，最终只剩 b。
+即使 B 只改记录名称，仍提交它的旧整图，会撤销 A 的样式更新。原子写入保护文件完整，不能防止这个逻辑覆盖。
+
+## 评审意见（Codex）
+
+**不同意把“同一次原子保存”推成“多入口下不会丢样式”；新增中等问题。**
+后续提交用户实际修改/删除的键的 delta 并合并最新 state，或明确禁止两个编辑草稿同时存在；无需引入数据库。
+独立核验：执行下方新增问题探针，P13 输出仅 `["b": "globe"]`。UI 还需验证同时编辑的可达路径，不夸大为本轮已实机双窗口复现。
+
+---
+
+## 🟡 P14 — 概览分类筛选的清理错误地把次标签算作仍有该分类
+
+**状态**：新增，领域条件已复现，未修。**严重性：低，筛选残留导致意外空列表。**
+
+证据：`MainWindow.swift:89-92` 用 hasTag 清理概览和历史筛选；
+`Analytics.swift:50-52` 概览按 category（首标签）筛选，`State.swift:69-73` 换分类把旧主标签留在尾部。
+选中“阅读”，把最后一条阅读改为数学后，阅读仍作为次标签存在，clearStaleFilter 不清除，概览却显示 0 条。
+这是最新分类编辑保留旧标签后很容易触发的交互，不是数据被删除。
+
+## 评审意见（Codex）
+
+**部分同意原筛选清理：历史页/popover 的全标签判断正确，概览应检查首标签语义。**
+不要为修概览而把历史页也改成只看首标签。独立核验：执行下方探针，P14 输出 hasTag=true、primary summary=0；
+并可在 QA13 选中唯一主分类后编辑换分类手工复验。
 
 ---
 
@@ -733,6 +891,52 @@ print("recovered=\(restored.phase) attention=\(restored.needsAttention) checksum
     subprocess.run(['xcrun', 'swiftc', '-O', 'TomatoBar/State.swift', 'TomatoBar/Analytics.swift',
                     str(root / 'main.swift'), '-o', str(root / 'probe')], check=True)
     subprocess.run([str(root / 'probe')], check=True)
+PYPROBE
+```
+
+---
+
+## 新增问题探针（P12–P14）
+
+此探针只使用合成内存数据，不读写任何 sessions.json。输出复现当前缺陷，修复后应重新评估预期。
+从仓库根目录运行：
+
+```sh
+python3 - <<'PYPROBE'
+from pathlib import Path
+import subprocess, tempfile
+with tempfile.TemporaryDirectory(prefix='tomatobar-review-') as tmp:
+    source = Path(tmp) / 'main.swift'
+    source.write_text(r"""
+import Foundation
+let now = Date(timeIntervalSince1970: 1_800_000_000)
+func record(_ tag: String) -> FocusRecord {
+    FocusRecord(id: UUID(), name: "probe", startedAt: now, endedAt: now.addingTimeInterval(60), plannedSeconds: 60,
+      completed: true, segments: [FocusSegment(start: now, end: now.addingTimeInterval(60))], tags: [tag])
+}
+var unicode = FocusState()
+let u = record("Straße")
+unicode.records = [u]
+try unicode.editRecord(id: u.id, name: u.name, tags: ["STRASSE"], categoryStyles: ["strasse": "star"])
+print("P12:", unicode.records[0].category, "override:", unicode.categoryStyles[unicode.records[0].category.lowercased()] as Any)
+var concurrent = FocusState()
+let a = record("A"), b = record("B")
+concurrent.records = [a,b]
+var editorA = concurrent.categoryStyles, editorB = concurrent.categoryStyles
+editorA["a"] = "star"
+try concurrent.editRecord(id: a.id, name: a.name, tags: a.tags, categoryStyles: editorA)
+editorB["b"] = "globe"
+try concurrent.editRecord(id: b.id, name: b.name, tags: b.tags, categoryStyles: editorB)
+print("P13:", concurrent.categoryStyles)
+var filtering = FocusState()
+let f = record("阅读")
+filtering.records = [f]
+try filtering.editRecord(id: f.id, name: f.name, tags: FocusRecord.tags(withPrimaryCategory: "数学", in: f.tags))
+print("P14: hasTag=", filtering.records.contains { $0.hasTag("阅读") }, "primary summary=", FocusSummary(records: filtering.records, period: .day, date: now, category: "阅读").records.count)
+""")
+    binary = Path(tmp) / 'probe'
+    subprocess.run(['xcrun', 'swiftc', 'TomatoBar/State.swift', 'TomatoBar/Analytics.swift', str(source), '-o', str(binary)], check=True)
+    subprocess.run([str(binary)], check=True)
 PYPROBE
 ```
 

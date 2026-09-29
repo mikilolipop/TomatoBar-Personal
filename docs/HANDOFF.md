@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-09-29，by Claude Code（Opus 5）· 修三处 UI 重复 + 分类图标可手动选
+最后更新：2026-09-29，by Codex · 第二轮交叉评审、分类视觉设计、P1/P2/P8 候选补丁
 
 ---
 
@@ -40,13 +40,13 @@ first process whose unix id is 40847（QA13 的 pid）  →  读到的 bid 是 c
 | 项 | 值 |
 |---|---|
 | ⚠️ **已安装版本** | **3.8.0（V1.2），不含本轮任何改动**。删除功能、分类入口、P9 修复都只在源码 + CI 里，`/Applications` 未重装。产物在 `/tmp/TomatoBar-personal-build/`（`/tmp` 会被系统清理，重装前先确认还在，否则重跑 `scripts/build.sh`） |
-| HEAD | `ef50b45`（分类图标可手动选）← 上一提交（修三处 UI 重复）← `3ea4acc` ← `abf55df`（P7）← `e69be32`（P9）← `bd7c214` ← `d01bc20`（Codex 评审）← `1f43359` ← `8fb1e74` ← `90a77d6`（上游基线） |
+| HEAD | 本轮 Codex 提交（基于 `58638f3`，含 `ef50b45` / `5a1c03e`；精确 hash 见 `git log -1`） |
 | 工作区 | 干净，与 `origin/feature/personal-focus` 一致 |
-| 测试 | `scripts/test.sh` → **96 项全绿** |
-| **CI** | ✅ `tests` workflow 生效中，前两次运行均 success（[首次运行](https://github.com/mikilolipop/TomatoBar-Personal/actions/runs/36431326540) 46 秒） |
+| 测试 | **138 项领域 + 12 项真实桥接 + 8 项合成启动事件**通过；Release clean build 与严格签名校验通过 |
+| **CI** | `tests` workflow 已由前轮启用；本轮交付以本地检查为证，未将旧 CI 结果当本轮结果 |
 | 远程 | `origin` = `mikilolipop/TomatoBar-Personal`（私有，默认分支 `feature/personal-focus`）；`upstream` = `ivoronin/TomatoBar` |
-| 用户真实数据 | **2 条**（`测试` 60秒、`未命名专注` 480秒，均带标签 `学习`），phase=idle。UI 验收前后逐条比对，**ID／名称／标签／时长／完成状态全部一致，未被触碰** |
-| QA 隔离环境 | `com.dilyar.TomatoBarPersonal.QA13`，构建于 `/tmp/TomatoBar-QA13-build/`，内含 5 条合成数据 + `categoryStyles` 一条 override。**与正式版容器完全隔离** |
+| 用户真实数据 | 前轮记载 2 条；**本轮未读取、未写入正式容器，也未退出正式应用**，不把旧数据量当作当前复查结果 |
+| QA 隔离环境 | 旧 QA13 app 未重建启动；本轮桥接检查只在 QA13 的新建 review-UUID 子目录做合成 IO，完成后清理该子目录；既有 QA13 sessions 未改 |
 | git 身份 | 本仓库 `--local`：`mikilolipop <207336577+mikilolipop@users.noreply.github.com>`（全局仍未设置） |
 
 ### 原版 TomatoBar 已退役
@@ -80,40 +80,52 @@ tarball 是首次提交前的应急措施。有了 git + 远程后必要性下�
 
 ## 进行中
 
-**无进行中的代码改动。** 本轮实施了用户指定的两项功能（单条删除、分类入口清晰化），
-已完成领域测试、构建签名、以及**隔离环境 QA13 的真实 UI 验收**（详见下节）。
+本轮实现与文档已结束。**交叉评审结果在 BACKLOG**；分类视觉方案在 [`分类视觉设计.md`](分类视觉设计.md)，设计尚未实现。
+P1/P2/P8 已获本轮用户授权并写候选补丁，尚不能标记用户验收通过；清单见 [`V1.3验收清单.md`](V1.3验收清单.md)。
+正式安装版未替换，本轮没有新像素素材。
 
-其余条目状态：
-
-| 条目 | 状态 |
+| 条目 | 当前状态 |
 |---|---|
-| **P10** | **新增，待人工点击**。菜单栏 popover 的删除入口无法用辅助功能自动化打开（状态栏项只支持 `AXPress`，执行后 popover 不出现；坐标点击同样无效）。需人工验一次 |
-| **P11** | **新增**。分类选择器的 `accessibilityLabel` 被 chevron 图标的 AX description（`向下移动`）覆盖，且 AX name 不稳定。需 VoiceOver 实测，本机无法验证读屏 |
-| P1 + P2 + P8 | **未授权**。三者必须一起做。需要用户亲自登出登入验收 |
-| P3 | **未授权**。Codex 已否定「比较休息分钟数」的修法；完整方案需持久化 RestKind + 旧 JSON 兼容解码 |
-| P4 / P6 | 建议**跳过**。P4 有真实构建风险（`pbxproj:16/169/217-226` 的 BuildFile + Resources phase + PBXVariantGroup 引用链）；P6 的 `Icons/` 是 `convert.sh` 的源素材，不能删 |
-| P5 | **暂不修**。原「13 次 / 416 趟」估算已被 Codex 推翻并撤回 |
-| P7 遗留 | main 首次推送为何零运行**仍未证实**。现已无关紧要 |
-
----
+| 解码兼容性 | 同意现有实现；独立合成旧结构 oracle + 可选日期/必需字段/嵌套 tags 等 42 项新增断言通过 |
+| 删除 | 真实 TBTimer 成功、重复调用、写失败、history 发布已测；alert 键盘默认/外部关闭/连点的实际 UI 序列未测 |
+| P10 / P11 | popover 与 VoiceOver 仍待真人验收；不能用同一组件或 AX 名称代替实际操作 |
+| P12 | **新增未修**：Unicode caseInsensitiveCompare 与 lowercased 语义不同，可能让已选图标失配 |
+| P13 | **新增未修**：两个编辑器全量样式草稿可能相互覆盖；状态层保存序列已复现，双入口 UI 序列待验 |
+| P14 | **新增未修**：概览清理筛选检查 hasTag，旧分类降为次标签后筛选残留 |
+| P1 + P2 + P8 | **候选补丁**：同步捕获登录标记，初始主窗口/恢复提醒同时静默；真正关闭主窗口才降级 accessory |
+| P3 / P4 / P5 / P6 | 沿用此前决定，未动 |
 
 ## 下一步
 
-1. **人工验收 P10**（约 1 分钟）：菜单栏图标 → 记录页 → 铅笔 → 「删除记录」→ 取消 →
-   再删除 → 确认。这是本轮唯一没验到的入口
-2. **决定是否重装 `/Applications`**。当前安装的仍是 V1.2 原版，**不含删除功能、分类入口和 P9 修复**。
-   重装前注意产物在 `/tmp`，可能已被清理
-3. **P11** 若有 VoiceOver 需求再处理：给 chevron 加 `.accessibilityHidden(true)`
-4. **P1 + P2 + P8** 仍是价值最高的一批，实施前先写 `docs/V1.3验收清单.md`，
-   因为验收必须由用户真人执行（登出登入、关窗看 Dock 图标、开设置 sheet 确认图标不消失、最小化）
-5. V1.3 若发版，另写验收文档，**不要回头改 `design-qa.md` 里的「41 项检查」**
-6. QA13 环境可复用：构建命令见下节，容器 `com.dilyar.TomatoBarPersonal.QA13` 里现有 5 条合成数据
+1. 先读本轮 BACKLOG 的 P12–P14 与完整删除/解码评审，决定下一轮修复范围；不要把这三个问题误记成已修。
+2. 按 V1.3 验收清单，在 QA13 做真人登录/恢复/关闭/最小化/Space 检查；候选补丁构建通过不等于登录已验证。
+3. 删除确认需真人测试 Return/Esc；当前 destructive role 不足以作为“安全默认”保证。若修，显式指定取消的 defaultAction，再复验。
+4. P10 popover、P11 VoiceOver、长内容滚动、大字号、恢复自动图标仍需实机；本轮离屏栅格化不完整，未当作通过证据。
+5. 分类视觉按设计文档保留旧 SF 字符串，新增可选像素元数据和回退；由 Codex 后续交付像素素材，不能把设计说明当作资产已就绪。
+6. 用户验收后再决定安装。本轮 **没有替换 /Applications、没有修改真实用户数据**。
 
 ### V1.3 候选（尚未规划）
 
 - 往 `scripts/seed-qa.py` 加几段**亚分钟记录**，用于视觉验证 `FocusCharts.tileWidth` 的
   `max(44, …)` 最小宽度分支。该分支在 UI 层，`scripts/test.sh` 编译不进去，**只能靠眼睛看**。
   注意：QA12 沙盒容器还在，但 **QA12 的 .app 本体已不存在**，需先造一个 QA12 bundle ID 的构建变体。
+
+---
+
+## 刚做完（2026-09-29，Codex 第二轮）
+
+- 逐文件复核 State / Log / Analytics / Timer / View / MainWindow / FocusCharts / App / Notifications。
+- 解码实现与普通 ASCII 样式规范化通过；3 个遗漏以 P12–P14 写回 BACKLOG，附可独立运行的合成探针。
+- 保留已验证的删除/分类生产逻辑；未因静态疑虑重写 RecordEditor 或持久化格式。
+- tests 96 → **138**；新增 `test-bridge.sh` **12 项**，链接真实 SwiftPM 依赖与 UI/桥接源码，仅把 @main 入口移除以运行检查。
+  无 Mock TBTimer；验证写失败不丢内存、重复删除不误删、图标单独修改仍发 history 通知。没有 UI 点击。
+- 先写 `docs/V1.3验收清单.md`，再实施 App.swift + LaunchContext.swift 的 P1/P2/P8 候选补丁。
+  新增 `test-launch-context.sh` **8 项**；同步观察 willFinish/didFinish，已确认的登录标记不被后续 nil 覆盖。
+- `scripts/build.sh` clean Release 成功，严格签名检查通过；未安装、未重启正式应用、未登记 QA 登录项。
+- `docs/分类视觉设计.md`：保留 categoryStyles 字符串，另增可选 categoryVisuals、资源/旧值/自动回退、增量提交与无脚本兼容。
+- 未完成：真人登录、Dock/UI 焦点、Return/Esc、popover、VoiceOver、最大文字/小窗滚动、图标恢复自动。
+  编译真实视图做离屏缓存时有文字缺失，舍弃该结果，不写成视觉验收通过。
+- 没有翻案或重提已否决方案。仅纠正 AGENTS 对“SwiftUI 不能用 swiftc 测”的过强表述：可以链接依赖测桥接，仍不能据此声称 UI 已验收。
 
 ---
 

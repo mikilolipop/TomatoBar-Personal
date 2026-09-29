@@ -306,3 +306,96 @@ check(styleRenamed.categoryStyles == ["数学": "globe"], "passing styles replac
 try styleRenamed.deleteRecord(id: delC.id)
 check(styleRenamed.categoryStyles == ["数学": "globe"], "deleting a record keeps the style map")
 print("PASS: \(checks) total checks including deletion and category switching")
+
+// Independent decoder oracle: the pre-categoryStyles storage shape with synthesized
+// Codable. Compare accepted payloads and re-encoded values, not just records.count.
+struct LegacyFocusState: Codable {
+    var phase: FocusPhase
+    var paused: Bool
+    var name: String
+    var startedAt: Date?
+    var segmentStart: Date?
+    var deadline: Date?
+    var remaining: TimeInterval
+    var planned: TimeInterval
+    var segments: [FocusSegment]
+    var rounds: Int
+    var records: [FocusRecord]
+    var checkpoint: Date
+}
+func reviewData(_ object: [String: Any]) throws -> Data {
+    try JSONSerialization.data(withJSONObject: object)
+}
+func legacyMatches(_ object: [String: Any]) throws -> Bool {
+    let data = try reviewData(object)
+    let legacy = try JSONDecoder().decode(LegacyFocusState.self, from: data)
+    let current = try JSONDecoder().decode(FocusState.self, from: data)
+    let left = try JSONSerialization.jsonObject(with: JSONEncoder().encode(legacy)) as! NSDictionary
+    var right = try JSONSerialization.jsonObject(with: JSONEncoder().encode(current)) as! [String: Any]
+    right.removeValue(forKey: "categoryStyles")
+    return left.isEqual(to: right)
+}
+func bothReject(_ object: [String: Any]) throws -> Bool {
+    let data = try reviewData(object)
+    let old = try? JSONDecoder().decode(LegacyFocusState.self, from: data)
+    let new = try? JSONDecoder().decode(FocusState.self, from: data)
+    return old == nil && new == nil
+}
+var decoderFixture = FocusState()
+decoderFixture.startWork(name: "decoder", seconds: 60, at: base)
+decoderFixture.records = [delC]
+decoderFixture.categoryStyles = ["swift": "star"]
+let decoderObject = try JSONSerialization.jsonObject(with: JSONEncoder().encode(decoderFixture)) as! [String: Any]
+for phase in [FocusPhase.idle, .work, .rest, .workFinished, .restFinished] {
+    var object = decoderObject
+    object["phase"] = phase.rawValue
+    let matches = try legacyMatches(object)
+    check(matches, "manual decoder preserves every legacy field for \(phase)")
+}
+for key in ["startedAt", "segmentStart", "deadline"] {
+    for value in [nil, NSNull(), NSNumber(value: 123.5)] as [Any?] {
+        var object = decoderObject
+        object[key] = value
+        let matches = try legacyMatches(object)
+        check(matches, "optional date \(key): missing/null/value matches synthesis")
+    }
+    var object = decoderObject
+    object[key] = "wrong-type"
+    let rejected = try bothReject(object)
+    check(rejected, "wrong-type optional date \(key) must still throw")
+}
+for key in ["phase", "paused", "name", "remaining", "planned", "segments", "rounds", "records", "checkpoint"] {
+    for value in [nil, NSNull()] as [Any?] {
+        var object = decoderObject
+        object[key] = value
+        let rejected = try bothReject(object)
+        check(rejected, "required legacy field \(key) remains required")
+    }
+}
+for value in [nil, NSNull(), [:]] as [Any?] {
+    var object = decoderObject
+    object["categoryStyles"] = value
+    var records = object["records"] as! [[String: Any]]
+    records[0].removeValue(forKey: "tags")
+    object["records"] = records
+    let decoded = try JSONDecoder().decode(FocusState.self, from: reviewData(object))
+    check(decoded.categoryStyles.isEmpty && decoded.records[0].tags.isEmpty,
+          "missing legacy nested tags and missing/null/empty styles compose safely")
+}
+for value: Any in ["invalid", ["swift": 42]] {
+    var object = decoderObject
+    object["categoryStyles"] = value
+    let decoded = try? JSONDecoder().decode(FocusState.self, from: reviewData(object))
+    check(decoded == nil, "wrong-type styles are not silently accepted as valid state")
+}
+var asciiStyles = FocusState()
+let asciiRecord = FocusRecord(id: UUID(), name: "ASCII", startedAt: base, endedAt: base,
+    plannedSeconds: 60, completed: true, segments: [], tags: ["Swift"])
+asciiStyles.records = [asciiRecord]
+try asciiStyles.editRecord(id: asciiRecord.id, name: "ASCII", tags: ["sWIFT"], categoryStyles: ["swift": "star"])
+check(asciiStyles.records[0].tags == ["Swift"] && asciiStyles.categoryStyles[asciiStyles.records[0].category.lowercased()] == "star",
+      "ASCII casing canonicalization preserves the icon lookup key")
+let asciiRoundTrip = try JSONDecoder().decode(FocusState.self, from: JSONEncoder().encode(asciiStyles))
+check(asciiRoundTrip.categoryStyles[asciiRoundTrip.records[0].category.lowercased()] == "star",
+      "ASCII category override survives canonicalization and persistence")
+print("PASS: \(checks) total checks including independent legacy decoding review")

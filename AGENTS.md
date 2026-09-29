@@ -42,15 +42,17 @@ macOS 菜单栏番茄钟，是 [ivoronin/TomatoBar](https://github.com/ivoronin/
 
 | 文件 | 职责 |
 |---|---|
-| `TomatoBar/Timer.swift` | `TBTimer`（ObservableObject 桥接）、`FocusHistory`、`WindowActivity`。**import SwiftUI + KeyboardShortcuts，因此无法进 swiftc 测试** |
+| `TomatoBar/Timer.swift` | `TBTimer`（ObservableObject 桥接）、`FocusHistory`、`WindowActivity`。依赖 SwiftUI + KeyboardShortcuts；默认领域测试不编译，另有 `scripts/test-bridge.sh` 链接真实依赖检查 |
+| `TomatoBar/LaunchContext.swift` | AppKit 启动事件分类；两个启动回调采样，不修改计时或登录注册 |
 | `TomatoBar/App.swift` | `TBStatusItem`（NSApplicationDelegate）：菜单栏、popover、主窗口、睡眠暂停、退出保护、URL scheme |
 | `TomatoBar/View.swift` | 菜单栏 popover（350pt）、`RecordEditor` |
 | `TomatoBar/MainWindow.swift` | 主窗口：概览/历史页、`TimerCard`、`ExpandedTimer`、`MainSettings` |
 | `TomatoBar/FocusCharts.swift` | `Garden` 配色、`GardenArt` 像素动画、`FocusChart`（日色块流/周堆叠柱/月热力日历） |
 | `TomatoBar/Notifications.swift` | `TBReminder`：无声浮动提醒面板 |
 
-**已知架构边界**：因为 `Timer.swift` 依赖 SwiftUI，`TBTimer` 里的派生值（如 `todayCount`、
-`restMinutes`）**无法被 `scripts/test.sh` 覆盖**。需要测试的逻辑应尽量下沉到领域层。
+**已知架构边界**：`scripts/test.sh` 只编译领域层，不覆盖 `TBTimer` 和 SwiftUI 交互。
+构建后可运行 `scripts/test-bridge.sh`，它编译真实桥接/UI 源文件与 SwiftPM 依赖，在 QA13 临时子目录检查存储事务，
+但不启动界面、不覆盖 alert/布局。`scripts/test-launch-context.sh` 只验证合成事件，不代替真人登录。
 
 ---
 
@@ -71,7 +73,9 @@ macOS 菜单栏番茄钟，是 [ivoronin/TomatoBar](https://github.com/ivoronin/
 ## 命令
 
 ```sh
-scripts/test.sh     # 55 项检查。swiftc 编译 State+Log+Analytics+Tests/main.swift 后直接运行
+scripts/test.sh     # 138 项领域检查（原 96 项 + 42 项解码兼容性/ASCII 样式检查）
+scripts/test-launch-context.sh # 8 项 AppKit 合成启动事件检查，不访问用户数据
+scripts/test-bridge.sh # 先 build.sh，再运行 12 项真实 TBTimer 检查；只使用 QA13 新建临时子目录
 scripts/build.sh    # Release 构建到 /tmp/TomatoBar-personal-build，ad-hoc 签名 + codesign --verify --deep --strict
 scripts/seed-qa.py  # 只写入隔离的 QA12 沙盒，运行前先退出该 App
 scripts/compare-design.py
