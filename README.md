@@ -9,7 +9,7 @@ macOS 菜单栏番茄钟 · [TomatoBar](https://github.com/ivoronin/TomatoBar) �
 完全无声 · 事件记录 · 日／周／月复盘
 
 [![tests](https://github.com/mikilolipop/TomatoBar-Personal/actions/workflows/main.yml/badge.svg?branch=feature/personal-focus)](https://github.com/mikilolipop/TomatoBar-Personal/actions/workflows/main.yml)
-[![download](https://img.shields.io/badge/下载-V1.3-orange)](releases/latest)
+[![download](https://img.shields.io/badge/下载-V1.3-orange)](https://github.com/mikilolipop/TomatoBar-Personal/releases/latest)
 ![macOS](https://img.shields.io/badge/macOS-12.3%2B-blue)
 ![Swift](https://img.shields.io/badge/Swift-SwiftUI%20%2B%20AppKit-orange)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -45,7 +45,7 @@ macOS 菜单栏番茄钟 · [TomatoBar](https://github.com/ivoronin/TomatoBar) �
 
 ## 安装
 
-**下载最新版**：前往 [Releases](releases/latest)，任选一种形式（均支持 Apple Silicon 与 Intel）：
+**下载最新版**：前往 [Releases](https://github.com/mikilolipop/TomatoBar-Personal/releases/latest)，任选一种形式（均支持 Apple Silicon 与 Intel）：
 
 | 文件 | 用法 |
 |---|---|
