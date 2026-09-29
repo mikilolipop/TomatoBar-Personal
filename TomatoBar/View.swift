@@ -10,6 +10,10 @@ struct TBPopoverView: View {
     @State private var editingRecord: FocusRecord?
     @State private var selectedTag: String?
     @State private var showCancelConfirm = false
+    // Opening the cancel dialog freezes the clock: otherwise the timer could hit zero
+    // behind the modal, addRecord fires, and 「放弃这段」 silently no-ops (phase is no
+    // longer .work) leaving exactly the record the user just tried to discard.
+    @State private var cancelWasPaused = false
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -37,7 +41,11 @@ struct TBPopoverView: View {
                             Text(timer.state.phase == .work ? "结束并记录" : "结束休息").frame(maxWidth: .infinity)
                         }.buttonStyle(.bordered)
                         if timer.state.phase == .work {
-                            Button { showCancelConfirm = true } label: {
+                            Button {
+                                cancelWasPaused = timer.state.paused
+                                if !timer.state.paused { timer.pause() }
+                                showCancelConfirm = true
+                            } label: {
                                 Text("取消专注").frame(maxWidth: .infinity)
                             }.buttonStyle(.bordered).foregroundColor(Garden.muted)
                                 .help("丢弃这段专注，不保存为记录")
@@ -86,7 +94,7 @@ struct TBPopoverView: View {
             }
         }.padding(18).frame(width: 350)
             .alert("取消这段专注？", isPresented: $showCancelConfirm) {
-                Button("继续专注", role: .cancel) { }.keyboardShortcut(.cancelAction)
+                Button("继续专注", role: .cancel) { if !cancelWasPaused { timer.togglePause() } }.keyboardShortcut(.cancelAction)
                 Button("放弃这段", role: .destructive) { timer.cancel() }
             } message: { Text(cancelFocusMessage(timer.state)) }
     }

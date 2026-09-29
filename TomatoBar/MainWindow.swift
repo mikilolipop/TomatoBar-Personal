@@ -294,6 +294,9 @@ struct ExpandedTimer: View {
     @ObservedObject var timer: TBTimer
     let close: () -> Void
     @State private var showCancelConfirm = false
+    // Opening the cancel dialog freezes the clock (see the popover): a completion behind
+    // the modal would turn 「放弃这段」 into a silent no-op that keeps the record anyway.
+    @State private var cancelWasPaused = false
     var body: some View {
         VStack(spacing: 18) {
             HStack { Spacer(); Button("收起", action: close).keyboardShortcut(.cancelAction) }
@@ -314,7 +317,11 @@ struct ExpandedTimer: View {
                             Text(timer.state.phase == .work ? "结束并记录" : "结束休息").frame(maxWidth: .infinity)
                         }.buttonStyle(.bordered)
                         if timer.state.phase == .work {
-                            Button { showCancelConfirm = true } label: {
+                            Button {
+                                cancelWasPaused = timer.state.paused
+                                if !timer.state.paused { timer.pause() }
+                                showCancelConfirm = true
+                            } label: {
                                 Text("取消专注").frame(maxWidth: .infinity)
                             }.buttonStyle(.bordered).foregroundColor(Garden.muted)
                                 .help("丢弃这段专注，不保存为记录")
@@ -328,7 +335,7 @@ struct ExpandedTimer: View {
         }.padding(28).frame(width: 540)
             .background(Garden.paper).foregroundColor(Garden.ink).accentColor(Garden.red)
             .alert("取消这段专注？", isPresented: $showCancelConfirm) {
-                Button("继续专注", role: .cancel) { }.keyboardShortcut(.cancelAction)
+                Button("继续专注", role: .cancel) { if !cancelWasPaused { timer.togglePause() } }.keyboardShortcut(.cancelAction)
                 Button("放弃这段", role: .destructive) { timer.cancel() }
             } message: { Text(cancelFocusMessage(timer.state)) }
     }
