@@ -124,6 +124,22 @@ V1.3 已按用户决定定稿上线，不再往这个版本里加东西。后续
 
 ---
 
+## 刚做完（2026-09-29，Claude Code 发布 V1.3 GitHub Release + 下载包）
+
+- **universal 构建**：`ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO` 另跑一次 Release 构建
+  （`/tmp/TomatoBar-universal-build`），lipo 确认双架构、`--deep --strict` 签名通过。
+  项目默认 `scripts/build.sh` 只出 arm64，**尚未把 universal 参数并进 build.sh**（待定夺）
+- **打包**：`/tmp/TomatoBarPersonal-3.9.0.dmg`（hdiutil UDZO，含 Applications 拖拽位，
+  CRC 校验 + 挂载实测）与 `.zip`（ditto 保元数据），SHA-256 见 Release 正文
+- **tag `v3.9.0`**：沿用上游内部版本号命名（上游历史 tag 占用了 v1.x–v3.6.1，
+  `v1.3` 会撞名）；对外标题 `TomatoBar Personal V1.3 (3.9.0)`
+- **GitHub Release 已创建**：挂 dmg + zip 双附件，正文含下载表、Gatekeeper 处理、
+  校验和、本版新增/长期特性/质量/已知未修；README 头部加「下载 V1.3」徽章、
+  安装一节改为 Releases 优先 + 源码构建保留
+- 版本对外 V1.3 / 内部 3.9.0 双轨并写在 Release 与 README，避免后续混淆
+
+---
+
 ## 刚做完（2026-09-29，Claude Code 开源准备：README 重写 + 封面截图替换）
 
 用户计划公开此仓库，要求美化 GitHub 侧内容。

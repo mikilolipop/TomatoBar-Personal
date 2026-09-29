@@ -9,6 +9,7 @@ macOS 菜单栏番茄钟 · [TomatoBar](https://github.com/ivoronin/TomatoBar) �
 完全无声 · 事件记录 · 日／周／月复盘
 
 [![tests](https://github.com/mikilolipop/TomatoBar-Personal/actions/workflows/main.yml/badge.svg?branch=feature/personal-focus)](https://github.com/mikilolipop/TomatoBar-Personal/actions/workflows/main.yml)
+[![download](https://img.shields.io/badge/下载-V1.3-orange)](releases/latest)
 ![macOS](https://img.shields.io/badge/macOS-12.3%2B-blue)
 ![Swift](https://img.shields.io/badge/Swift-SwiftUI%20%2B%20AppKit-orange)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -44,7 +45,21 @@ macOS 菜单栏番茄钟 · [TomatoBar](https://github.com/ivoronin/TomatoBar) �
 
 ## 安装
 
-本仓库暂未发布安装包，从源码构建（需要 Xcode 与 Command Line Tools）：
+**下载最新版**：前往 [Releases](releases/latest)，任选一种形式（均支持 Apple Silicon 与 Intel）：
+
+| 文件 | 用法 |
+|---|---|
+| `TomatoBarPersonal-<版本>.dmg` | 打开后把番茄图标拖进 Applications |
+| `TomatoBarPersonal-<版本>.zip` | 解压后把 app 移入 Applications |
+| Source code (tar.gz/zip) | GitHub 自动附带，从源码构建 |
+
+首次打开若被 Gatekeeper 拦截（本应用为 ad-hoc 签名，未做付费公证）：
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/TomatoBar Personal.app"
+```
+
+也可以直接从源码构建（需要 Xcode 与 Command Line Tools）：
 
 ```sh
 git clone https://github.com/mikilolipop/TomatoBar-Personal.git
