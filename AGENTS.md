@@ -73,7 +73,7 @@ macOS 菜单栏番茄钟，是 [ivoronin/TomatoBar](https://github.com/ivoronin/
 ## 命令
 
 ```sh
-scripts/test.sh     # 领域检查（当前 169 项，**以末行 PASS 数为准**，历轮修复一直在加）
+scripts/test.sh     # 领域检查（当前 174 项，**以末行 PASS 数为准**，历轮修复一直在加）
 scripts/test-launch-context.sh # 8 项 AppKit 合成启动事件检查，不访问用户数据
 scripts/test-bridge.sh # 先 build.sh，再运行真实 TBTimer 检查（当前 35 项）；只使用 QA13 新建临时子目录
 scripts/build.sh    # Release 构建到 /tmp/TomatoBar-personal-build，ad-hoc 签名 + codesign --verify --deep --strict

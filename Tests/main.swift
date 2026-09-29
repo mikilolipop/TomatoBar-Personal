@@ -516,3 +516,25 @@ exactDeadline.pause(at: base.addingTimeInterval(10))
 check(exactDeadline.phase == .workFinished && exactDeadline.records.count == 1,
       "pause at the exact deadline completes instead of pausing")
 print("PASS: \(checks) total checks including same-record lost-update guard")
+
+// allCategories (UI redesign handoff via Google Drive, contract completed locally
+// 2026-09-30): the 「已有主分类」 menu lists ONLY tags that actually head some record.
+var catState = FocusState()
+catState.records = [
+    FocusRecord(id: UUID(), name: "一", startedAt: base, endedAt: base, plannedSeconds: 60, completed: true, segments: [], tags: ["数学", "作业"]),
+    FocusRecord(id: UUID(), name: "二", startedAt: base, endedAt: base, plannedSeconds: 60, completed: true, segments: [], tags: ["swift"]),
+    FocusRecord(id: UUID(), name: "三", startedAt: base, endedAt: base, plannedSeconds: 60, completed: true, segments: [], tags: []),
+]
+check(!catState.allCategories.contains("作业") && !catState.allCategories.contains("未分类"),
+      "allCategories excludes secondary tags and never offers 未分类 as a choice")
+check(catState.allTags.contains("作业") && catState.allTags.contains("swift"),
+      "allTags still carries secondary tags — the two menus keep distinct meanings")
+try catState.editRecord(id: catState.records[2].id, name: "三", tags: ["SWIFT", "阅读"])
+check(catState.allCategories.count == 2 && catState.allCategories.contains("swift"),
+      "a retagged primary canonicalizes to the known spelling and dedupes case-insensitively")
+try catState.editRecord(id: catState.records[2].id, name: "三", tags: ["科研"])
+check(catState.allCategories.count == 3 && catState.allCategories.contains("科研"),
+      "a genuinely new primary category joins the menu")
+check(catState.allCategories == catState.allCategories.sorted { $0.localizedStandardCompare($1) == .orderedAscending },
+      "allCategories is sorted the same way as allTags")
+print("PASS: \(checks) total checks including primary-category menu contract")

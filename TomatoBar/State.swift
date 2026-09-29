@@ -137,6 +137,21 @@ struct FocusState: Codable {
         FocusRecord.normalizedTags(records.flatMap(\.tags)).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
+    /// Categories that ACTUALLY serve as some record's primary tag — the "已有主分类"
+    /// menu. Distinct from `allTags` by design: an ordinary secondary tag must not show
+    /// up as a category choice unless a record really counts towards it (the editor's
+    /// two menus keep the two meanings apart). Records with no tags contribute nothing:
+    /// "未分类" is the display form of an empty tag list, never a selectable category
+    /// (rejected design, see HANDOFF). Dedupe and spelling reuse `normalizedTags`; the
+    /// sort matches `allTags`. Derived, not stored — no Codable or migration change.
+    /// (Contract completed locally 2026-09-30: the external AI's Drive-side State.swift
+    /// never arrived; View/MainWindow referenced this, so the derivation is reconstructed
+    /// from their described intent and call sites. If their file syncs in later, diff it.)
+    var allCategories: [String] {
+        FocusRecord.normalizedTags(records.compactMap { $0.tags.first })
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
     func filteredRecords(tag: String?) -> [FocusRecord] {
         guard let tag = tag else { return records }
         return records.filter { $0.hasTag(tag) }

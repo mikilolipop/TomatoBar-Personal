@@ -56,7 +56,7 @@ struct MainWindowView: View {
         }.background(Garden.paper).foregroundColor(Garden.ink).accentColor(Garden.red)
             .preferredColorScheme(.light)
             .sheet(item: $editing) { record in
-                RecordEditor(record: record, availableTags: timer.state.allTags,
+                RecordEditor(record: record, availableCategories: timer.state.allCategories,
                     styles: timer.state.categoryStyles, onCancel: { editing = nil },
                     onSave: { name, tags, styleChanges in
                         // `record` is the sheet's snapshot at open; the expected check

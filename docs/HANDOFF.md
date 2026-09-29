@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-09-29，by Claude Code · 外部评审第三轮修完（P24–P27 + P16）+ 三份文档一致性清理；桥接 35 项，HEAD 见下表
+最后更新：2026-09-30，by Claude Code · 外部 AI 经 Drive 的 UI 重构已核验集成（allCategories 契约本地补齐），领域 174 / 桥接 35 / 启动 8 全绿
 
 ---
 
@@ -40,9 +40,9 @@ first process whose unix id is 40847（QA13 的 pid）  →  读到的 bid 是 c
 | 项 | 值 |
 |---|---|
 | ✅ **已安装版本** | **3.9.0（V1.3）**，`/Applications/TomatoBar Personal.app`（前轮构建安装；**本轮代码改动只过了 Release 构建验证,未重新构建安装、未重启应用**） |
-| HEAD | 本轮两提交：`60706a5`（评审第三轮 P24–P27、P16）← 文档一致性清理；基线 `6893c30`（BACKLOG 登记 P16–P23） |
+| HEAD | 顶部提交 = 2026-09-30 Drive UI 重构集成（View/MainWindow + State.allCategories + 测试/文档）← `79e13ad`（公开确认归档）← `4139124`/`60706a5`（评审第三轮） |
 | 工作区 | 干净，全部已提交推送 |
-| 测试 | **169 项领域 + 35 项真实桥接 + 8 项合成启动事件**全绿；Release 干净构建 + 严格签名通过 |
+| 测试 | **174 项领域 + 35 项真实桥接 + 8 项合成启动事件**全绿；Release 干净构建 + 严格签名通过 |
 | **CI** | 推送后以 HEAD 最新 run 为准；本地四套检查均已复跑 |
 | 远程 | `origin` = `mikilolipop/TomatoBar-Personal`（**public**，2026-09-29 GitHub API 实测；默认分支 `feature/personal-focus`）；`upstream` = `ivoronin/TomatoBar` |
 | 用户真实数据 | 前轮记载 2 条；**本轮未读取、未写入正式容器，也未退出正式应用**，不把旧数据量当作当前复查结果 |
@@ -126,6 +126,34 @@ V1.3 已按用户决定定稿上线，不再往这个版本里加东西。后续
 ---
 
 ---
+
+## 刚做完（2026-09-30，Claude Code 集成外部 AI 经 Drive 直改的 UI  redesign + 补齐缺失契约）
+
+外部 AI（Gemini/其他，经 Google Drive"我的 Mac"同步项目）报告**直接改了 3 个文件**：
+`View.swift`（弹层 Garden 化 + 编辑器"主分类"重构）、`State.swift`（`allCategories`）、
+`MainWindow.swift`（编辑器入参改名）。用户贴入其报告，未 commit/push。
+
+**核验结论**（先审后收，全部坐实才提交）：
+- 改动叠在我 `60706a5` 之上，**未覆盖任何第三轮修复**：`freezeForCancel`、`expected:` 守卫、
+  P16 `onChange`、`styleDelta`、P24/P27 相关注释逐一确认健在。
+- **State.swift 没同步过来**（Drive 挂载点全盘搜索无镜像）：两个 UI 文件引用
+  `state.allCategories`，工作区当时全量编译不过。它自称做过的两项验证（SHA-256 逐字节、
+  `swiftc -parse`）都证明不了类型正确 —— parse 不查类型,而断链恰在跨文件契约上。
+- 契约由我按"设计描述 + 两处调用点"重建：`allCategories` = 真正作为首标签出现的分类，
+  大小写不敏感去重、与 allTags 同序、派生不落存储（无 Codable 变更、无迁移）。
+  代码注释与测试均标注了重建出处；**若 Drive 版本之后出现，diff 再收敛**。
+- 设计合规检查：「未分类」不入菜单（HANDOFF 已否决方案的约束保住了）、其他标签不再混入
+  主分类菜单、style delta 协议与 P13/P19 未破坏、`未分类` 时图标入口禁用带提示。
+- 新增领域测试 5 项（169→**174**）钉住 allCategories/allTags 语义分界。
+
+**变异检验与一次事故记录**：把"只取首标签"换成全标签 → 被抓；反向污染 `allTags` → 也被抓。
+事故本身值得记：**恢复变异用的 `replace()` 把无关的第二处同字文本一起改了，误伤 `allTags`
+后测试竟仍全绿**（消费路径没被覆盖到）—— 新增的 allTags 对比断言把这条路焊死后，同型
+破坏现在必被抓。教训：变异串必须全文件唯一，恢复后 diff 确认，而不是只信测试绿。
+
+**未做/待人工**：本次视觉重构（米白弹层、非系统 Tab、图标即菜单、Dark Mode 强制 light）
+纯观感项，`test.sh`/bridge 编译不进眼 —— **用户需构建安装后目测**，重点：Dark Mode 下弹层
+是否还与主程序一致、图标角标会不会显得拥挤、34pt 图标按钮的可点性。本轮**未重新构建安装**。
 
 ## 刚做完（2026-09-29，Claude Code 修外部 Code Review 第三轮 P24–P27 + P16 + 文档清理）
 

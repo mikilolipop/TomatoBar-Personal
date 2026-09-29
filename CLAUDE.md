@@ -11,7 +11,7 @@
 ## 会话协议
 
 开始时：`git status` → `git log --oneline -5` → `./scripts/test.sh`（必须全绿；项数以末行
-PASS 为准，当前 169 项）→ 读上述三份文档。
+PASS 为准，当前 174 项）→ 读上述三份文档。
 
 结束时：`./scripts/test.sh` 全绿 → 更新 `docs/HANDOFF.md` → commit + push。**不得留下未提交的工作。**
 
