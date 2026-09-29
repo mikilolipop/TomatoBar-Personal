@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-09-29，by Claude Code · 修主窗口可缩到布局地板以下导致的裁切（App.swift 窗口初始化顺序）
+最后更新：2026-09-29，by Claude Code · 主窗口最小尺寸两轮修复：contentMinSize 顺序 + delegate 兜底（拖拽外的缩窗路径）
 
 ---
 
@@ -40,8 +40,8 @@ first process whose unix id is 40847（QA13 的 pid）  →  读到的 bid 是 c
 | 项 | 值 |
 |---|---|
 | ✅ **已安装版本** | **3.9.0（V1.3）**，`/Applications/TomatoBar Personal.app`，本次会话构建、签名校验、安装、启动，正在运行 |
-| HEAD | `6ff1819`（定版 V1.3）← `996cdf8`（P12–P14 修复）← `a9939b5`（Codex 第二轮评审 + P1/P2/P8 候选补丁）← `58638f3` ← `ef50b45` ← `5a1c03e` |
-| 工作区 | 干净，与 `origin/feature/personal-focus` 一致 |
+| HEAD | `4b3bd52`（最小尺寸验证记录）← `03bcb52`（contentMinSize 顺序修复）← `d6fc9bb` ← `6ff1819`（定版 V1.3） |
+| 工作区 | 本轮最小尺寸第二轮修复（delegate 兜底）另起提交；已安装版本与 HEAD 一致 |
 | 测试 | **153 项领域 + 12 项真实桥接 + 8 项合成启动事件**通过；Release clean build 与严格签名校验通过（V1.3 定版时复跑确认） |
 | **CI** | `tests` workflow 已由前轮启用；本轮交付以本地检查为证，未将旧 CI 结果当本轮结果 |
 | 远程 | `origin` = `mikilolipop/TomatoBar-Personal`（私有，默认分支 `feature/personal-focus`）；`upstream` = `ivoronin/TomatoBar` |
@@ -141,6 +141,28 @@ V1.3 已按用户决定定稿上线，不再往这个版本里加东西。后续
 重启后恢复被钳制为 920×772（内容 920×740 + 标题栏），且正常写回 autosave。
 注意：System Events 的 AX 强制 resize 会绕过 minSize（曾污染 autosave 为 600×714，已恢复），
 不能用它测试最小尺寸；拖拽路径与 frame 恢复共用同一 clamp 逻辑，以此为准。
+
+### 第二轮：上一段的结论不完整，仍有路径能绕过
+
+用户复现后反馈"依旧会有"，实测窗口被拖到 **368×415**，内容照样被裁。
+
+**上一轮的判断哪里错了**：`contentMinSize` 只约束**用户拖拽边缘**和**frame 恢复**两条路径。
+把窗口缩小到 368×415 走的是另一条路（第三方贴边工具、macOS 的窗口磁贴、
+或任何直接 `setFrame` 的调用方），这类路径**根本不受 `contentMinSize` 约束**，
+所以我上一轮"拖拽与恢复共用同一 clamp"的结论虽然成立，却漏掉了这个更大的入口。
+
+**第二处修复**（`App.swift`）：把尺寸地板从"依赖 AppKit 约束"改为"delegate 主动兜住"。
+`windowWillResize` 钳制将要应用的新尺寸，`windowDidResize` 在窗口已经被改小之后
+再纠回地板；地板值统一走 `mainWindowMinContent` 常量。全屏/Split View 直接放行
+（那种尺寸归系统管，硬抢会来回抖动）。
+
+**验证**：对运行中的实例做 AX 强制 `set size {500,400}`，窗口被自动纠回
+**920×772**，autosave 同步写为 `320 75 920 772`。`scripts/test.sh` 153 项全绿，
+Release 构建 + 严格签名通过，已安装运行。
+
+**仍未做**：没能在本机确定到底是哪个缩窗入口（用户是手动拖的还是用了贴边工具），
+所以无法断言 delegate 之外没有别的漏口；现在的兜底是事后的，窗口会有一帧被裁再纠回。
+若用户后续报告仍会裁切，需要先问清缩窗方式再排查。
 
 ---
 

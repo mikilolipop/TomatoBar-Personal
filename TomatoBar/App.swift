@@ -22,6 +22,7 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let reminder = TBReminder()
     private var launchContext = LaunchContext()
     static var shared: TBStatusItem?
+    private static let mainWindowMinContent = NSSize(width: 920, height: 740)
 
     func applicationWillFinishLaunching(_: Notification) {
         launchContext.observe(NSAppleEventManager.shared().currentAppleEvent)
@@ -89,7 +90,7 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
             // Assigning contentViewController overwrites contentMinSize with the view
             // controller's own minimum (≈0 once sizingOptions is cleared), so this must
             // run after the assignment or the window can shrink past the layout's floor.
-            window.contentMinSize = NSSize(width: 920, height: 740)
+            window.contentMinSize = Self.mainWindowMinContent
             window.setContentSize(NSSize(width: 1120, height: 800))
             window.center()
             window.setFrameAutosaveName("TomatoBarMainWindow")
@@ -107,6 +108,32 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func windowDidResignKey(_ notification: Notification) { model.windowActivity.visible = false }
     func windowDidMiniaturize(_ notification: Notification) { model.windowActivity.visible = false }
     func windowDidDeminiaturize(_ notification: Notification) { model.windowActivity.visible = true }
+    // contentMinSize only constrains interactive resize and frame restoration. System
+    // window tiling and programmatic setFrame paths bypass it, so the floor is also
+    // enforced in the delegate: clamp proposed sizes, and bounce back any applied
+    // frame that still ended up smaller than the layout can render without clipping.
+    func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
+        guard sender === mainWindow else { return frameSize }
+        return clampedMainFixedSize(frameSize)
+    }
+    func windowDidResize(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow, window === mainWindow else { return }
+        // Fullscreen and Split View own their frame; fighting them would loop.
+        guard !window.styleMask.contains(.fullScreen) else { return }
+        let clamped = clampedMainFixedSize(window.frame.size)
+        if clamped != window.frame.size {
+            window.setFrame(window.constrainFrameRect(NSRect(origin: window.frame.origin, size: clamped), to: window.screen),
+                display: true)
+        }
+    }
+    private func clampedMainFixedSize(_ size: NSSize) -> NSSize {
+        guard let window = mainWindow else { return size }
+        let content = window.contentRect(forFrameRect: NSRect(origin: .zero, size: size)).size
+        let min = Self.mainWindowMinContent
+        guard content.width < min.width || content.height < min.height else { return size }
+        let fixedContent = NSSize(width: max(content.width, min.width), height: max(content.height, min.height))
+        return window.frameRect(forContentRect: NSRect(origin: .zero, size: fixedContent)).size
+    }
     func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow, window === mainWindow else { return }
         model.windowActivity.visible = false
