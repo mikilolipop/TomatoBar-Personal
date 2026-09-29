@@ -86,11 +86,11 @@ final class TBTimer: ObservableObject {
     func pause() { change { $0.pause(at: $1) } }
     func stop() { change { $0.stop(at: $1) } }
     /// Commit edits only after the atomic disk write succeeds; a failed edit stays in the editor.
-    func editRecord(id: UUID, name: String, tags: [String], styles: [String: String]? = nil) -> String? {
+    func editRecord(id: UUID, name: String, tags: [String], styleChanges: [String: String?]? = nil) -> String? {
         guard !loadFailed else { return "记录未能读取，暂时无法编辑。" }
         var updated = state
         do {
-            try updated.editRecord(id: id, name: name, tags: tags, categoryStyles: styles)
+            try updated.editRecord(id: id, name: name, tags: tags, styleChanges: styleChanges)
             updated.checkpoint = Date()
             try store.save(updated)
             state = updated
@@ -135,7 +135,7 @@ final class TBTimer: ObservableObject {
     /// glyph. Resolution lives here rather than in State.swift because Garden imports
     /// SwiftUI while State.swift must stay in the Foundation-only test compile set.
     func categorySymbol(_ category: String) -> String {
-        state.categoryStyles[category.lowercased()] ?? Garden.symbol(category)
+        FocusState.styleSymbol(in: state.categoryStyles, forCategory: category) ?? Garden.symbol(category)
     }
 
     /// A failed read and a failed write recover differently, so both the action and its

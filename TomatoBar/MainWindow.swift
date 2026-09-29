@@ -57,8 +57,8 @@ struct MainWindowView: View {
             .sheet(item: $editing) { record in
                 RecordEditor(record: record, availableTags: timer.state.allTags,
                     styles: timer.state.categoryStyles, onCancel: { editing = nil },
-                    onSave: { name, tags, styles in
-                        let error = timer.editRecord(id: record.id, name: name, tags: tags, styles: styles)
+                    onSave: { name, tags, styleChanges in
+                        let error = timer.editRecord(id: record.id, name: name, tags: tags, styleChanges: styleChanges)
                         if error == nil { clearStaleFilter(); editing = nil }
                         return error
                     }, onDelete: {
@@ -87,7 +87,10 @@ struct MainWindowView: View {
     /// Drop the active category filter when the record just edited or deleted was the last
     /// one carrying it, so the view never rests on a category that no longer exists.
     private func clearStaleFilter() {
-        if let category = selectedCategory, !timer.state.records.contains(where: { $0.hasTag(category) }) {
+        // Overview filters by primary category, history by any tag; the predicate lives in
+        // FocusState so both semantics are covered by the domain suite.
+        if let category = selectedCategory,
+           !timer.state.categoryFilterStillMatches(category, primaryOnly: !historyTab) {
             selectedCategory = nil
         }
     }

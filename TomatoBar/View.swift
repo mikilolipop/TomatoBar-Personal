@@ -79,8 +79,8 @@ struct TBPopoverView: View {
                 RecordEditor(record: record, availableTags: timer.state.allTags,
                              styles: timer.state.categoryStyles, onCancel: {
                     editingRecord = nil
-                }, onSave: { name, tags, styles in
-                    let error = timer.editRecord(id: record.id, name: name, tags: tags, styles: styles)
+                }, onSave: { name, tags, styleChanges in
+                    let error = timer.editRecord(id: record.id, name: name, tags: tags, styleChanges: styleChanges)
                     if error == nil { clearStaleFilter(); editingRecord = nil }
                     return error
                 }, onDelete: {
@@ -183,7 +183,7 @@ struct TBPopoverView: View {
 struct RecordEditor: View {
     let availableTags: [String]
     let onCancel: () -> Void
-    let onSave: (String, [String], [String: String]) -> String?
+    let onSave: (String, [String], [String: String?]) -> String?
     /// Returns an error message, or nil once the deletion has been committed to disk.
     /// The caller dismisses the editor, because it also owns the filter selection that may
     /// need clearing when the deleted record was the last one carrying that tag.
@@ -195,19 +195,23 @@ struct RecordEditor: View {
     @State private var newCategory = ""
     /// Icon overrides edited in this session; committed only when 保存 succeeds, so
     /// cancelling discards them like every other field here.
+    /// Snapshot at open, used only to compute the delta on save. Submitting the whole map
+    /// would let a second open editor overwrite overrides saved after this one opened.
+    private let initialStyles: [String: String]
     @State private var localStyles: [String: String]
     @State private var error: String?
     @State private var confirmDelete = false
 
     init(record: FocusRecord, availableTags: [String], styles: [String: String],
          onCancel: @escaping () -> Void,
-         onSave: @escaping (String, [String], [String: String]) -> String?,
+         onSave: @escaping (String, [String], [String: String?]) -> String?,
          onDelete: @escaping () -> String?) {
         self.record = record
         self.availableTags = availableTags
         self.onCancel = onCancel
         self.onSave = onSave
         self.onDelete = onDelete
+        self.initialStyles = styles
         _name = State(initialValue: record.name)
         _tags = State(initialValue: record.tags)
         _localStyles = State(initialValue: styles)
@@ -221,8 +225,20 @@ struct RecordEditor: View {
     }
 
     private var category: String { tags.first ?? "未分类" }
-    private var previewSymbol: String { localStyles[category.lowercased()] ?? Garden.symbol(category) }
-    private var hasStyleOverride: Bool { localStyles[category.lowercased()] != nil }
+    private var previewSymbol: String {
+        FocusState.styleSymbol(in: localStyles, forCategory: category) ?? Garden.symbol(category)
+    }
+    private var hasStyleOverride: Bool {
+        FocusState.styleSymbol(in: localStyles, forCategory: category) != nil
+    }
+    /// Only the keys this draft changed, so saving never replays a stale whole-map
+    /// snapshot over overrides another editor saved in the meantime.
+    private var styleChanges: [String: String?] {
+        var delta: [String: String?] = [:]
+        for (key, value) in localStyles where initialStyles[key] != value { delta[key] = value }
+        for key in initialStyles.keys where localStyles[key] == nil { delta[key] = nil }
+        return delta
+    }
     /// Tags other than the statistics category. The primary is deliberately absent: the
     /// remove button must never be able to change what a record counts towards.
     private var otherTags: [String] { Array(tags.dropFirst()) }
@@ -252,7 +268,7 @@ struct RecordEditor: View {
                 Button("取消", action: onCancel).keyboardShortcut(.cancelAction)
                 Button("保存") {
                     addTag()
-                    error = onSave(name, tags, localStyles)
+                    error = onSave(name, tags, styleChanges)
                 }.buttonStyle(.borderedProminent)
                     .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
@@ -261,6 +277,8 @@ struct RecordEditor: View {
         // role: .destructive keeps macOS from making the delete the default button, and
         // .cancelAction binds Escape to cancelling, so the safe action is the default one.
         .alert("删除这段专注记录？", isPresented: $confirmDelete) {
+            // role: .cancel keeps Escape bound to cancelling; defaultAction makes Return
+            // cancel too, so the destructive button can never be the keyboard default.
             Button("取消", role: .cancel) {}.keyboardShortcut(.cancelAction)
             Button("删除记录", role: .destructive) { error = onDelete() }
         } message: {

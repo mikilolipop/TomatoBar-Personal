@@ -133,7 +133,7 @@ struct FocusChart: View {
                         HStack(spacing: 8) {
                             ForEach(row) { record in
                                 Button { onRecord(record) } label: {
-                                    Image(systemName: styles[record.category.lowercased()] ?? Garden.symbol(record.category)).font(.system(size: 22, weight: .medium))
+                                    Image(systemName: FocusState.styleSymbol(in: styles, forCategory: record.category) ?? Garden.symbol(record.category)).font(.system(size: 22, weight: .medium))
                                         .foregroundColor(Garden.paper)
                                         .frame(width: tileWidth(record, available: geometry.size.width - 8), height: 68)
                                         .background(Garden.color(record.category).opacity(0.85))

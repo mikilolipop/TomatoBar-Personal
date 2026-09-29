@@ -794,7 +794,7 @@ FocusRecord.tags 的缺键/null 兼容在嵌套 records 中仍有效，日期策
 
 ## 🟡 P12 — Unicode 大小写规范化后图标覆盖失配
 
-**状态**：新增，领域探针已复现，未修。**严重性：中等，特定自定义分类的视觉设置丢失。**
+**状态**：✅ **已修复**（Codex 发现，Claude Code 修复）· 领域探针曾复现 · 严重性：中等
 
 证据：`State.swift:153-158` 用 caseInsensitiveCompare 采用既有标签写法；
 `View.swift:223-225,305-314` 用编辑草稿 category.lowercased() 做样式键；
@@ -817,7 +817,7 @@ xcrun swift -e 'import Foundation; for (a,b) in [("Swift","swift"),("Straße","S
 
 ## 🟡 P13 — 两处编辑器的全量样式快照会覆盖另一处已保存设置
 
-**状态**：新增，状态层保存序列已复现；双窗口 UI 序列未实机验证。**严重性：中等，展示元数据丢失。**
+**状态**：✅ **已修复**（改为只提交 delta 并合并）· 状态层曾复现 · 严重性：中等
 
 证据：`View.swift:198-213` 在初始化抓取全量 localStyles；`:253-255` 每次保存传整个字典；
 `State.swift:158` 无条件替换全局 map。主窗口 sheet 与菜单栏 popover 是两个入口（MainWindow.swift:57-68、View.swift:78-93），
@@ -834,7 +834,7 @@ xcrun swift -e 'import Foundation; for (a,b) in [("Swift","swift"),("Straße","S
 
 ## 🟡 P14 — 概览分类筛选的清理错误地把次标签算作仍有该分类
 
-**状态**：新增，领域条件已复现，未修。**严重性：低，筛选残留导致意外空列表。**
+**状态**：✅ **已修复**（判定谓词移入 `FocusState.categoryFilterStillMatches`，两种语义均入领域测试）· 严重性：低
 
 证据：`MainWindow.swift:89-92` 用 hasTag 清理概览和历史筛选；
 `Analytics.swift:50-52` 概览按 category（首标签）筛选，`State.swift:69-73` 换分类把旧主标签留在尾部。
@@ -846,6 +846,53 @@ xcrun swift -e 'import Foundation; for (a,b) in [("Swift","swift"),("Straße","S
 **部分同意原筛选清理：历史页/popover 的全标签判断正确，概览应检查首标签语义。**
 不要为修概览而把历史页也改成只看首标签。独立核验：执行下方探针，P14 输出 hasTag=true、primary summary=0；
 并可在 QA13 选中唯一主分类后编辑换分类手工复验。
+
+---
+
+## 🟡 P15 — 概览分类筛选按钮没有任何无障碍名称
+
+**状态**：新增（2026-09-29，Claude Code 做 UI 自动化时发现）· 严重性：低 · 无障碍 · V1.2 既有缺陷
+
+`MainWindow.swift` 汇总面板的分类按钮（`summaryPanel` 里的 `Button`）在辅助功能树中
+`name / description / help / title` **全部为空且无子元素**，实测：
+
+```
+按钮1: name=[missing value] desc=[按钮] help=[missing value] title=[missing value] 子=0
+```
+
+后果有二：VoiceOver 用户无法知道每个按钮是哪个分类；UI 自动化也无法按名称定位，
+只能靠排序位置猜（本轮 P14 的实机复验因此失败两次）。修法很小：给该 Button 加
+`.accessibilityLabel("筛选分类：\(category.name)")`。与 P11 同属无障碍债，可一并处理。
+
+---
+
+## P12–P14 的修复方式（2026-09-29，Claude Code）
+
+- **P12**：`editRecord` 落盘时把样式键**重写成规范标签的小写形式**；解析侧
+  `FocusState.styleSymbol(in:forCategory:)` 先精确匹配再按 `caseInsensitiveCompare`
+  别名回退。两个等价关系（规范化用 caseInsensitiveCompare、键用 lowercased）不再各自为政。
+- **P13**：`editRecord` 的样式参数从「整张 map 替换」改为 **delta `[String: String?]`**
+  （nil = 移除该键），只合并本次编辑碰过的键。编辑器只提交自己草稿相对打开时快照的差集，
+  于是第二个编辑器的保存不会抹掉第一个刚存的覆盖；纯改名的编辑提交空 delta，什么也不碰。
+- **P14**：判定谓词移入 `FocusState.categoryFilterStillMatches(_:primaryOnly:)`，
+  概览按首标签、历史按任意标签，两种语义都进了领域测试（153 项）。
+  SwiftUI 里只剩一行调用。**谓词已测，UI 调用点未实机验证**（分类按钮无无障碍名称，见 P15，
+  自动化无法可靠点到它）。
+- 变异检验：删别名回退、删规范名重写、整表清空代替合并、概览误用 hasTag —— **四个变异全部被抓**。
+
+### 删除确认弹窗的键盘行为（实测矩阵，纠正之前的无据断言）
+
+此前交接与注释声称「`role: .destructive` 保证删除不是默认按钮」，**没有实测依据**（Codex 已指出）。
+本轮在 QA13 用真实按键实测两种配置：
+
+| Cancel 按钮配置 | Esc | Return |
+|---|---|---|
+| `.keyboardShortcut(.cancelAction)` | **取消** ✅ | 无反应（安全）✅ |
+| `.keyboardShortcut(.defaultAction)` | **无反应** ❌ | 取消 ✅ |
+
+一个按钮只能绑一个快捷键，两键不可兼得。最终保留 **`.cancelAction`**：Esc 是通用退出键，
+而 Return 无反应不可能触发删除。两种配置下 **Return 都不会删除**，规格「默认操作为取消」
+在效果上成立，但理由是本表实测，不是 role 语义。
 
 ---
 

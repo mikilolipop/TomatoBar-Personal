@@ -145,7 +145,7 @@ struct FocusState: Codable {
     /// `categoryStyles` defaults to nil so callers that only rename or retag leave the
     /// icon overrides untouched.
     mutating func editRecord(id: UUID, name: String, tags: [String],
-                             categoryStyles: [String: String]? = nil) throws {
+                             styleChanges: [String: String?]? = nil) throws {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw RecordEditError.emptyName }
         guard let index = records.firstIndex(where: { $0.id == id }) else { throw RecordEditError.missingRecord }
@@ -155,7 +155,39 @@ struct FocusState: Codable {
         }
         records[index].name = trimmed
         records[index].tags = canonicalTags
-        if let categoryStyles = categoryStyles { self.categoryStyles = categoryStyles }
+        // Merge only the keys this edit touched, so two editors holding separate drafts
+        // cannot wipe each other's saved overrides (P13). Keys are re-spelled to the
+        // canonical tag before storage, because caseInsensitiveCompare and lowercased()
+        // disagree on Unicode pairs such as Straße/STRASSE (P12).
+        if let styleChanges = styleChanges {
+            for (key, value) in styleChanges {
+                let canonical = canonicalTags.first { $0.caseInsensitiveCompare(key) == .orderedSame } ?? key
+                let storageKey = canonical.lowercased()
+                if let value = value { categoryStyles[storageKey] = value }
+                else { categoryStyles.removeValue(forKey: storageKey) }
+            }
+        }
+    }
+
+    /// Whether an active category filter still matches anything. The overview filters by
+    /// the primary tag (the statistics category) while history and the popover filter by
+    /// any tag, so the test differs per surface. It lives here, not inside the SwiftUI
+    /// view, so both semantics are testable — a stale-filter bug there is invisible to
+    /// the whole domain suite otherwise.
+    func categoryFilterStillMatches(_ category: String, primaryOnly: Bool) -> Bool {
+        if primaryOnly {
+            return records.contains { $0.category.caseInsensitiveCompare(category) == .orderedSame }
+        }
+        return records.contains { $0.hasTag(category) }
+    }
+
+    /// Resolve an icon override for a category: exact lowercased key first, then a
+    /// case-insensitive scan. The scan is the alias fallback that keeps an override
+    /// written from a draft spelling reachable after the tag is canonicalized on save.
+    static func styleSymbol(in styles: [String: String], forCategory category: String) -> String? {
+        let key = category.lowercased()
+        if let exact = styles[key] { return exact }
+        return styles.first { $0.key.caseInsensitiveCompare(key) == .orderedSame }?.value
     }
 
     /// Deletes by UUID only — never by index or name, both of which shift as the list

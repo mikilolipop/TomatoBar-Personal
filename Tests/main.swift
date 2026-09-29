@@ -301,10 +301,56 @@ var styleRenamed = styleRound
 check(styleRenamed.categoryStyles == ["学习": "star"], "fixture starts with an override in place")
 try styleRenamed.editRecord(id: delC.id, name: delC.name, tags: delC.tags)
 check(styleRenamed.categoryStyles == ["学习": "star"], "a rename without styles leaves overrides untouched")
-try styleRenamed.editRecord(id: delC.id, name: delC.name, tags: delC.tags, categoryStyles: ["数学": "globe"])
-check(styleRenamed.categoryStyles == ["数学": "globe"], "passing styles replaces the map in the same atomic edit")
+try styleRenamed.editRecord(id: delC.id, name: delC.name, tags: delC.tags, styleChanges: ["数学": "globe"])
+check(styleRenamed.categoryStyles == ["学习": "star", "数学": "globe"],
+      "style changes merge into the map instead of replacing it")
+try styleRenamed.editRecord(id: delC.id, name: delC.name, tags: delC.tags, styleChanges: ["数学": nil])
+check(styleRenamed.categoryStyles == ["学习": "star"], "a nil change removes only that key")
 try styleRenamed.deleteRecord(id: delC.id)
-check(styleRenamed.categoryStyles == ["数学": "globe"], "deleting a record keeps the style map")
+check(styleRenamed.categoryStyles == ["学习": "star"], "deleting a record keeps the style map")
+// P13: edits submit only their own delta, so a stale or concurrent draft cannot erase
+// overrides saved after it opened.
+var styleMerge = FocusState()
+styleMerge.records = [delA, delB]
+try styleMerge.editRecord(id: delA.id, name: delA.name, tags: delA.tags, styleChanges: ["a": "star"])
+try styleMerge.editRecord(id: delB.id, name: delB.name, tags: delB.tags, styleChanges: ["b": "globe"])
+check(styleMerge.categoryStyles == ["a": "star", "b": "globe"], "sequential deltas keep both overrides")
+try styleMerge.editRecord(id: delA.id, name: "改名", tags: delA.tags, styleChanges: [:])
+check(styleMerge.categoryStyles == ["a": "star", "b": "globe"],
+      "a name-only edit from a stale draft submits an empty delta and wipes nothing")
+// P12: caseInsensitiveCompare and lowercased() disagree on Unicode pairs such as
+// Straße/STRASSE, so a key written from a draft spelling must still resolve after the
+// tag is canonicalized on save.
+var uniState = FocusState()
+let uniRecord = statsRecord(day(2026, 9, 28, 9), day(2026, 9, 28, 9, 25), tags: ["Straße"])
+uniState.records = [uniRecord]
+try uniState.editRecord(id: uniRecord.id, name: uniRecord.name, tags: ["STRASSE"], styleChanges: ["strasse": "star"])
+check(uniState.records[0].category == "Straße", "canonical spelling wins on save")
+check(uniState.categoryStyles.keys.first == "straße", "override key is re-spelled to the canonical tag")
+check(FocusState.styleSymbol(in: uniState.categoryStyles, forCategory: uniState.records[0].category) == "star",
+      "override written from a draft spelling resolves against the canonical category")
+check(FocusState.styleSymbol(in: ["swift": "star"], forCategory: "Swift") == "star", "exact lowercased key resolves")
+check(FocusState.styleSymbol(in: ["Swift": "star"], forCategory: "swift") == "star", "alias fallback matches across case")
+check(FocusState.styleSymbol(in: [:], forCategory: "学习") == nil, "no override resolves to nil")
+// P14: clearing a stale filter must use the right semantics per surface. The overview
+// filters by primary category, so a tag that survives only as a secondary tag must count
+// as stale there, while history must still treat it as a match.
+var filterState = FocusState()
+let filterRecord = statsRecord(day(2026, 9, 28, 9), day(2026, 9, 28, 9, 25), tags: ["阅读"])
+filterState.records = [filterRecord]
+check(filterState.categoryFilterStillMatches("阅读", primaryOnly: true), "primary filter matches its only record")
+try filterState.editRecord(id: filterRecord.id, name: filterRecord.name,
+                           tags: FocusRecord.tags(withPrimaryCategory: "数学", in: filterRecord.tags))
+check(filterState.records[0].tags == ["数学", "阅读"], "recategorising keeps the old primary as a secondary tag")
+check(!filterState.categoryFilterStillMatches("阅读", primaryOnly: true),
+      "overview treats a secondary-only tag as stale")
+check(filterState.categoryFilterStillMatches("阅读", primaryOnly: false),
+      "history still matches a secondary tag")
+check(filterState.categoryFilterStillMatches("数学", primaryOnly: true), "new primary matches in overview")
+filterState.records = []
+check(!filterState.categoryFilterStillMatches("数学", primaryOnly: true)
+      && !filterState.categoryFilterStillMatches("数学", primaryOnly: false),
+      "an empty record set leaves every filter stale")
 print("PASS: \(checks) total checks including deletion and category switching")
 
 // Independent decoder oracle: the pre-categoryStyles storage shape with synthesized
@@ -392,7 +438,7 @@ var asciiStyles = FocusState()
 let asciiRecord = FocusRecord(id: UUID(), name: "ASCII", startedAt: base, endedAt: base,
     plannedSeconds: 60, completed: true, segments: [], tags: ["Swift"])
 asciiStyles.records = [asciiRecord]
-try asciiStyles.editRecord(id: asciiRecord.id, name: "ASCII", tags: ["sWIFT"], categoryStyles: ["swift": "star"])
+try asciiStyles.editRecord(id: asciiRecord.id, name: "ASCII", tags: ["sWIFT"], styleChanges: ["swift": "star"])
 check(asciiStyles.records[0].tags == ["Swift"] && asciiStyles.categoryStyles[asciiStyles.records[0].category.lowercased()] == "star",
       "ASCII casing canonicalization preserves the icon lookup key")
 let asciiRoundTrip = try JSONDecoder().decode(FocusState.self, from: JSONEncoder().encode(asciiStyles))

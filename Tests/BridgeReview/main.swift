@@ -26,7 +26,7 @@ try store.save(initial)
 let timer = TBTimer(store: store)
 var historyEvents = 0
 let observation = timer.history.$records.dropFirst().sink { _ in historyEvents += 1 }
-check(timer.editRecord(id: a.id, name: a.name, tags: ["swift"], styles: ["swift": "star"]) == nil, "actual bridge style edit succeeds")
+check(timer.editRecord(id: a.id, name: a.name, tags: ["swift"], styleChanges: ["swift": "star"]) == nil, "actual bridge style edit succeeds")
 check(timer.categorySymbol("SWIFT") == "star", "actual bridge resolves ASCII override")
 check(historyEvents == 1, "style-only edit publishes history even with unchanged records")
 check(timer.deleteRecord(id: a.id) == nil, "actual bridge deletes by UUID")
@@ -45,7 +45,7 @@ try Data("QA13 write failure".utf8).write(to: failureParent)
 check(failing.deleteRecord(id: a.id) != nil, "actual bridge returns write failure")
 check(failing.state.records == initial.records && failing.history.records == initial.records, "failed delete preserves real bridge memory and history")
 check(!failing.hasUnsavedChanges, "failed deletion does not invent an unsaved-change exit block")
-check(failing.editRecord(id: a.id, name: "changed", tags: ["数学"], styles: ["数学": "star"]) != nil,
+check(failing.editRecord(id: a.id, name: "changed", tags: ["数学"], styleChanges: ["数学": "star"]) != nil,
       "actual bridge edit also returns write failure")
 check(failing.state.records == initial.records && failing.state.categoryStyles.isEmpty, "failed edit preserves records and styles")
 print("PASS: \(checks) actual TBTimer bridge checks; isolated QA13 IO, no UI interaction")
