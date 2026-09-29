@@ -26,16 +26,24 @@ struct TBPopoverView: View {
             if timer.state.isTiming {
                 Text(timer.timeLeft).font(.system(size: 40, weight: .medium, design: .rounded).monospacedDigit())
                     .frame(maxWidth: .infinity)
-                HStack {
-                    Button(timer.state.paused ? "继续" : "暂停") { timer.togglePause() }
-                        .buttonStyle(.borderedProminent).frame(maxWidth: .infinity)
-                    Button(timer.state.phase == .work ? "结束并记录" : "结束休息") { timer.stop() }
-                    if timer.state.phase == .work {
-                        Button("取消") { showCancelConfirm = true }
-                            .buttonStyle(.borderless).foregroundColor(Garden.red)
-                            .help("丢弃这段专注，不保存为记录")
+                // macOS buttons never stretch their capsule for a frame on the Button
+                // itself — the label must carry the maxWidth for the background to follow.
+                VStack(spacing: 8) {
+                    Button { timer.togglePause() } label: {
+                        Text(timer.state.paused ? "继续" : "暂停").frame(maxWidth: .infinity)
+                    }.buttonStyle(.borderedProminent).controlSize(.large)
+                    HStack(spacing: 8) {
+                        Button { timer.stop() } label: {
+                            Text(timer.state.phase == .work ? "结束并记录" : "结束休息").frame(maxWidth: .infinity)
+                        }.buttonStyle(.bordered)
+                        if timer.state.phase == .work {
+                            Button { showCancelConfirm = true } label: {
+                                Text("取消专注").frame(maxWidth: .infinity)
+                            }.buttonStyle(.bordered).foregroundColor(Garden.muted)
+                                .help("丢弃这段专注，不保存为记录")
+                        }
                     }
-                }.frame(maxWidth: .infinity)
+                }
             } else if timer.state.needsAttention {
                 Button("查看到时提醒") { timer.onAttention?() }
                     .buttonStyle(.borderedProminent).frame(maxWidth: .infinity)

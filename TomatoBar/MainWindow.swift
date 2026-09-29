@@ -295,7 +295,7 @@ struct ExpandedTimer: View {
     let close: () -> Void
     @State private var showCancelConfirm = false
     var body: some View {
-        VStack(spacing: 22) {
+        VStack(spacing: 18) {
             HStack { Spacer(); Button("收起", action: close).keyboardShortcut(.cancelAction) }
             GardenArt(name: "PixelTomato", activity: timer.windowActivity).frame(width: 110, height: 110)
             Text(timer.phaseLabel).foregroundColor(Garden.muted)
@@ -303,17 +303,30 @@ struct ExpandedTimer: View {
             else { Text(timer.state.name).font(.title3).lineLimit(2) }
             Text(timer.state.isTiming ? timer.timeLeft : timer.state.needsAttention ? "完成" : "\(timer.workIntervalLength):00")
                 .font(.system(size: 76, weight: .medium, design: .rounded).monospacedDigit()).foregroundColor(Garden.red)
-            HStack(spacing: 20) {
-                Button(timer.state.isTiming ? (timer.state.paused ? "继续专注" : "暂停") : timer.state.needsAttention ? "查看提醒" : "开始专注") { timer.primaryAction() }.buttonStyle(.borderedProminent)
-                if timer.state.isTiming { Button(timer.state.phase == .work ? "结束并记录" : "结束休息") { timer.stop() } }
-                if timer.state.phase == .work {
-                    Button("取消专注") { showCancelConfirm = true }
-                        .buttonStyle(.borderless).foregroundColor(Garden.red)
-                        .help("丢弃这段专注，不保存为记录")
+            VStack(spacing: 10) {
+                Button { timer.primaryAction() } label: {
+                    Text(timer.state.isTiming ? (timer.state.paused ? "继续专注" : "暂停") : timer.state.needsAttention ? "查看提醒" : "开始专注")
+                        .frame(maxWidth: .infinity)
+                }.buttonStyle(.borderedProminent).controlSize(.large)
+                if timer.state.isTiming {
+                    HStack(spacing: 10) {
+                        Button { timer.stop() } label: {
+                            Text(timer.state.phase == .work ? "结束并记录" : "结束休息").frame(maxWidth: .infinity)
+                        }.buttonStyle(.bordered)
+                        if timer.state.phase == .work {
+                            Button { showCancelConfirm = true } label: {
+                                Text("取消专注").frame(maxWidth: .infinity)
+                            }.buttonStyle(.bordered).foregroundColor(Garden.muted)
+                                .help("丢弃这段专注，不保存为记录")
+                        }
+                    }
                 }
-            }
+            }.frame(maxWidth: 340)
             Text("收起或关闭主窗口后，菜单栏会继续陪你专注。").font(.caption).foregroundColor(Garden.muted)
-        }.padding(28).frame(width: 540, height: 460).background(Garden.paper).foregroundColor(Garden.ink).accentColor(Garden.red)
+        // Height follows the content: a fixed frame smaller than the work-state stack
+        // clipped the caption against the sheet edge on both earlier attempts.
+        }.padding(28).frame(width: 540)
+            .background(Garden.paper).foregroundColor(Garden.ink).accentColor(Garden.red)
             .alert("取消这段专注？", isPresented: $showCancelConfirm) {
                 Button("继续专注", role: .cancel) { }.keyboardShortcut(.cancelAction)
                 Button("放弃这段", role: .destructive) { timer.cancel() }
