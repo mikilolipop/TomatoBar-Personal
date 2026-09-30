@@ -703,7 +703,7 @@ struct MainSettings: View {
                 if let notice = easterEggNotice {
                     Text(notice).font(.caption).foregroundColor(Garden.muted).transition(.opacity)
                 }
-                Text("Personal · V1.3")
+                Text("Personal · \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")")
                     .font(.caption).foregroundColor(Garden.muted)
                     .contentShape(Rectangle())
                     .onTapGesture { registerEasterEggTap() }

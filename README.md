@@ -9,7 +9,7 @@ macOS 菜单栏番茄钟 · [TomatoBar](https://github.com/ivoronin/TomatoBar) �
 完全无声 · 事件记录 · 日／周／月复盘
 
 [![tests](https://github.com/mikilolipop/TomatoBar-Personal/actions/workflows/main.yml/badge.svg?branch=feature/personal-focus)](https://github.com/mikilolipop/TomatoBar-Personal/actions/workflows/main.yml)
-[![download](https://img.shields.io/badge/下载-V1.3-orange)](https://github.com/mikilolipop/TomatoBar-Personal/releases/latest)
+[![download](https://img.shields.io/badge/下载-V1.3.1-orange)](https://github.com/mikilolipop/TomatoBar-Personal/releases/latest)
 [![website](https://img.shields.io/badge/官网-mikilolipop.github.io-8a6d3b)](https://mikilolipop.github.io/TomatoBar-Personal/)
 ![macOS](https://img.shields.io/badge/macOS-12.3%2B-blue)
 ![Swift](https://img.shields.io/badge/Swift-SwiftUI%20%2B%20AppKit-orange)
@@ -41,6 +41,7 @@ macOS 菜单栏番茄钟 · [TomatoBar](https://github.com/ivoronin/TomatoBar) �
 
 | 版本 | 内容 |
 |---|---|
+| V1.3.1（3.9.1） | 待办、分类配色、数值输入及 UI 精修；包含近期存储和计时修复。[更新说明](docs/V1.3.1更新说明.md) |
 | V1.3（3.9.0） | 删除单条记录；分类入口常驻、可选图标。[更新说明](docs/V1.3更新说明.md) |
 | V1.2（3.8.0） | 原生主窗口，日／周／月复盘，紧凑与大倒计时。[更新说明](docs/V1.2更新说明.md) |
 | V1.1（3.7.1） | 记录改名、多标签与标签筛选。[更新说明](docs/V1.1更新说明.md) |
@@ -56,7 +57,7 @@ macOS 菜单栏番茄钟 · [TomatoBar](https://github.com/ivoronin/TomatoBar) �
 | `TomatoBarPersonal-<版本>.zip` | 解压后把 app 移入 Applications |
 | Source code (tar.gz/zip) | GitHub 自动附带，从源码构建 |
 
-首次打开若被 Gatekeeper 拦截（本应用为 ad-hoc 签名，未做付费公证）：
+GitHub 下载包使用 ad-hoc 签名，未做付费公证。首次打开若被 Gatekeeper 拦截：
 
 ```sh
 xattr -dr com.apple.quarantine "/Applications/TomatoBar Personal.app"
@@ -71,7 +72,9 @@ cd TomatoBar-Personal
 open "/tmp/TomatoBar-personal-build/Build/Products/Release/TomatoBar Personal.app"
 ```
 
-构建产物为 ad-hoc 签名。若从其他位置拷贝后被 Gatekeeper 拦截：
+本机源码构建使用项目的 Automatic Personal Team 开发签名，默认同时构建 Apple Silicon 与 Intel。
+公开下载包从同一产物制作副本并重签为 ad-hoc，不携带本机开发签名。
+若从其他位置拷贝后被 Gatekeeper 拦截：
 
 ```sh
 xattr -dr com.apple.quarantine "/Applications/TomatoBar Personal.app"

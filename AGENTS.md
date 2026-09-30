@@ -16,7 +16,7 @@ macOS 菜单栏番茄钟，是 [ivoronin/TomatoBar](https://github.com/ivoronin/
 |---|---|
 | 产品名 | TomatoBar Personal |
 | Bundle ID | `com.dilyar.TomatoBarPersonal`（与上游共存，不迁移原版数据） |
-| 当前版本 | 3.9.0（对外称 V1.3） |
+| 当前版本 | 3.9.1（对外称 V1.3.1，build 2） |
 | 默认分支 | `feature/personal-focus` |
 | `main` 分支 | 上游基线 `90a77d6`，仅用于对比 diff，**不要在上面开发** |
 | `origin` | `mikilolipop/TomatoBar-Personal`（**public**，2026-09-29 GitHub API 实测确认） |
@@ -83,7 +83,7 @@ scripts/dev-run.sh  # 一键开发闭环：优雅退出旧实例 → 测试闸�
                     # 它只从 /tmp 起开发实例，/Applications 正式版不动；SKIP_TESTS=1 跳闸门。
 scripts/test-launch-context.sh # 8 项 AppKit 合成启动事件检查，不访问用户数据
 scripts/test-bridge.sh # 先 build.sh，再运行真实 TBTimer 检查（当前 40 项）；只使用 QA13 新建临时子目录
-scripts/build.sh    # Release 构建到 /tmp/TomatoBar-personal-build。使用项目自带
+scripts/build.sh    # universal Release（arm64 + x86_64）构建到 /tmp/TomatoBar-personal-build。使用项目自带
                     # Automatic 签名（免费 Personal Team，profile 由 -allowProvisioningUpdates
                     # 自动续期），产物过 codesign --verify --deep --strict。CI 上无账号，
                     # 走「不签名构建 + ad-hoc 重签」编译门路线，产物不可当运行版。

@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-09-30，by Codex · Computer Use 实机 UI 精修完成；日/周/月布局、动作图标、编辑器与设置已复验。Widget 仍全面取消，Personal Team 自动签名契约保留。
+最后更新：2026-10-01，by Codex · V1.3.1（3.9.1 / build 2）正式安装与 GitHub 发布同步；设置显示实际版本，源码构建默认 universal。Widget 仍全面取消，Personal Team 自动签名契约保留。
 
 ---
 
@@ -44,12 +44,13 @@ popover 和到时提醒窗。上面的限制来自旧 System Events / screencapt
 
 | 项 | 值 |
 |---|---|
-| ✅ **已安装版本** | **3.9.0（V1.3）**，`/Applications/TomatoBar Personal.app`（未动；菜单栏实际跑的是 `/tmp` 最新构建，经 dev-run 启动，数据容器共用） |
-| HEAD | 顶部提交 = 2026-09-30 Computer Use UI 精修；此前安全锚点 `6d8c0ef` |
-| 工作区 | UI 精修源码与本轮文档提交推送至 origin；截图和数据快照仅保留本地 |
+| ✅ **已安装版本** | **3.9.1（V1.3.1，build 2）**，`/Applications/TomatoBar Personal.app` 已替换并从该路径运行；设置页实读 `Personal · 3.9.1`；本机开发签名，arm64 + x86_64 |
+| HEAD | 顶部提交 = V1.3.1 正式安装发布准备；包含 UI 精修 `41cb08e`，此前安全锚点 `6d8c0ef` |
+| 工作区 | 版本、构建、发布文档和合成示例宣传图提交推送至 origin；真实数据与验收截图仅保留本地 |
 | 测试 | **214 项领域 + 40 项真实桥接 + 8 项合成启动事件**全绿；Release 干净构建 + 严格签名通过 |
 | **CI** | 推送后以 HEAD 最新 run 为准；本地四套检查均已复跑 |
 | 远程 | `origin` = `mikilolipop/TomatoBar-Personal`（**public**，2026-09-29 GitHub API 实测；默认分支 `feature/personal-focus`）；`upstream` = `ivoronin/TomatoBar` |
+| 发布入口 | [V1.3.1 / v3.9.1](https://github.com/mikilolipop/TomatoBar-Personal/releases/tag/v3.9.1)，DMG + ZIP；[下载页](https://mikilolipop.github.io/TomatoBar-Personal/) 的兜底链接、更新说明及宣传图同步为本版 |
 | 用户真实数据 | 本轮检查前后 **4 条记录 + 1 个待办 + 分类样式逐条一致**；仅正常退出更新 checkpoint。私有快照与比对结果保留在仓库外的本地审计目录，未提交真实事件名或数据 |
 | QA 隔离环境 | 本轮 UI 使用新建 UIAudit Bundle ID，24 条合成记录 + 4 个合成待办，实际完成计时新增 1 条；空状态另以隔离快照检查。桥接仍使用 QA13 新建临时子目录，既有 QA13 sessions 未改 |
 | git 身份 | 本仓库 `--local`：`mikilolipop <207336577+mikilolipop@users.noreply.github.com>`（全局仍未设置） |
@@ -85,7 +86,7 @@ tarball 是首次提交前的应急措施。有了 git + 远程后必要性下�
 
 ## 进行中
 
-**V1.3 已定版并安装**（`6ff1819`，内部版本 3.9.0，见 [`V1.3更新说明.md`](V1.3更新说明.md)）。
+**V1.3.1 已正式安装**（内部版本 3.9.1，build 2，见 [`V1.3.1更新说明.md`](V1.3.1更新说明.md)）。
 用户明确要求：这一版先把已经做完的功能定稿装上用，剩余问题不在本轮范围内解决。
 
 分类视觉方案在 [`分类视觉设计.md`](分类视觉设计.md)，**设计已定稿，代码尚未按新格式实现**
@@ -199,6 +200,18 @@ CI 产物明确标注**只是编译门,不可运行**。pbxproj 中云端引入�
 macosx 专属 identity 行,属本机契约的一部分,不要 Drive 反向覆盖;改动前先 `git pull`。
 
 ---
+
+## 刚做完（2026-10-01，Codex 正式安装与发布准备 V1.3.1）
+
+- 用户明确授权正式安装及 GitHub 同步。版本升级到 3.9.1 / build 2，设置页从 Bundle 元数据读取真实版本。
+- `scripts/build.sh` 默认构建 arm64 + x86_64，Automatic Personal Team 签名契约保留。
+- `scripts/dev-run.sh` 完整闭环通过：214 领域 + 40 真实桥接 + 8 合成启动，Release 与严格签名通过。
+- 旧安装应用已备份，阶段目录校验后替换到 `/Applications`；当前唯一进程来自安装目录，设置与历史已实读。
+- 安装前后 4 条记录、1 个待办和分类样式一致，仅 checkpoint 正常更新；私有快照放在仓库外。
+- 发布副本从同一 universal 产物制作，host/helper 重新 ad-hoc 签名；DMG 校验、只读挂载和 ZIP 解压签名核对通过。
+- README/版本表/安装签名说明、最新更新说明、下载页静态兜底链接及两处宣传图同步。
+  宣传图采用本轮合成数据 UI 截图，不包含真实使用数据。
+- 真实登录、Intel 实机及完整无障碍验收仍未完成，详见更新说明。
 
 ## 刚做完（2026-09-30，Codex Computer Use UI 精修）
 
