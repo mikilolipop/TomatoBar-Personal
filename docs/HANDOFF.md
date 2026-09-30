@@ -125,6 +125,41 @@ V1.3 已按用户决定定稿上线，不再往这个版本里加东西。后续
 
 ---
 
+## 刚做完（2026-09-30，Widget 第一轮：编译被炸根因定位+修复，签名契约悬而未决）
+
+**云端经 Drive 交了 Widget 初版**：`TomatoBarWidget/`（appex target + Info.plist + entitlements）、
+`WidgetSnapshot.swift`（纯 Foundation 领域文件，已并入 test.sh 编译,214 项全绿）、
+Timer/App 以 `#if canImport(WidgetKit)` 发布快照到 App Group `group.com.dilyar.TomatoBarPersonal`。
+
+**BUILD FAILED 根因（已修，本地 pbxproj）**：主 target 两份配置被加了
+`SYSTEM_FRAMEWORK_SEARCH_PATHS += $(SYSTEM_LIBRARY_DIR)/PrivateFrameworks`。本机运行系统
+（macOS 27 beta）的 PrivateFrameworks 里有一个**无 Headers 的 ExtensionFoundation.framework 壳**,
+搜索优先级压过 SDK 副本 → 模块扫描/PCM 必然 "file not found"（Network 同炸）。WidgetKit 一进来
+就触发,与签名无关。删除两处该行后 `CODE_SIGNING_ALLOWED=NO` 全量编译通过。**云端注意：
+pbxproj 不要再加回 PrivateFrameworks 搜索路径；Widget 代码不需要任何私有框架。**
+
+**未决：签名契约**。App Groups 是受限 entitlement,xcodebuild 规划期对
+「Manual + ad-hoc + 无 profile」直接报 requires a provisioning profile（主/子 target 一起挂,
+build.sh 现行契约过不了）。实验矩阵：
+- `CODE_SIGNING_ALLOWED=NO` 构建 + 手工 ad-hoc 重签 helper→appex→app：codesign --deep --strict 通过
+- 但重签产物**运行时 widget 未注册**（pluginkit 无记录、Group Containers 无 snapshot 文件,
+  快照发布路径可能也依赖扩展注册）→ ad-hoc 大概率喂不饱 WidgetKit,macOS 期望真实开发证书 + Team
+- 本机钥匙串有一枚 `Apple Development: …(W37XN6F9LP)` 证书,但 Xcode 未登录对应 Apple ID
+  （`-allowProvisioningUpdates` 报 No Account for Team）→ **需要用户在 Xcode Settings > Accounts
+  登录该 Apple ID**,然后试 `CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=W37XN6F9LP
+  -allowProvisioningUpdates`（wtest8 曾 BUILD SUCCEEDED 但那是 identity 空 = 未签名的假绿,勿以此为准）
+
+**一旦定了签名路线,三处要联动**（云端决策 + 本地验证）：build.sh、test-bridge.sh、
+.github/workflows/main.yml（CI 无账号,只能继续 CODE_SIGNING_ALLOWED=NO 编到构建产物为止,
+`codesign --verify` 那步要按新契约改写或删除）。
+
+**⚠️ 事故现场（待用户收尾）**：实验期间新旧两个同 bundle id 实例并存
+（51418 = TomatoBar-personal-build 旧版,58821 = TB-wtestA 实验版,写同一容器）。
+用户当时正在 workFinished 流程,未强杀。**请用户在弹层完成/取消本段后,把两个实例都退出**
+（弹出层「退出」按钮）,然后重跑 `sh scripts/dev-run.sh` 恢复单实例基线。
+
+---
+
 ## 刚做完（2026-09-30，Claude Code 编译闸门：Drive 第三~六轮云端同步逐轮核验 + 安全锚点提交）
 
 **分工变更（用户明确指令）**：云端 agent 负责改代码（git push 到 origin 或 Drive 直改工作区），

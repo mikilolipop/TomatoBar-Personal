@@ -21,7 +21,21 @@
 		D12000000000000000000011 /* MainWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12000000000000000000001; };
 		D12000000000000000000012 /* FocusCharts.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12000000000000000000002; };
 		D13000000000000000000010 /* LaunchContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = D13000000000000000000000; };
+		D14000000000000000000010 /* WidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14000000000000000000000 /* WidgetSnapshot.swift */; };
+		D14000000000000000000011 /* WidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14000000000000000000000 /* WidgetSnapshot.swift */; };
+		D14000000000000000000012 /* TomatoBarWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14000000000000000000001 /* TomatoBarWidget.swift */; };
+		D14000000000000000000013 /* TomatoBarWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = D14000000000000000000004 /* TomatoBarWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D14000000000000000000032 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8A21B78027EE31A20009E5DB /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D14000000000000000000030;
+			remoteInfo = TomatoBarWidget;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		8A21B78827EE31A20009E5DB /* TomatoBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TomatoBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -40,7 +54,26 @@
 		D12000000000000000000001 /* MainWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindow.swift; sourceTree = "<group>"; };
 		D12000000000000000000002 /* FocusCharts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusCharts.swift; sourceTree = "<group>"; };
 		D13000000000000000000000 /* LaunchContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchContext.swift; sourceTree = "<group>"; };
+		D14000000000000000000000 /* WidgetSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshot.swift; sourceTree = "<group>"; };
+		D14000000000000000000001 /* TomatoBarWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TomatoBarWidget.swift; sourceTree = "<group>"; };
+		D14000000000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		D14000000000000000000003 /* TomatoBarWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TomatoBarWidget.entitlements; sourceTree = "<group>"; };
+		D14000000000000000000004 /* TomatoBarWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TomatoBarWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D14000000000000000000023 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				D14000000000000000000013 /* TomatoBarWidget.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		8A21B78527EE31A20009E5DB /* Frameworks */ = {
@@ -52,6 +85,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D14000000000000000000020 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -59,6 +99,7 @@
 			isa = PBXGroup;
 			children = (
 				8A21B78A27EE31A20009E5DB /* TomatoBar */,
+				D14000000000000000000040 /* TomatoBarWidget */,
 				8A21B78927EE31A20009E5DB /* Products */,
 				8A9F700D27EE3AED0012A1EC /* Frameworks */,
 			);
@@ -68,6 +109,7 @@
 			isa = PBXGroup;
 			children = (
 				8A21B78827EE31A20009E5DB /* TomatoBar.app */,
+				D14000000000000000000004 /* TomatoBarWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -76,6 +118,7 @@
 			isa = PBXGroup;
 			children = (
 				8A21B78B27EE31A20009E5DB /* App.swift */,
+				D14000000000000000000000 /* WidgetSnapshot.swift */,
 				D13000000000000000000000 /* LaunchContext.swift */,
 				D12000000000000000000002 /* FocusCharts.swift */,
 				D12000000000000000000001 /* MainWindow.swift */,
@@ -90,6 +133,16 @@
 				8AA54347293094AB002A47FC /* Localizable.strings */,
 			);
 			path = TomatoBar;
+			sourceTree = "<group>";
+		};
+		D14000000000000000000040 /* TomatoBarWidget */ = {
+			isa = PBXGroup;
+			children = (
+				D14000000000000000000001 /* TomatoBarWidget.swift */,
+				D14000000000000000000002 /* Info.plist */,
+				D14000000000000000000003 /* TomatoBarWidget.entitlements */,
+			);
+			path = TomatoBarWidget;
 			sourceTree = "<group>";
 		};
 		8A9F700D27EE3AED0012A1EC /* Frameworks */ = {
@@ -109,11 +162,13 @@
 				8A21B78427EE31A20009E5DB /* Sources */,
 				8A21B78527EE31A20009E5DB /* Frameworks */,
 				8A21B78627EE31A20009E5DB /* Resources */,
+				D14000000000000000000023 /* Embed App Extensions */,
 				8A7403A127FA1A4E00E7F90B /* Copy “Launch at Login Helper” */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				D14000000000000000000031 /* PBXTargetDependency */,
 			);
 			name = TomatoBar;
 			packageProductDependencies = (
@@ -123,6 +178,25 @@
 			productName = TomatoBar;
 			productReference = 8A21B78827EE31A20009E5DB /* TomatoBar.app */;
 			productType = "com.apple.product-type.application";
+		};
+		D14000000000000000000030 /* TomatoBarWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D14000000000000000000052 /* Build configuration list for PBXNativeTarget "TomatoBarWidget" */;
+			buildPhases = (
+				D14000000000000000000021 /* Sources */,
+				D14000000000000000000020 /* Frameworks */,
+				D14000000000000000000022 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TomatoBarWidget;
+			packageProductDependencies = (
+			);
+			productName = TomatoBarWidget;
+			productReference = D14000000000000000000004 /* TomatoBarWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -136,6 +210,9 @@
 				TargetAttributes = {
 					8A21B78727EE31A20009E5DB = {
 						CreatedOnToolsVersion = 13.3;
+					};
+					D14000000000000000000030 = {
+						CreatedOnToolsVersion = 15.0;
 					};
 				};
 			};
@@ -159,6 +236,7 @@
 			projectRoot = "";
 			targets = (
 				8A21B78727EE31A20009E5DB /* TomatoBar */,
+				D14000000000000000000030 /* TomatoBarWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -170,6 +248,13 @@
 			files = (
 				8A21B79027EE31A30009E5DB /* Assets.xcassets in Resources */,
 				8AA5434A2930F008002A47FC /* Localizable.strings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D14000000000000000000022 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -202,6 +287,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D14000000000000000000010 /* WidgetSnapshot.swift in Sources */,
 				8AEE49AF2AA75A5E00243D2F /* Log.swift in Sources */,
 				8A21B78E27EE31A20009E5DB /* View.swift in Sources */,
 				8A9F701927EE3DAF0012A1EC /* Timer.swift in Sources */,
@@ -215,7 +301,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D14000000000000000000021 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D14000000000000000000012 /* TomatoBarWidget.swift in Sources */,
+				D14000000000000000000011 /* WidgetSnapshot.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D14000000000000000000031 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D14000000000000000000030 /* TomatoBarWidget */;
+			targetProxy = D14000000000000000000032 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		8AA54347293094AB002A47FC /* Localizable.strings */ = {
@@ -376,10 +479,6 @@
 				PRODUCT_NAME = "TomatoBar Personal";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				SYSTEM_FRAMEWORK_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(SYSTEM_LIBRARY_DIR)/PrivateFrameworks",
-				);
 			};
 			name = Debug;
 		};
@@ -411,10 +510,62 @@
 				PRODUCT_NAME = "TomatoBar Personal";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				SYSTEM_FRAMEWORK_SEARCH_PATHS = (
+			};
+			name = Release;
+		};
+		D14000000000000000000050 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = TomatoBarWidget/TomatoBarWidget.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = TomatoBarWidget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(SYSTEM_LIBRARY_DIR)/PrivateFrameworks",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 3.9.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dilyar.TomatoBarPersonal.Widget;
+				PRODUCT_NAME = TomatoBarWidget;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		D14000000000000000000051 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = TomatoBarWidget/TomatoBarWidget.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = TomatoBarWidget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 3.9.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dilyar.TomatoBarPersonal.Widget;
+				PRODUCT_NAME = TomatoBarWidget;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
 		};
@@ -435,6 +586,15 @@
 			buildConfigurations = (
 				8A21B79827EE31A30009E5DB /* Debug */,
 				8A21B79927EE31A30009E5DB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D14000000000000000000052 /* Build configuration list for PBXNativeTarget "TomatoBarWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D14000000000000000000050 /* Debug */,
+				D14000000000000000000051 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
