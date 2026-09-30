@@ -358,6 +358,47 @@ check(FocusState.styleSymbol(in: uniState.categoryStyles, forCategory: uniState.
 check(FocusState.styleSymbol(in: ["swift": "star"], forCategory: "Swift") == "star", "exact lowercased key resolves")
 check(FocusState.styleSymbol(in: ["Swift": "star"], forCategory: "swift") == "star", "alias fallback matches across case")
 check(FocusState.styleSymbol(in: [:], forCategory: "学习") == nil, "no override resolves to nil")
+// Colour overrides ride the same map as icons: `symbol|index` carries both, `@auto|index`
+// is colour-only, and a bare symbol stays the legacy representation so old files and old
+// code paths keep working unchanged.
+check(FocusState.styleSymbol(in: ["学习": "star|2"], forCategory: "学习") == "star",
+      "a symbol|index payload still resolves the symbol")
+check(FocusState.styleColorIndex(in: ["学习": "star|2"], forCategory: "学习") == 2,
+      "a symbol|index payload resolves the colour index")
+check(FocusState.styleSymbol(in: ["学习": "@auto|2"], forCategory: "学习") == nil,
+      "@auto keeps the automatic symbol while the colour is overridden")
+check(FocusState.styleColorIndex(in: ["学习": "@auto|2"], forCategory: "学习") == 2,
+      "@auto|index carries a colour-only override")
+check(FocusState.styleColorIndex(in: ["学习": "star"], forCategory: "学习") == nil,
+      "legacy bare-symbol payloads have no colour index")
+check(FocusState.styleColorIndex(in: ["学习": "star|nope"], forCategory: "学习") == nil,
+      "a non-numeric index falls back to the automatic colour")
+check(FocusState.styleSymbol(in: ["学习": "star|nope"], forCategory: "学习") == "star",
+      "a malformed index does not poison the symbol")
+check(FocusState.styleColorIndex(in: ["学习": "star|-1"], forCategory: "学习") == nil,
+      "a negative index is not a colour override")
+check(FocusState.styleSymbol(in: ["学习": "star|1|2"], forCategory: "学习") == "star",
+      "only the first separator is consumed")
+check(FocusState.styleColorIndex(in: ["学习": "star|1|2"], forCategory: "学习") == nil,
+      "extra separators make the index unreadable rather than guessing")
+check(FocusState.composedStyle(symbol: "star", colorIndex: 2) == "star|2",
+      "both overrides compose into symbol|index")
+check(FocusState.composedStyle(symbol: "star", colorIndex: nil) == "star",
+      "a symbol-only override keeps the legacy bare representation")
+check(FocusState.composedStyle(symbol: nil, colorIndex: 2) == "@auto|2",
+      "a colour-only override uses the @auto sentinel")
+check(FocusState.composedStyle(symbol: nil, colorIndex: nil) == nil,
+      "clearing both overrides composes to nil so the key can be removed")
+check(FocusState.hasStyleOverride(in: ["学习": "@auto|2"], forCategory: "学习"),
+      "a colour-only override counts as customised even with no symbol")
+check(!FocusState.hasStyleOverride(in: [:], forCategory: "学习"),
+      "an empty style map reports no override")
+var colourStyle = styleRound
+try colourStyle.editRecord(id: delC.id, name: delC.name, tags: delC.tags, styleChanges: ["学习": "star|2"])
+check(colourStyle.categoryStyles == ["学习": "star|2"],
+      "colour payloads persist through the same delta-merge path as icons")
+let colourRoundTrip = try JSONDecoder().decode(FocusState.self, from: try JSONEncoder().encode(colourStyle))
+check(colourRoundTrip.categoryStyles == ["学习": "star|2"], "colour overrides survive a save/load round trip")
 // P14: clearing a stale filter must use the right semantics per surface. The overview
 // filters by primary category, so a tag that survives only as a secondary tag must count
 // as stale there, while history must still treat it as a match.

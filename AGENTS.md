@@ -73,7 +73,7 @@ macOS 菜单栏番茄钟，是 [ivoronin/TomatoBar](https://github.com/ivoronin/
 ## 命令
 
 ```sh
-scripts/test.sh     # 领域检查（当前 174 项，**以末行 PASS 数为准**，历轮修复一直在加）
+scripts/test.sh     # 领域检查（当前 192 项，**以末行 PASS 数为准**，历轮修复一直在加）
 scripts/dev-run.sh  # 一键开发闭环：优雅退出旧实例 → 测试闸门 → build.sh → 从 /tmp 启动新版。
                     # **改完代码想看效果统一跑它**（人和所有 AI 都是）。不要自己拼
                     # killall + xcodebuild：进程名带空格（"TomatoBar Personal"）杀不干净，

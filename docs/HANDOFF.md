@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-09-30，by Claude Code · 外部 AI 经 Drive 的 UI 重构已核验集成（allCategories 契约本地补齐），领域 174 / 桥接 35 / 启动 8 全绿；新增 scripts/dev-run.sh 统一开发闭环并端到端实跑通过
+最后更新：2026-09-30，by Claude Code · 项目已迁入 `~/Developer/番茄钟项目/TomatoBar` 并调试通过；Drive 第二轮同步（分类颜色覆盖）已核验集成、补 18 项领域测试，领域 192 / 桥接 35 / 启动 8 全绿
 
 ---
 
@@ -40,9 +40,9 @@ first process whose unix id is 40847（QA13 的 pid）  →  读到的 bid 是 c
 | 项 | 值 |
 |---|---|
 | ✅ **已安装版本** | **3.9.0（V1.3）**，`/Applications/TomatoBar Personal.app`（前轮构建安装；**本轮代码改动只过了 Release 构建验证,未重新构建安装、未重启应用**） |
-| HEAD | 顶部提交 = 2026-09-30 Drive UI 重构集成（View/MainWindow + State.allCategories + 测试/文档）← `79e13ad`（公开确认归档）← `4139124`/`60706a5`（评审第三轮） |
-| 工作区 | 干净，全部已提交推送 |
-| 测试 | **174 项领域 + 35 项真实桥接 + 8 项合成启动事件**全绿；Release 干净构建 + 严格签名通过 |
+| HEAD | 顶部提交 = 2026-09-30 Drive 第二轮同步集成（分类颜色覆盖 symbol\|index 编码 + 18 项领域测试）← Drive UI 重构集成（View/MainWindow + State.allCategories + 测试/文档）← `79e13ad`（公开确认归档）← `4139124`/`60706a5`（评审第三轮） |
+| 工作区 | 干净，全部已提交推送（Drive 一次性探针文件已移出仓库，见「刚做完」） |
+| 测试 | **192 项领域 + 35 项真实桥接 + 8 项合成启动事件**全绿；Release 干净构建 + 严格签名通过 |
 | **CI** | 推送后以 HEAD 最新 run 为准；本地四套检查均已复跑 |
 | 远程 | `origin` = `mikilolipop/TomatoBar-Personal`（**public**，2026-09-29 GitHub API 实测；默认分支 `feature/personal-focus`）；`upstream` = `ivoronin/TomatoBar` |
 | 用户真实数据 | 前轮记载 2 条；**本轮未读取、未写入正式容器，也未退出正式应用**，不把旧数据量当作当前复查结果 |
@@ -124,6 +124,29 @@ V1.3 已按用户决定定稿上线，不再往这个版本里加东西。后续
   QA13 已经在本轮建过并可用（见「QA13 复现方式」），不必复用 QA12。
 
 ---
+
+## 刚做完（2026-09-30，Claude Code 项目迁入 + Drive 第二轮同步「分类颜色覆盖」核验集成 + 补测试）
+
+**迁入**：项目从原位置整体移至 `~/Developer/番茄钟项目/TomatoBar`（本次会话工作目录）。
+排查结果：无硬编码旧路径（scripts/xcodeproj/.vscode 全干净），`.git` 完整、远程配置未变，
+旧位置已不存在第二份源码 —— **以本目录为唯一事实源**（用户明确指令）。基线复跑 174/35/8 全绿。
+
+**Drive 第二轮同步到达**：工作区出现 4 个未提交文件（FocusCharts/MainWindow/State/View），
+是分类颜色覆盖功能 —— `categoryStyles` 值扩展为 `symbol|index`，`@auto|index` 表示仅换色，
+裸 symbol 保持旧表示（无迁移、旧 sessions.json 兼容）；RecordEditor 样式菜单拆成「图标」「颜色」
+两级子菜单，图表/主窗口取色统一走 `Garden.color(_:styles:)`。逐条审阅：编码/解码边界自洽，
+`@auto` 哨兵不误伤 `styleSymbol` 的别名回退，越界 index 由 `colors.indices.contains` 兜底。
+
+**补测试 18 项（174→192）**：同步来的代码**一项测试都没带**，而 test.sh 只编译领域层 ——
+新增断言钉住 `styleSymbol`/`styleColorIndex`/`composedStyle`/`hasStyleOverride` 的全部编码形态
+（含 `star|nope`、`star|-1`、`star|1|2` 畸形值）与 editRecord/JSON 往返。
+桥接 35 / 启动 8 复跑全绿；Release 干净构建 + 严格签名通过。**本轮未重新构建安装、未动正式版应用。**
+
+**探针文件**：仓库根出现 `CHATGPT_DRIVE_BRIDGE_PROBE.txt`（ChatGPT 建，验证 Drive→本地反向同步，
+已生效）。一次性验证物按惯例不入库，已移至仓库外的 `番茄钟项目/` 根目录；HANDOFF 此条即其归档。
+
+**待人工目测**：颜色子菜单的实际观感（色名文案、checkmark 样式、两级 Menu 在 350pt 弹层里的
+可用性）—— `test.sh`/bridge 编译不进眼，需 `scripts/dev-run.sh` 起新版看。
 
 ---
 

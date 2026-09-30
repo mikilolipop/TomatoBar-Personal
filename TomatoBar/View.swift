@@ -344,8 +344,30 @@ struct RecordEditor: View {
     private var previewSymbol: String {
         FocusState.styleSymbol(in: localStyles, forCategory: category) ?? Garden.symbol(category)
     }
+    private var previewColor: Color {
+        Garden.color(category, styles: localStyles)
+    }
     private var hasStyleOverride: Bool {
-        FocusState.styleSymbol(in: localStyles, forCategory: category) != nil
+        FocusState.hasStyleOverride(in: localStyles, forCategory: category)
+    }
+    private var currentSymbolOverride: String? {
+        FocusState.styleSymbol(in: localStyles, forCategory: category)
+    }
+    private var currentColorIndex: Int? {
+        FocusState.styleColorIndex(in: localStyles, forCategory: category)
+    }
+    private var menuChevron: some View {
+        Image(systemName: "chevron.down")
+            .font(.system(size: 11, weight: .semibold))
+            .frame(width: 12, height: 12)
+    }
+    private func setStyle(symbol: String?, colorIndex: Int?) {
+        let key = category.lowercased()
+        if let value = FocusState.composedStyle(symbol: symbol, colorIndex: colorIndex) {
+            localStyles[key] = value
+        } else {
+            localStyles.removeValue(forKey: key)
+        }
     }
     /// Only the keys this draft changed, so saving never replays a stale whole-map
     /// snapshot over overrides another editor saved in the meantime.
@@ -414,7 +436,7 @@ struct RecordEditor: View {
             HStack {
                 Text("主分类").font(.subheadline).fontWeight(.medium)
                 Spacer()
-                Text(category == "未分类" ? "设置后可自定义图标" : (hasStyleOverride ? "已自定义图标" : "自动图标"))
+                Text(category == "未分类" ? "设置后可自定义图标" : (hasStyleOverride ? "已自定义样式" : "自动样式"))
                     .font(.caption2)
                     .foregroundColor(Garden.muted)
             }
@@ -424,37 +446,54 @@ struct RecordEditor: View {
                 // separate paint-palette button made the preview and the action look like
                 // two unrelated controls even though they represented the same setting.
                 Menu {
-                    Button("使用自动图标") {
-                        localStyles.removeValue(forKey: category.lowercased())
-                    }.disabled(!hasStyleOverride)
-                    Divider()
-                    ForEach(Garden.palette) { choice in
-                        Button {
-                            localStyles[category.lowercased()] = choice.symbol
-                        } label: {
-                            Label(choice.label, systemImage: choice.symbol)
+                    Menu("图标") {
+                        Button("使用自动图标") {
+                            setStyle(symbol: nil, colorIndex: currentColorIndex)
+                        }.disabled(currentSymbolOverride == nil)
+                        Divider()
+                        ForEach(Garden.palette) { choice in
+                            Button {
+                                setStyle(symbol: choice.symbol, colorIndex: currentColorIndex)
+                            } label: {
+                                Label(choice.label, systemImage: choice.symbol)
+                            }
+                        }
+                    }
+                    Menu("颜色") {
+                        Button("使用自动颜色") {
+                            setStyle(symbol: currentSymbolOverride, colorIndex: nil)
+                        }.disabled(currentColorIndex == nil)
+                        Divider()
+                        ForEach(Array(Garden.colorNames.enumerated()), id: \.offset) { index, label in
+                            Button {
+                                setStyle(symbol: currentSymbolOverride, colorIndex: index)
+                            } label: {
+                                Label(label, systemImage: currentColorIndex == index ? "checkmark.circle.fill" : "circle.fill")
+                            }
+                        }
+                    }
+                    if hasStyleOverride {
+                        Divider()
+                        Button("恢复全部自动") {
+                            setStyle(symbol: nil, colorIndex: nil)
                         }
                     }
                 } label: {
-                    ZStack(alignment: .bottomTrailing) {
+                    HStack(spacing: 6) {
                         Image(systemName: previewSymbol)
                             .font(.system(size: 17, weight: .medium))
                             .foregroundColor(Garden.paper)
                             .frame(width: 34, height: 34)
-                            .background(Garden.color(category).opacity(0.85))
+                            .background(previewColor.opacity(0.85))
                             .cornerRadius(7)
-                        Image(systemName: "chevron.down.circle.fill")
-                            .font(.system(size: 10))
-                            .foregroundColor(Garden.paper)
-                            .background(Circle().fill(Garden.muted))
-                            .offset(x: 3, y: 3)
+                        menuChevron
                     }
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .fixedSize()
-                .help(category == "未分类" ? "先设置主分类，再自定义图标" : "点击修改这个分类的图标")
-                .accessibilityLabel(category == "未分类" ? "未分类，设置主分类后可修改图标" : "修改主分类图标")
+                .help(category == "未分类" ? "先设置主分类，再自定义样式" : "点击修改这个分类的图标和颜色")
+                .accessibilityLabel(category == "未分类" ? "未分类，设置主分类后可修改样式" : "修改主分类图标和颜色")
                 .disabled(category == "未分类")
 
                 Menu {
@@ -474,13 +513,14 @@ struct RecordEditor: View {
                 } label: {
                     HStack(spacing: 6) {
                         Text(category).lineLimit(1)
-                        Image(systemName: "chevron.down").font(.caption2)
+                        menuChevron
                     }
                     .padding(.horizontal, 9)
                     .frame(height: 34)
                     .background(RoundedRectangle(cornerRadius: 7).fill(Garden.line.opacity(0.22)))
                 }
                 .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
                 .frame(maxWidth: 190, alignment: .leading)
                 .help("每条记录只计入一个主分类")
                 .accessibilityLabel("主分类：\(category)")

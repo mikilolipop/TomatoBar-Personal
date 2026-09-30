@@ -99,9 +99,9 @@ struct FocusState: Codable {
     var rounds = 0
     var records: [FocusRecord] = []
     var checkpoint = Date()
-    /// Per-category icon overrides, keyed by lowercased category name. Absent from files
-    /// written before this field existed, so init(from:) must tolerate the missing key;
-    /// a category without an entry falls back to the automatic glyph.
+    /// Per-category visual overrides, keyed by lowercased category name. Values keep the
+    /// original bare-SF-Symbol format and may also carry a colour palette index, so old
+    /// sessions.json files remain compatible while icon and colour can be edited separately.
     var categoryStyles: [String: String] = [:]
 
     private enum CodingKeys: String, CodingKey {
@@ -210,13 +210,45 @@ struct FocusState: Codable {
         return records.contains { $0.hasTag(category) }
     }
 
-    /// Resolve an icon override for a category: exact lowercased key first, then a
+    /// Resolve the raw style payload for a category: exact lowercased key first, then a
     /// case-insensitive scan. The scan is the alias fallback that keeps an override
     /// written from a draft spelling reachable after the tag is canonicalized on save.
-    static func styleSymbol(in styles: [String: String], forCategory category: String) -> String? {
+    private static func styleValue(in styles: [String: String], forCategory category: String) -> String? {
         let key = category.lowercased()
         if let exact = styles[key] { return exact }
         return styles.first { $0.key.caseInsensitiveCompare(key) == .orderedSame }?.value
+    }
+
+    /// `categoryStyles` originally stored a bare SF Symbol name (for example `star`).
+    /// Newer values may also carry a colour palette index as `symbol|index`; `@auto`
+    /// means keep the automatic symbol while overriding only the colour. Keeping the
+    /// legacy bare-symbol form avoids a migration and preserves existing sessions.json.
+    static func styleSymbol(in styles: [String: String], forCategory category: String) -> String? {
+        guard let raw = styleValue(in: styles, forCategory: category) else { return nil }
+        let parts = raw.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+        guard parts.count == 2 else { return raw }
+        return parts[0] == "@auto" ? nil : String(parts[0])
+    }
+
+    static func styleColorIndex(in styles: [String: String], forCategory category: String) -> Int? {
+        guard let raw = styleValue(in: styles, forCategory: category) else { return nil }
+        let parts = raw.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+        guard parts.count == 2, let index = Int(parts[1]), index >= 0 else { return nil }
+        return index
+    }
+
+    /// Compose the compact, backwards-compatible payload used by `categoryStyles`.
+    /// Symbol-only overrides keep the old exact representation so existing tests and
+    /// saved data remain stable; a colour-only override uses the `@auto` sentinel.
+    static func composedStyle(symbol: String?, colorIndex: Int?) -> String? {
+        if let symbol = symbol, let colorIndex = colorIndex { return "\(symbol)|\(colorIndex)" }
+        if let symbol = symbol { return symbol }
+        if let colorIndex = colorIndex { return "@auto|\(colorIndex)" }
+        return nil
+    }
+
+    static func hasStyleOverride(in styles: [String: String], forCategory category: String) -> Bool {
+        styleValue(in: styles, forCategory: category) != nil
     }
 
     /// Deletes by UUID only — never by index or name, both of which shift as the list

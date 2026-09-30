@@ -10,6 +10,9 @@ enum Garden {
         Color(red: 0.81, green: 0.65, blue: 0.34), Color(red: 0.48, green: 0.62, blue: 0.66),
         Color(red: 0.71, green: 0.54, blue: 0.40), Color(red: 0.65, green: 0.59, blue: 0.70),
         Color(red: 0.75, green: 0.62, blue: 0.54), Color(red: 0.43, green: 0.54, blue: 0.48)]
+    /// Human-readable names for the fixed Garden palette used by the category style menu.
+    /// Keep this array in lockstep with `colors`.
+    static let colorNames = ["番茄红", "鼠尾草绿", "暖黄", "雾蓝", "陶土棕", "灰紫", "豆沙粉", "松石绿"]
     /// Categories offered in the record editor. These are suggestions only: choosing one
     /// tags that record and nothing else — no sample records, no edits to existing ones,
     /// no invented statistics.
@@ -63,6 +66,14 @@ enum Garden {
         if name == "未分类" { return muted }
         if let index = suggestedCategories.firstIndex(of: name) { return colors[index] }
         return colors[Int(hashOf(name) % UInt64(colors.count))]
+    }
+
+    static func color(_ name: String, styles: [String: String]) -> Color {
+        if let index = FocusState.styleColorIndex(in: styles, forCategory: name),
+           colors.indices.contains(index) {
+            return colors[index]
+        }
+        return color(name)
     }
 }
 
@@ -144,7 +155,7 @@ struct FocusChart: View {
                                     Image(systemName: FocusState.styleSymbol(in: styles, forCategory: record.category) ?? Garden.symbol(record.category)).font(.system(size: 22, weight: .medium))
                                         .foregroundColor(Garden.paper)
                                         .frame(width: tileWidth(record, available: geometry.size.width - 8), height: 68)
-                                        .background(Garden.color(record.category).opacity(0.85))
+                                        .background(Garden.color(record.category, styles: styles).opacity(0.85))
                                         .cornerRadius(5)
                                 }.buttonStyle(.plain).help("\(record.name) · \(record.category) · \(focusDuration(record.seconds(in: summary.interval)))")
                                     .accessibilityLabel("编辑专注：\(record.name)")
@@ -168,7 +179,7 @@ struct FocusChart: View {
                                 .font(.system(size: 11)).foregroundColor(Garden.muted)
                             VStack(spacing: 0) {
                                 ForEach(day.categories.reversed()) { category in
-                                    Rectangle().fill(Garden.color(category.name).opacity(0.78))
+                                    Rectangle().fill(Garden.color(category.name, styles: styles).opacity(0.78))
                                         .frame(height: CGFloat(category.seconds / max(1, summary.days.map(\.seconds).max() ?? 1)) * max(20, geometry.size.height - 66))
                                 }
                             }.frame(maxWidth: .infinity).frame(height: max(20, geometry.size.height - 64), alignment: .bottom)

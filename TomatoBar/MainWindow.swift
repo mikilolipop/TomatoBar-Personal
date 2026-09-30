@@ -166,7 +166,7 @@ struct MainWindowView: View {
                     ForEach(showAllCategories ? summary.categories : Array(summary.categories.prefix(5))) { category in
                         Button { selectedCategory = selectedCategory == category.name ? nil : category.name } label: {
                             HStack {
-                                Rectangle().fill(Garden.color(category.name)).frame(width: 10, height: 10)
+                                Rectangle().fill(Garden.color(category.name, styles: timer.state.categoryStyles)).frame(width: 10, height: 10)
                                 Text(category.name).lineLimit(1)
                                 Spacer()
                                 Text(focusDuration(category.seconds)).foregroundColor(Garden.muted)
@@ -220,7 +220,7 @@ struct MainWindowView: View {
                     LazyVStack(spacing: 0) {
                         ForEach(visibleRecords) { record in
                             HStack(spacing: 12) {
-                                Circle().fill(Garden.color(record.category)).frame(width: 8, height: 8)
+                                Circle().fill(Garden.color(record.category, styles: timer.state.categoryStyles)).frame(width: 8, height: 8)
                                 Group {
                                     if historyTab || period != .day {
                                         Text(record.startedAt, format: .dateTime.month().day().hour().minute())
@@ -232,7 +232,7 @@ struct MainWindowView: View {
                                     .help("\(record.startedAt.formatted()) — \(record.endedAt.formatted())；暂停不计入专注时长")
                                 Text(record.name).font(.system(size: 15)).lineLimit(1).help(record.name)
                                 Spacer()
-                                Text(record.tags.isEmpty ? "未分类" : record.tags.joined(separator: " · ")).font(.caption).foregroundColor(Garden.color(record.category)).lineLimit(1).frame(maxWidth: 140, alignment: .trailing)
+                                Text(record.tags.isEmpty ? "未分类" : record.tags.joined(separator: " · ")).font(.caption).foregroundColor(Garden.color(record.category, styles: timer.state.categoryStyles)).lineLimit(1).frame(maxWidth: 140, alignment: .trailing)
                                 if !record.completed { Text("提前结束").font(.caption2).foregroundColor(Garden.muted) }
                                 Text(focusDuration(historyTab ? record.seconds : record.seconds(in: summary.interval)))
                                     .font(.system(size: 13).monospacedDigit()).frame(width: 90, alignment: .trailing)
