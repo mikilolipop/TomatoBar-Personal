@@ -101,6 +101,12 @@ xattr -dr com.apple.quarantine "/Applications/TomatoBar Personal.app"
 open tomatobar-personal://startStop
 ```
 
+## 鸣谢
+
+感谢第一批客户 **nafi**、**Chiwawa** 和 **ElF**。
+
+谢谢你们在 TomatoBar Personal 起步时给予的信任与支持。
+
 ## 许可与致谢
 
 - 基于 [Ilya Voronin 的 TomatoBar](https://github.com/ivoronin/TomatoBar)（[MIT License](LICENSE)），

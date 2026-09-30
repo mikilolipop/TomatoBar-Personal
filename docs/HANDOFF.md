@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-10-01，by Codex · V1.3.1（3.9.1 / build 2）正式安装与 GitHub 发布同步；设置显示实际版本，源码构建默认 universal。Widget 仍全面取消，Personal Team 自动签名契约保留。
+最后更新：2026-10-01，by Codex · GitHub README 与下载页新增第一批客户鸣谢。V1.3.1（3.9.1 / build 2）正式安装与发布状态延续，Widget 仍全面取消，Personal Team 自动签名契约保留。
 
 ---
 
@@ -45,8 +45,8 @@ popover 和到时提醒窗。上面的限制来自旧 System Events / screencapt
 | 项 | 值 |
 |---|---|
 | ✅ **已安装版本** | **3.9.1（V1.3.1，build 2）**，`/Applications/TomatoBar Personal.app` 已替换并从该路径运行；设置页实读 `Personal · 3.9.1`；本机开发签名，arm64 + x86_64 |
-| HEAD | 顶部提交 = V1.3.1 正式安装发布准备；包含 UI 精修 `41cb08e`，此前安全锚点 `6d8c0ef` |
-| 工作区 | 版本、构建、发布文档和合成示例宣传图提交推送至 origin；真实数据与验收截图仅保留本地 |
+| HEAD | 顶部提交 = README 与网页第一批客户鸣谢；应用发布源码锚点 `9100c67`，包含 UI 精修 `41cb08e`，此前安全锚点 `6d8c0ef` |
+| 工作区 | 客户鸣谢随 README 与下载页提交推送至 origin；真实使用数据与验收截图仅保留本地 |
 | 测试 | **214 项领域 + 40 项真实桥接 + 8 项合成启动事件**全绿；Release 干净构建 + 严格签名通过 |
 | **CI** | 推送后以 HEAD 最新 run 为准；本地四套检查均已复跑 |
 | 远程 | `origin` = `mikilolipop/TomatoBar-Personal`（**public**，2026-09-29 GitHub API 实测；默认分支 `feature/personal-focus`）；`upstream` = `ivoronin/TomatoBar` |
@@ -198,6 +198,15 @@ App Groups 是付费开发者计划能力。三条路：
 CI 产物明确标注**只是编译门,不可运行**。pbxproj 中云端引入的 `SYSTEM_FRAMEWORK_SEARCH_PATHS`
 已删且未被 Xcode GUI 重新引入。**云端注意**:pbxproj 现含 Team `Z9PY2WFY9C` 与
 macosx 专属 identity 行,属本机契约的一部分,不要 Drive 反向覆盖;改动前先 `git pull`。
+
+---
+
+## 刚做完（2026-10-01，Codex 第一批客户鸣谢）
+
+- 用户明确要求公开鸣谢第一批客户，按提供的称呼与大小写写入 **nafi、Chiwawa、ElF**。
+- `README.md` 新增「鸣谢」；`site/index.html` 在安装说明下方新增同名卡片，页脚提供锚点入口。
+- 文案只感谢信任与支持，不附加身份、联系方式或未经提供的反馈；这是用户授权的署名鸣谢，外部反馈文档仍执行匿名约定。
+- 验证与发布：214 项领域基线通过，`git diff --check` 通过；提交至 origin 后通过 `scripts/deploy-site.sh` 同步 GitHub Pages，再检查公开 HTTPS 页面。本地 `file://` 预览刷新受浏览器策略阻止，不绕过该限制。不更新应用版本或发布包。
 
 ---
 
