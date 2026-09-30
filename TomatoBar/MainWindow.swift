@@ -1,9 +1,10 @@
 import SwiftUI
 import LaunchAtLogin
 import KeyboardShortcuts
+import UniformTypeIdentifiers
 
 struct MainWindowView: View {
-    let timer: TBTimer
+    @ObservedObject var timer: TBTimer
     @ObservedObject var history: FocusHistory
     @State private var period = FocusPeriod.day
     @State private var date = Date()
@@ -17,6 +18,9 @@ struct MainWindowView: View {
     @State private var deleteError: String?
     @State private var settings = false
     @State private var expandedTimer = false
+    @State private var newTodoTitle = ""
+    @State private var editingTodoID: UUID?
+    @State private var editingTodoTitle = ""
     private var summary: FocusSummary { FocusSummary(records: history.records, period: period, date: date) }
     private var filtered: FocusSummary { FocusSummary(records: history.records, period: period, date: date, category: selectedCategory) }
     private var visibleRecords: [FocusRecord] {
@@ -30,17 +34,36 @@ struct MainWindowView: View {
         VStack(spacing: 0) {
             header
             Rectangle().fill(Garden.line).frame(height: 1)
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 12) {
                 if !historyTab {
                     heading
-                    HStack(alignment: .top, spacing: 36) {
-                        summaryPanel.frame(width: 340)
+                    HStack(alignment: .top, spacing: 14) {
+                        summaryPanel
+                            .padding(16)
+                            .frame(width: 350)
+                            .frame(maxHeight: .infinity, alignment: .topLeading)
+                            .background(
+                                RoundedRectangle(cornerRadius: Garden.cornerLarge)
+                                    .fill(Garden.surface.opacity(0.36))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Garden.cornerLarge)
+                                    .stroke(Garden.line.opacity(0.34), lineWidth: 1)
+                            )
                         FocusChart(summary: filtered, styles: timer.state.categoryStyles, activity: timer.windowActivity, period: period, onDay: { date = $0; period = .day }, onRecord: { editing = $0 })
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }.frame(minHeight: 170, idealHeight: 280, maxHeight: 280)
-                    Rectangle().fill(Garden.line).frame(height: 1)
+                            .padding(16)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                            .background(
+                                RoundedRectangle(cornerRadius: Garden.cornerLarge)
+                                    .fill(Garden.surface.opacity(0.36))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Garden.cornerLarge)
+                                    .stroke(Garden.line.opacity(0.34), lineWidth: 1)
+                            )
+                    }
+                    .frame(minHeight: 150, idealHeight: 158, maxHeight: 164)
                 }
-                recordHeader
                 if let message = deleteError {
                     HStack(spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill").foregroundColor(Garden.red)
@@ -50,9 +73,31 @@ struct MainWindowView: View {
                     }.padding(.vertical, 6).padding(.horizontal, 10)
                         .background(Garden.red.opacity(0.08)).cornerRadius(6)
                 }
-                recordList
-            }.padding(.horizontal, 32).padding(.top, 23)
-            TimerCard(timer: timer, expanded: $expandedTimer).padding(20)
+                if historyTab {
+                    VStack(alignment: .leading, spacing: 10) {
+                        recordHeader
+                        recordList
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .background(
+                        RoundedRectangle(cornerRadius: Garden.cornerLarge)
+                            .fill(Garden.surface.opacity(0.30))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Garden.cornerLarge)
+                            .stroke(Garden.line.opacity(0.34), lineWidth: 1)
+                    )
+                } else {
+                    overviewLowerSection
+                }
+            }
+            .padding(.horizontal, 28)
+            .padding(.top, 14)
+            TimerCard(timer: timer, expanded: $expandedTimer)
+                .padding(.horizontal, 28)
+                .padding(.top, 10)
+                .padding(.bottom, 14)
         }.background(Garden.paper).foregroundColor(Garden.ink).accentColor(Garden.red)
             .preferredColorScheme(.light)
             .sheet(item: $editing) { record in
@@ -108,8 +153,8 @@ struct MainWindowView: View {
     }
     private var header: some View {
         HStack(spacing: 12) {
-            GardenArt(name: "PixelTomato", activity: timer.windowActivity).frame(width: 38, height: 38)
-            Text("TomatoBar").font(.system(size: 21, weight: .bold, design: .rounded))
+            GardenArt(name: "PixelTomato", activity: timer.windowActivity).frame(width: 34, height: 34)
+            Text("TomatoBar").font(.system(size: 20, weight: .bold, design: .rounded))
             Spacer().frame(width: 28)
             Button("概览") { historyTab = false; search = ""; selectedCategory = nil }.font(.system(size: 15, weight: .medium))
                 .foregroundColor(historyTab ? Garden.muted : Garden.red)
@@ -119,14 +164,14 @@ struct MainWindowView: View {
             Text("让专注，慢慢生长").font(.caption).foregroundColor(Garden.muted)
             Button { settings = true } label: { Image(systemName: "gearshape").font(.system(size: 18)) }
                 .padding(.leading, 16).help("设置").accessibilityLabel("设置")
-        }.buttonStyle(.plain).padding(.horizontal, 28).frame(height: 62)
+        }.buttonStyle(.plain).padding(.horizontal, 28).frame(height: 58)
     }
     private var heading: some View {
         HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(period == .day ? (Calendar.current.isDateInToday(date) ? "今天，把时间留给了什么？" : "这一天，把时间留给了什么？") : period == .week ? "这一周的专注时光" : "这个月，留下的点点滴滴")
-                    .font(.system(size: 36, weight: .semibold))
-                HStack(spacing: 12) {
+                    .font(.system(size: 32, weight: .semibold))
+                HStack(spacing: 10) {
                     Button { step(-1) } label: { Image(systemName: "chevron.left") }.help("上一\(period.rawValue)")
                     Text(dateTitle).font(.system(size: 13))
                     Button { step(1) } label: { Image(systemName: "chevron.right") }
@@ -139,7 +184,7 @@ struct MainWindowView: View {
                 ForEach(FocusPeriod.allCases) { option in
                     Button { period = option } label: {
                         Text(option.rawValue).font(.system(size: 15, weight: .medium))
-                            .frame(width: 48, height: 32)
+                            .frame(width: 46, height: 30)
                             .foregroundColor(period == option ? Garden.paper : Garden.ink)
                             .background(period == option ? Garden.red : .clear).cornerRadius(7)
                     }.buttonStyle(.plain).accessibilityLabel("\(option.rawValue)视图")
@@ -158,9 +203,15 @@ struct MainWindowView: View {
         if let next = Calendar.current.date(byAdding: period == .week ? .day : period.component, value: period == .week ? value * 7 : value, to: date) { date = next }
     }
     private var summaryPanel: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("\(period == .day ? "当日" : period == .week ? "本周" : "本月")累计专注（不含进行中）").font(.system(size: 13)).foregroundColor(Garden.muted)
-            Text(focusDuration(summary.seconds)).font(.system(size: 46, weight: .semibold, design: .rounded)).foregroundColor(Garden.red).minimumScaleFactor(0.7).lineLimit(1)
+        VStack(alignment: .leading, spacing: 8) {
+            Text("\(period == .day ? "当日" : period == .week ? "本周" : "本月")累计专注（不含进行中）")
+                .font(.system(size: 12))
+                .foregroundColor(Garden.muted)
+            Text(focusDuration(summary.seconds))
+                .font(.system(size: 42, weight: .semibold, design: .rounded))
+                .foregroundColor(Garden.red)
+                .minimumScaleFactor(0.72)
+                .lineLimit(1)
             ScrollView {
                 VStack(spacing: 7) {
                     ForEach(showAllCategories ? summary.categories : Array(summary.categories.prefix(5))) { category in
@@ -178,19 +229,231 @@ struct MainWindowView: View {
                         Button(showAllCategories ? "收起标签" : "展开其余 \(summary.categories.count - 5) 个标签") { showAllCategories.toggle() }
                             .buttonStyle(.plain).font(.caption).foregroundColor(Garden.muted).frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    if summary.categories.isEmpty { Text("专注之后，再来看看时间的去向。 ").font(.caption).foregroundColor(Garden.muted) }
+                    if summary.categories.isEmpty { Text("专注之后，再来看看时间的去向。").font(.caption).foregroundColor(Garden.muted) }
                 }.padding(.trailing, 8)
             }
             HStack {
-                GardenArt(name: "PixelSprout", activity: timer.windowActivity).frame(width: 46, height: 35)
+                GardenArt(name: "PixelSprout", activity: timer.windowActivity).frame(width: 38, height: 29)
                 Text("每一段投入，都有迹可循").font(.caption2).foregroundColor(Garden.muted)
                 Spacer()
             }
         }
     }
+    private var overviewLowerSection: some View {
+        HStack(alignment: .top, spacing: 14) {
+            todoPanel
+                .padding(14)
+                .frame(width: 350)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .background(
+                    RoundedRectangle(cornerRadius: Garden.cornerLarge)
+                        .fill(Garden.surface.opacity(0.30))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: Garden.cornerLarge)
+                        .stroke(Garden.line.opacity(0.34), lineWidth: 1)
+                )
+            VStack(alignment: .leading, spacing: 10) {
+                recordHeader
+                recordList
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background(
+                RoundedRectangle(cornerRadius: Garden.cornerLarge)
+                    .fill(Garden.surface.opacity(0.30))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Garden.cornerLarge)
+                    .stroke(Garden.line.opacity(0.34), lineWidth: 1)
+            )
+        }
+        .frame(maxHeight: .infinity)
+    }
+
+    private var todoPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("待办").font(.system(size: 17, weight: .semibold))
+                Text("\(timer.state.pendingTodos.count) 项未完成")
+                    .font(.caption).foregroundColor(Garden.muted)
+                Spacer()
+                if !timer.state.todos.isEmpty {
+                    Text("拖动排序").font(.caption2).foregroundColor(Garden.muted)
+                }
+            }
+
+            HStack(spacing: 8) {
+                TextField("添加待办，例如：阅读章节", text: $newTodoTitle)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+                    .padding(.horizontal, 10)
+                    .frame(height: 34)
+                    .background(
+                        RoundedRectangle(cornerRadius: Garden.cornerSmall)
+                            .fill(Garden.surface)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Garden.cornerSmall)
+                            .stroke(Garden.line.opacity(0.82), lineWidth: 1)
+                    )
+                    .onSubmit { addTodo() }
+                Button { addTodo() } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 12, weight: .semibold))
+                        .frame(width: 30, height: 30)
+                        .foregroundColor(Garden.paper)
+                        .background(Circle().fill(Garden.red))
+                }
+                .buttonStyle(.plain)
+                .disabled(newTodoTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityLabel("添加待办")
+            }
+
+            if timer.state.todos.isEmpty {
+                VStack(spacing: 8) {
+                    GardenArt(name: "PixelSprout", activity: timer.windowActivity)
+                        .frame(width: 46, height: 35)
+                    Text("把下一件想做的事写在这里")
+                        .font(.system(size: 14, weight: .medium))
+                    Text("点一下任务，就会带到下一段专注。")
+                        .font(.caption).foregroundColor(Garden.muted)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 4) {
+                        ForEach(timer.state.todos) { todo in
+                            todoRow(todo)
+                                .onDrag {
+                                    NSItemProvider(object: todo.id.uuidString as NSString)
+                                }
+                                .onDrop(of: [UTType.text], isTargeted: nil) { providers in
+                                    guard let provider = providers.first else { return false }
+                                    provider.loadObject(ofClass: NSString.self) { object, _ in
+                                        guard let raw = object as? NSString,
+                                              let sourceID = UUID(uuidString: raw as String),
+                                              sourceID != todo.id else { return }
+                                        DispatchQueue.main.async {
+                                            timer.moveTodo(id: sourceID, before: todo.id)
+                                        }
+                                    }
+                                    return true
+                                }
+                        }
+                    }
+                    .padding(.trailing, 6)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func todoRow(_ todo: FocusTodo) -> some View {
+        HStack(spacing: 8) {
+            Button { timer.toggleTodo(id: todo.id) } label: {
+                Image(systemName: todo.isCompleted ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(todo.isCompleted ? Garden.red : Garden.muted)
+            }
+            .buttonStyle(.plain)
+            .help(todo.isCompleted ? "标记为未完成" : "标记完成")
+
+            if editingTodoID == todo.id {
+                TextField("待办名称", text: $editingTodoTitle)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+                    .onSubmit { commitTodoRename(todo.id) }
+                Button { commitTodoRename(todo.id) } label: {
+                    Image(systemName: "checkmark").font(.caption)
+                }.buttonStyle(.plain)
+                Button { editingTodoID = nil } label: {
+                    Image(systemName: "xmark").font(.caption)
+                }.buttonStyle(.plain)
+            } else {
+                Button {
+                    timer.prepareTodo(todo)
+                } label: {
+                    Text(todo.title)
+                        .font(.system(size: 13, weight: timer.preparedTodoID == todo.id ? .semibold : .regular))
+                        .strikethrough(todo.isCompleted)
+                        .foregroundColor(todo.isCompleted ? Garden.muted : Garden.ink)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .help("设为下一段专注")
+
+                let seconds = timer.state.focusSeconds(forTodo: todo.id)
+                if seconds > 0 {
+                    Text(focusDuration(seconds))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundColor(Garden.muted)
+                }
+
+                if !todo.isCompleted {
+                    Button {
+                        timer.prepareTodo(todo)
+                        timer.startWork()
+                    } label: {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 9))
+                            .foregroundColor(Garden.red)
+                    }
+                    .buttonStyle(.plain)
+                    .help("立即开始这项待办")
+                    .disabled(timer.state.isTiming || timer.state.needsAttention || timer.storageError != nil)
+                }
+
+                Menu {
+                    Button("设为下一段") { timer.prepareTodo(todo) }
+                    Button("重命名") {
+                        editingTodoID = todo.id
+                        editingTodoTitle = todo.title
+                    }
+                    Button(todo.isCompleted ? "标记为未完成" : "标记完成") {
+                        timer.toggleTodo(id: todo.id)
+                    }
+                    Divider()
+                    Button("删除待办", role: .destructive) { timer.deleteTodo(id: todo.id) }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .foregroundColor(Garden.muted)
+                        .frame(width: 18)
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+            }
+        }
+        .padding(.horizontal, 9)
+        .frame(height: 34)
+        .background(
+            RoundedRectangle(cornerRadius: Garden.cornerSmall)
+                .fill(timer.preparedTodoID == todo.id ? Garden.red.opacity(0.09) : Color.clear)
+        )
+        .contentShape(Rectangle())
+        .opacity(todo.isCompleted ? 0.68 : 1)
+    }
+
+    private func addTodo() {
+        let title = newTodoTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return }
+        timer.addTodo(title)
+        newTodoTitle = ""
+    }
+
+    private func commitTodoRename(_ id: UUID) {
+        let title = editingTodoTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return }
+        timer.renameTodo(id: id, title: title)
+        editingTodoID = nil
+        editingTodoTitle = ""
+    }
+
     private var recordHeader: some View {
         HStack {
-            Text(historyTab ? "所有专注记录" : "专注记录").font(.system(size: 18, weight: .semibold))
+            Text(historyTab ? "所有专注记录" : "专注记录").font(.system(size: 17, weight: .semibold))
             if let category = selectedCategory {
                 Button { selectedCategory = nil } label: { Label(category, systemImage: "xmark.circle.fill") }.buttonStyle(.plain).font(.caption).foregroundColor(Garden.red)
             }
@@ -204,7 +467,6 @@ struct MainWindowView: View {
                 TextField("搜索名称或标签", text: $search).textFieldStyle(.roundedBorder).frame(width: 190)
             } else {
                 Text("按时间顺序").font(.caption).foregroundColor(Garden.muted)
-                GardenArt(name: "PixelPlant", activity: timer.windowActivity).frame(width: 60, height: 28)
             }
         }
     }
@@ -249,7 +511,7 @@ struct MainWindowView: View {
                                     Image(systemName: "ellipsis.circle").foregroundColor(Garden.muted)
                                 }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                                     .help("编辑或删除").accessibilityLabel("更多操作：\(record.name)")
-                            }.padding(.vertical, 12)
+                            }.padding(.vertical, 10)
                             .onHover { inside in
                                 if inside { hoverDelete = record.id }
                                 else if hoverDelete == record.id { hoverDelete = nil }
@@ -269,9 +531,12 @@ struct TimerCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 14) {
-                GardenArt(name: "PixelTomato", activity: timer.windowActivity).frame(width: 44, height: 44)
+                GardenArt(name: "PixelTomato", activity: timer.windowActivity).frame(width: 38, height: 38)
                 if timer.state.phase == .idle {
-                    TextField("下一段，想专注什么？", text: $timer.eventName).textFieldStyle(.plain).font(.system(size: 15))
+                    TextField("下一段，想专注什么？", text: Binding(
+                        get: { timer.eventName },
+                        set: { timer.setEventName($0) }
+                    )).textFieldStyle(.plain).font(.system(size: 15))
                 } else {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(timer.state.name.isEmpty ? timer.phaseLabel : timer.state.name).font(.system(size: 14, weight: .medium)).lineLimit(1)
@@ -292,7 +557,11 @@ struct TimerCard: View {
                     Button("打开记录文件夹") { timer.openRecordsFolder() }
                 }
             }
-        }.padding(.horizontal, 18).padding(.vertical, 9).background(Garden.red.opacity(0.085)).cornerRadius(9)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 8)
+        .background(Garden.red.opacity(0.075))
+        .cornerRadius(Garden.cornerMedium)
     }
 }
 
@@ -308,7 +577,12 @@ struct ExpandedTimer: View {
             HStack { Spacer(); Button("收起", action: close).keyboardShortcut(.cancelAction) }
             GardenArt(name: "PixelTomato", activity: timer.windowActivity).frame(width: 110, height: 110)
             Text(timer.phaseLabel).foregroundColor(Garden.muted)
-            if timer.state.phase == .idle { TextField("这次准备做什么？", text: $timer.eventName).textFieldStyle(.roundedBorder).frame(width: 300) }
+            if timer.state.phase == .idle {
+                TextField("这次准备做什么？", text: Binding(
+                    get: { timer.eventName },
+                    set: { timer.setEventName($0) }
+                )).textFieldStyle(.roundedBorder).frame(width: 300)
+            }
             else { Text(timer.state.name).font(.title3).lineLimit(2) }
             Text(timer.state.isTiming ? timer.timeLeft : timer.state.needsAttention ? "完成" : "\(timer.workIntervalLength):00")
                 .font(.system(size: 76, weight: .medium, design: .rounded).monospacedDigit()).foregroundColor(Garden.red)
@@ -350,20 +624,46 @@ struct MainSettings: View {
     @ObservedObject var timer: TBTimer
     let close: () -> Void
     @AppStorage("gentleAnimations") private var animations = true
+    @State private var easterEggTapCount = 0
+    @State private var lastEasterEggTap = Date.distantPast
+    @State private var easterEggNotice: String?
+
+    private func registerEasterEggTap() {
+        let now = Date()
+        if now.timeIntervalSince(lastEasterEggTap) > 2 { easterEggTapCount = 0 }
+        lastEasterEggTap = now
+        easterEggTapCount += 1
+        guard easterEggTapCount >= 7 else { return }
+        easterEggTapCount = 0
+        let enabled = timer.toggleSmokeBreakEasterEgg()
+        easterEggNotice = enabled ? "🚬 休息彩蛋已开启" : "休息彩蛋已关闭"
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { easterEggNotice = nil }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack { Text("设置").font(.title2); Spacer(); Button("完成", action: close).keyboardShortcut(.cancelAction) }
-            Stepper("专注：\(timer.workIntervalLength) 分钟", value: $timer.workIntervalLength, in: 1...180)
-            Stepper("短休息：\(timer.shortRestIntervalLength) 分钟", value: $timer.shortRestIntervalLength, in: 1...60)
-            Stepper("长休息：\(timer.longRestIntervalLength) 分钟", value: $timer.longRestIntervalLength, in: 1...60)
-            Stepper("每组：\(timer.workIntervalsInSet) 个番茄", value: $timer.workIntervalsInSet, in: 1...10)
+            GardenNumberInputRow(title: "专注", value: $timer.workIntervalLength, range: 1...180, unit: "分钟")
+            GardenNumberInputRow(title: "短休息", value: $timer.shortRestIntervalLength, range: 1...60, unit: "分钟")
+            GardenNumberInputRow(title: "长休息", value: $timer.longRestIntervalLength, range: 1...60, unit: "分钟")
+            GardenNumberInputRow(title: "每组", value: $timer.workIntervalsInSet, range: 1...10, unit: "个番茄")
             Divider()
             Toggle("轻微像素动画", isOn: $animations)
             Toggle("菜单栏显示倒计时", isOn: $timer.showTimerInMenuBar).onChange(of: timer.showTimerInMenuBar) { _ in timer.updateStatus() }
             LaunchAtLogin.Toggle("登录时启动")
             KeyboardShortcuts.Recorder("开始 / 暂停 / 继续", name: .startStopTimer)
-            Text("时长调整从下一段生效。暂停与休息不计入专注；到时显示无声提醒。每条记录的第一个标签用于统计分类，可在编辑时更改。").font(.caption).foregroundColor(Garden.muted)
-            HStack { Button("打开记录文件夹") { timer.openRecordsFolder() }; Spacer(); Text("Personal · V1.3").font(.caption).foregroundColor(Garden.muted) }
+            Text("时长可直接输入数字，并从下一段生效。暂停与休息不计入专注；到时显示无声提醒。每条记录的第一个标签用于统计分类，可在编辑时更改。").font(.caption).foregroundColor(Garden.muted)
+            HStack {
+                Button("打开记录文件夹") { timer.openRecordsFolder() }
+                Spacer()
+                if let notice = easterEggNotice {
+                    Text(notice).font(.caption).foregroundColor(Garden.muted).transition(.opacity)
+                }
+                Text("Personal · V1.3")
+                    .font(.caption).foregroundColor(Garden.muted)
+                    .contentShape(Rectangle())
+                    .onTapGesture { registerEasterEggTap() }
+            }
         }.padding(28).frame(width: 460).background(Garden.paper).foregroundColor(Garden.ink).accentColor(Garden.red)
     }
 }

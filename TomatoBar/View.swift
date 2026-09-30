@@ -1,8 +1,105 @@
+import AppKit
 import KeyboardShortcuts
 import LaunchAtLogin
 import SwiftUI
 
 extension KeyboardShortcuts.Name { static let startStopTimer = Self("startStopTimer") }
+
+private struct GardenPrimaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundColor(Garden.paper)
+            .frame(maxWidth: .infinity, minHeight: 42)
+            .padding(.horizontal, 12)
+            .background(
+                RoundedRectangle(cornerRadius: Garden.cornerMedium)
+                    .fill(Garden.red.opacity(configuration.isPressed ? 0.84 : 1.0))
+            )
+            .opacity(isEnabled ? 1 : 0.45)
+            .scaleEffect(configuration.isPressed ? 0.99 : 1)
+    }
+}
+
+private struct GardenSecondaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .medium))
+            .foregroundColor(Garden.ink)
+            .frame(maxWidth: .infinity, minHeight: 36)
+            .padding(.horizontal, 10)
+            .background(
+                RoundedRectangle(cornerRadius: Garden.cornerMedium)
+                    .fill(Garden.surface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Garden.cornerMedium)
+                    .stroke(Garden.line.opacity(0.82), lineWidth: 1)
+            )
+            .opacity(isEnabled ? 1 : 0.45)
+            .scaleEffect(configuration.isPressed ? 0.99 : 1)
+    }
+}
+
+/// Shared numeric setting row used by both the menu-bar popover and the main settings
+/// sheet. Direct typing is much faster than walking a Stepper one minute at a time.
+struct GardenNumberInputRow: View {
+    let title: String
+    @Binding var value: Int
+    let range: ClosedRange<Int>
+    let unit: String
+    @State private var draft: String
+    // SwiftUI wrapper must stay module-qualified: the domain type `FocusState`
+    // (State.swift) shadows it inside this module.
+    @SwiftUI.FocusState private var isFocused: Bool
+
+    init(title: String, value: Binding<Int>, range: ClosedRange<Int>, unit: String) {
+        self.title = title
+        self._value = value
+        self.range = range
+        self.unit = unit
+        _draft = State(initialValue: String(value.wrappedValue))
+    }
+
+    private func commitDraft() {
+        guard let parsed = Int(draft.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            draft = String(value)
+            return
+        }
+        let clamped = min(max(parsed, range.lowerBound), range.upperBound)
+        value = clamped
+        draft = String(clamped)
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(title)
+            Spacer()
+            TextField("", text: $draft)
+                .textFieldStyle(.roundedBorder)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 64)
+                .focused($isFocused)
+                .onSubmit { commitDraft() }
+                .onChange(of: isFocused) { focused in
+                    if !focused { commitDraft() }
+                }
+                .onChange(of: value) { newValue in
+                    if !isFocused { draft = String(newValue) }
+                }
+                .accessibilityLabel(title)
+                .accessibilityValue("\(value)\(unit)")
+            Text(unit)
+                .foregroundColor(Garden.muted)
+                .frame(minWidth: unit == "分钟" ? 28 : 48, alignment: .leading)
+        }
+        .font(.system(size: 13))
+    }
+}
 
 struct TBPopoverView: View {
     @ObservedObject var timer: TBTimer
@@ -10,31 +107,42 @@ struct TBPopoverView: View {
     @State private var editingRecord: FocusRecord?
     @State private var selectedTag: String?
     @State private var showCancelConfirm = false
+    @State private var quickTodoTitle = ""
     // Opening the cancel dialog freezes the clock: otherwise the timer could hit zero
     // behind the modal, addRecord fires, and 「放弃这段」 silently no-ops (phase is no
     // longer .work) leaving exactly the record the user just tried to discard.
     @State private var cancelWasPaused = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 15) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 9) {
                 GardenArt(name: "PixelTomato", activity: timer.windowActivity)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 30, height: 30)
                 Text("TomatoBar")
-                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
                 Spacer()
                 Text(timer.phaseLabel)
-                    .font(.caption)
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundColor(Garden.muted)
             }
 
             if timer.state.phase == .idle || timer.state.phase == .restFinished {
-                TextField("这次准备做什么？", text: $timer.eventName)
+                TextField("这次准备做什么？", text: Binding(
+                    get: { timer.eventName },
+                    set: { timer.setEventName($0) }
+                ))
                     .textFieldStyle(.plain)
-                    .padding(.horizontal, 12)
-                    .frame(height: 38)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.58)))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Garden.line, lineWidth: 1))
+                    .font(.system(size: 14))
+                    .padding(.horizontal, 13)
+                    .frame(height: 42)
+                    .background(
+                        RoundedRectangle(cornerRadius: Garden.cornerMedium)
+                            .fill(Garden.surface)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Garden.cornerMedium)
+                            .stroke(Garden.line.opacity(0.85), lineWidth: 1)
+                    )
                     .accessibilityLabel("事件名称")
             } else {
                 Text(timer.state.name)
@@ -51,14 +159,12 @@ struct TBPopoverView: View {
                     Button { timer.togglePause() } label: {
                         Text(timer.state.paused ? "继续" : "暂停").frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .tint(Garden.red)
+                    .buttonStyle(GardenPrimaryButtonStyle())
                     HStack(spacing: 8) {
                         Button { timer.stop() } label: {
                             Text(timer.state.phase == .work ? "结束并记录" : "结束休息")
                                 .frame(maxWidth: .infinity)
-                        }.buttonStyle(.bordered)
+                        }.buttonStyle(GardenSecondaryButtonStyle())
                         if timer.state.phase == .work {
                             Button {
                                 cancelWasPaused = timer.state.paused
@@ -66,7 +172,7 @@ struct TBPopoverView: View {
                             } label: {
                                 Text("取消专注").frame(maxWidth: .infinity)
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(GardenSecondaryButtonStyle())
                             .foregroundColor(Garden.muted)
                             .help("丢弃这段专注，不保存为记录")
                         }
@@ -74,8 +180,7 @@ struct TBPopoverView: View {
                 }
             } else if timer.state.needsAttention {
                 Button("查看到时提醒") { timer.onAttention?() }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Garden.red)
+                    .buttonStyle(GardenPrimaryButtonStyle())
                     .frame(maxWidth: .infinity)
             } else {
                 Button { timer.startWork() } label: {
@@ -83,9 +188,7 @@ struct TBPopoverView: View {
                         .font(.system(size: 15, weight: .semibold))
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .tint(Garden.red)
+                .buttonStyle(GardenPrimaryButtonStyle())
                 .disabled(timer.storageError != nil)
             }
 
@@ -94,8 +197,13 @@ struct TBPopoverView: View {
                 Spacer()
                 Text("完成 \(timer.todayCount) 个番茄")
             }
-            .font(.caption)
+            .font(.system(size: 12))
             .foregroundColor(Garden.muted)
+            .padding(.horizontal, 2)
+
+            if canPrepareNext {
+                nextTodoSection
+            }
 
             if let error = timer.storageError {
                 VStack(alignment: .leading, spacing: 5) {
@@ -114,27 +222,30 @@ struct TBPopoverView: View {
             }
             .padding(3)
             .background(Garden.line.opacity(0.30))
-            .cornerRadius(9)
+            .cornerRadius(Garden.cornerMedium)
 
             Group {
                 if tab == 0 { history }
                 else if tab == 1 { intervals }
                 else { settings }
-            }.frame(height: 320)
+            }.frame(height: canPrepareNext ? 235 : 320)
 
             Rectangle().fill(Garden.line.opacity(0.7)).frame(height: 1)
             HStack {
-                Button("打开主窗口") { TBStatusItem.shared?.showMainWindow() }
+                Button { TBStatusItem.shared?.showMainWindow() } label: {
+                    Label("打开主窗口", systemImage: "macwindow")
+                        .font(.caption)
+                }
                     .buttonStyle(.plain)
-                    .font(.caption)
                     .foregroundColor(Garden.muted)
                 Spacer()
                 Button("退出") { NSApp.terminate(nil) }
                     .buttonStyle(.plain)
-                    .foregroundColor(Garden.ink)
+                    .font(.caption)
+                    .foregroundColor(Garden.muted)
             }
         }
-        .padding(18)
+        .padding(19)
         .frame(width: 350)
         .background(Garden.paper)
         .foregroundColor(Garden.ink)
@@ -151,6 +262,109 @@ struct TBPopoverView: View {
         .onChange(of: timer.state.records) { _ in clearStaleFilter() }
     }
 
+    private var canPrepareNext: Bool {
+        timer.state.phase == .idle || timer.state.phase == .restFinished
+    }
+
+    private var nextTodoSection: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Text("接下来")
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Text("\(timer.state.pendingTodos.count) 项")
+                    .font(.caption2)
+                    .foregroundColor(Garden.muted)
+            }
+
+            if timer.state.pendingTodos.isEmpty {
+                Text("还没有待办。先记下一件想做的事。")
+                    .font(.caption)
+                    .foregroundColor(Garden.muted)
+                    .padding(.vertical, 2)
+            } else {
+                ForEach(Array(timer.state.pendingTodos.prefix(3))) { todo in
+                    HStack(spacing: 7) {
+                        Button { timer.toggleTodo(id: todo.id) } label: {
+                            Image(systemName: "circle")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(Garden.muted)
+                        }
+                        .buttonStyle(.plain)
+                        .help("标记完成")
+
+                        Button { timer.prepareTodo(todo) } label: {
+                            Text(todo.title)
+                                .font(.system(size: 12, weight: timer.preparedTodoID == todo.id ? .semibold : .regular))
+                                .foregroundColor(Garden.ink)
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+                        .help("设为下一段专注")
+
+                        Button {
+                            timer.prepareTodo(todo)
+                            timer.startWork()
+                        } label: {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 8))
+                                .foregroundColor(Garden.red)
+                        }
+                        .buttonStyle(.plain)
+                        .help("立即开始")
+                        .disabled(timer.storageError != nil || timer.state.needsAttention || timer.state.isTiming)
+                    }
+                    .padding(.horizontal, 8)
+                    .frame(height: 27)
+                    .background(
+                        RoundedRectangle(cornerRadius: Garden.cornerSmall)
+                            .fill(timer.preparedTodoID == todo.id ? Garden.red.opacity(0.09) : Garden.surface.opacity(0.72))
+                    )
+                }
+            }
+
+            HStack(spacing: 6) {
+                TextField("快速添加待办", text: $quickTodoTitle)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12))
+                    .padding(.horizontal, 9)
+                    .frame(height: 30)
+                    .background(
+                        RoundedRectangle(cornerRadius: Garden.cornerSmall)
+                            .fill(Garden.surface)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Garden.cornerSmall)
+                            .stroke(Garden.line.opacity(0.72), lineWidth: 1)
+                    )
+                    .onSubmit { addQuickTodo() }
+                Button { addQuickTodo() } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(Garden.paper)
+                        .frame(width: 26, height: 26)
+                        .background(Circle().fill(Garden.red))
+                }
+                .buttonStyle(.plain)
+                .disabled(quickTodoTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityLabel("快速添加待办")
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: Garden.cornerMedium)
+                .fill(Garden.line.opacity(0.16))
+        )
+    }
+
+    private func addQuickTodo() {
+        let title = quickTodoTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return }
+        timer.addTodo(title)
+        quickTodoTitle = ""
+    }
+
     private func popoverTab(_ title: String, value: Int) -> some View {
         Button { tab = value } label: {
             Text(title)
@@ -159,7 +373,7 @@ struct TBPopoverView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 7)
                 .background(tab == value ? Garden.red : Color.clear)
-                .cornerRadius(7)
+                .cornerRadius(Garden.cornerSmall)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
@@ -201,11 +415,13 @@ struct TBPopoverView: View {
                 }
                 if timer.state.filteredRecords(tag: selectedTag).isEmpty {
                     VStack(spacing: 10) {
-                        Image(systemName: "list.bullet.clipboard")
-                            .font(.title).foregroundColor(Garden.muted)
+                        GardenArt(name: "PixelSprout", activity: timer.windowActivity)
+                            .frame(width: 46, height: 35)
                         Text(selectedTag == nil ? "还没有专注记录" : "这个标签下还没有记录")
-                        Text("完成后可编辑名称，并添加分类或标签。")
-                            .font(.caption).foregroundColor(Garden.muted)
+                            .font(.system(size: 15, weight: .medium))
+                        Text(selectedTag == nil ? "完成一段专注后，这里会留下足迹。" : "换个标签看看，或者继续留下一段专注。")
+                            .font(.caption)
+                            .foregroundColor(Garden.muted)
                     }.frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
@@ -240,10 +456,18 @@ struct TBPopoverView: View {
                         }
                     }
                 }
-                Button("打开记录文件夹 →") { timer.openRecordsFolder() }
-                    .buttonStyle(.plain)
-                    .font(.caption)
-                    .foregroundColor(Garden.muted)
+                Button { timer.openRecordsFolder() } label: {
+                    Label("打开记录文件夹", systemImage: "folder")
+                        .font(.caption)
+                        .foregroundColor(Garden.muted)
+                        .padding(.horizontal, 10)
+                        .frame(height: 30)
+                        .background(
+                            RoundedRectangle(cornerRadius: Garden.cornerSmall)
+                                .fill(Garden.line.opacity(0.24))
+                        )
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -264,12 +488,12 @@ struct TBPopoverView: View {
     }
 
     private var intervals: some View {
-        VStack(spacing: 14) {
-            Stepper("专注：\(timer.workIntervalLength) 分钟", value: $timer.workIntervalLength, in: 1...180)
-            Stepper("短休息：\(timer.shortRestIntervalLength) 分钟", value: $timer.shortRestIntervalLength, in: 1...60)
-            Stepper("长休息：\(timer.longRestIntervalLength) 分钟", value: $timer.longRestIntervalLength, in: 1...60)
-            Stepper("每组：\(timer.workIntervalsInSet) 个番茄", value: $timer.workIntervalsInSet, in: 1...10)
-            Text("调整时长从下一段计时生效。暂停与休息不计入专注记录。")
+        VStack(spacing: 12) {
+            GardenNumberInputRow(title: "专注", value: $timer.workIntervalLength, range: 1...180, unit: "分钟")
+            GardenNumberInputRow(title: "短休息", value: $timer.shortRestIntervalLength, range: 1...60, unit: "分钟")
+            GardenNumberInputRow(title: "长休息", value: $timer.longRestIntervalLength, range: 1...60, unit: "分钟")
+            GardenNumberInputRow(title: "每组", value: $timer.workIntervalsInSet, range: 1...10, unit: "个番茄")
+            Text("可直接输入数字。专注 1–180 分钟，休息 1–60 分钟；调整从下一段生效。")
                 .font(.caption).foregroundColor(Garden.muted)
             Spacer(minLength: 0)
         }.padding(.top, 4)
@@ -360,6 +584,43 @@ struct RecordEditor: View {
         Image(systemName: "chevron.down")
             .font(.system(size: 11, weight: .semibold))
             .frame(width: 12, height: 12)
+    }
+
+    /// macOS Menu can suppress/tint SF Symbols in menu-item labels. Draw the palette chip
+    /// as a non-template NSImage so every Garden colour remains visible in the native menu.
+    private func colorSwatchImage(index: Int, selected: Bool) -> NSImage {
+        let size = NSSize(width: 14, height: 14)
+        let image = NSImage(size: size)
+        image.lockFocus()
+        defer { image.unlockFocus() }
+
+        guard Garden.colors.indices.contains(index) else {
+            image.isTemplate = false
+            return image
+        }
+
+        let rect = NSRect(x: 1, y: 1, width: 12, height: 12)
+        let chip = NSBezierPath(roundedRect: rect, xRadius: 3, yRadius: 3)
+        Garden.colorPalette[index].nsColor.setFill()
+        chip.fill()
+        NSColor.black.withAlphaComponent(0.14).setStroke()
+        chip.lineWidth = 0.7
+        chip.stroke()
+
+        if selected {
+            let check = NSBezierPath()
+            check.move(to: NSPoint(x: 3.8, y: 7.0))
+            check.line(to: NSPoint(x: 6.1, y: 4.8))
+            check.line(to: NSPoint(x: 10.2, y: 9.4))
+            check.lineWidth = 1.7
+            check.lineCapStyle = .round
+            check.lineJoinStyle = .round
+            NSColor.white.withAlphaComponent(0.96).setStroke()
+            check.stroke()
+        }
+
+        image.isTemplate = false
+        return image
     }
     private func setStyle(symbol: String?, colorIndex: Int?) {
         let key = category.lowercased()
@@ -468,7 +729,12 @@ struct RecordEditor: View {
                             Button {
                                 setStyle(symbol: currentSymbolOverride, colorIndex: index)
                             } label: {
-                                Label(label, systemImage: currentColorIndex == index ? "checkmark.circle.fill" : "circle.fill")
+                                Label {
+                                    Text(label)
+                                } icon: {
+                                    Image(nsImage: colorSwatchImage(index: index, selected: currentColorIndex == index))
+                                }
+                                .labelStyle(.titleAndIcon)
                             }
                         }
                     }
@@ -479,21 +745,29 @@ struct RecordEditor: View {
                         }
                     }
                 } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: previewSymbol)
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundColor(Garden.paper)
-                            .frame(width: 34, height: 34)
-                            .background(previewColor.opacity(0.85))
-                            .cornerRadius(7)
-                        menuChevron
-                    }
+                    // Keep the native Menu hit target, but render the visible preview in an
+                    // overlay. Borderless macOS menus can restyle their label content and
+                    // strip SwiftUI foreground/background styling; the overlay is outside
+                    // that label rendering path, so the category colour always stays visible.
+                    Color.clear
+                        .frame(width: 34, height: 34)
+                        .contentShape(RoundedRectangle(cornerRadius: 7))
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
-                .fixedSize()
-                .help(category == "未分类" ? "先设置主分类，再自定义样式" : "点击修改这个分类的图标和颜色")
-                .accessibilityLabel(category == "未分类" ? "未分类，设置主分类后可修改样式" : "修改主分类图标和颜色")
+                .frame(width: 34, height: 34)
+                .overlay {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 7)
+                            .fill(previewColor.opacity(0.85))
+                        Image(systemName: previewSymbol)
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundColor(Garden.paper)
+                    }
+                    .allowsHitTesting(false)
+                }
+                .help(category == "未分类" ? "先设置主分类，再自定义样式" : "点击彩色图标修改图标和颜色")
+                .accessibilityLabel(category == "未分类" ? "未分类，设置主分类后可修改样式" : "分类样式，点击修改图标和颜色")
                 .disabled(category == "未分类")
 
                 Menu {

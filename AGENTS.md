@@ -4,6 +4,7 @@
 
 易变状态（当前进度、下一步、已否决方案）见 [`docs/HANDOFF.md`](docs/HANDOFF.md)。
 已知问题清单见 [`docs/BACKLOG.md`](docs/BACKLOG.md)。
+匿名用户反馈与产品决策见 [`docs/USER_FEEDBACK.md`](docs/USER_FEEDBACK.md)。
 
 ---
 
@@ -73,7 +74,7 @@ macOS 菜单栏番茄钟，是 [ivoronin/TomatoBar](https://github.com/ivoronin/
 ## 命令
 
 ```sh
-scripts/test.sh     # 领域检查（当前 192 项，**以末行 PASS 数为准**，历轮修复一直在加）
+scripts/test.sh     # 领域检查（当前 214 项，**以末行 PASS 数为准**，历轮修复一直在加）
 scripts/dev-run.sh  # 一键开发闭环：优雅退出旧实例 → 测试闸门 → build.sh → 从 /tmp 启动新版。
                     # **改完代码想看效果统一跑它**（人和所有 AI 都是）。不要自己拼
                     # killall + xcodebuild：进程名带空格（"TomatoBar Personal"）杀不干净，
@@ -81,7 +82,7 @@ scripts/dev-run.sh  # 一键开发闭环：优雅退出旧实例 → 测试闸�
                     # 「专注记录尚未保存」退出闸门。有未落盘记录时它会中止并保留现场。
                     # 它只从 /tmp 起开发实例，/Applications 正式版不动；SKIP_TESTS=1 跳闸门。
 scripts/test-launch-context.sh # 8 项 AppKit 合成启动事件检查，不访问用户数据
-scripts/test-bridge.sh # 先 build.sh，再运行真实 TBTimer 检查（当前 35 项）；只使用 QA13 新建临时子目录
+scripts/test-bridge.sh # 先 build.sh，再运行真实 TBTimer 检查（当前 40 项）；只使用 QA13 新建临时子目录
 scripts/build.sh    # Release 构建到 /tmp/TomatoBar-personal-build，ad-hoc 签名 + codesign --verify --deep --strict
 scripts/seed-qa.py  # 只写入隔离的 QA12 沙盒，运行前先退出该 App
 scripts/compare-design.py
@@ -112,6 +113,7 @@ scripts/deploy-site.sh # 把 site/ 发布到 gh-pages 分支（GitHub Pages）�
 - 🚫 **不要向 `upstream` 推送任何东西。** `origin` 才是本项目的远程。
 - 🚫 **仓库现为 public**（2026-09-29 用户决定并实测确认；曾为私有）。**不要把真实个人使用数据
   提交进仓库**（文档、测试、截图里的分类/事件名注意脱敏）；可见性再变更必须用户明确决定。
+- 🚫 **公开仓库中的外部用户反馈必须匿名化。** 只保留产品需求、可复现行为和决策；不要提交反馈者姓名、账号、联系方式、个人习惯、健康/生活信息或其他可识别背景。原话如含这些信息，先改写成最小必要的匿名描述再进入 `docs/USER_FEEDBACK.md`。
 - 🚫 不要动 `~/Library/Containers/com.github.ivoronin.TomatoBar`（原版数据，用户明确保留作为后续测试数据源）。
 
 ---

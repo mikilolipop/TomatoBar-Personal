@@ -1,18 +1,47 @@
+import AppKit
 import SwiftUI
 
 enum Garden {
+    /// One source of truth for palette names and RGB values. The SwiftUI charts and the
+    /// AppKit-backed native menu swatches are derived from the same entries, so they cannot
+    /// silently drift to different shades.
+    struct PaletteColor {
+        let name: String
+        let red: Double
+        let green: Double
+        let blue: Double
+
+        var color: Color { Color(red: red, green: green, blue: blue) }
+        var nsColor: NSColor {
+            NSColor(srgbRed: CGFloat(red), green: CGFloat(green), blue: CGFloat(blue), alpha: 1)
+        }
+    }
+
+    static let colorPalette: [PaletteColor] = [
+        PaletteColor(name: "番茄红", red: 0.70, green: 0.30, blue: 0.24),
+        PaletteColor(name: "鼠尾草绿", red: 0.53, green: 0.61, blue: 0.43),
+        PaletteColor(name: "暖黄", red: 0.81, green: 0.65, blue: 0.34),
+        PaletteColor(name: "雾蓝", red: 0.48, green: 0.62, blue: 0.66),
+        PaletteColor(name: "陶土棕", red: 0.71, green: 0.54, blue: 0.40),
+        PaletteColor(name: "灰紫", red: 0.65, green: 0.59, blue: 0.70),
+        PaletteColor(name: "豆沙粉", red: 0.75, green: 0.62, blue: 0.54),
+        PaletteColor(name: "松石绿", red: 0.43, green: 0.54, blue: 0.48)
+    ]
+    static let colors: [Color] = colorPalette.map(\.color)
+    static let colorNames: [String] = colorPalette.map(\.name)
+
     static let paper = Color(red: 0.97, green: 0.94, blue: 0.88)
     static let ink = Color(red: 0.29, green: 0.20, blue: 0.15)
     static let muted = Color(red: 0.55, green: 0.47, blue: 0.38)
-    static let red = Color(red: 0.70, green: 0.30, blue: 0.24)
+    static let red = colorPalette[0].color
     static let line = Color(red: 0.86, green: 0.81, blue: 0.71)
-    static let colors: [Color] = [red, Color(red: 0.53, green: 0.61, blue: 0.43),
-        Color(red: 0.81, green: 0.65, blue: 0.34), Color(red: 0.48, green: 0.62, blue: 0.66),
-        Color(red: 0.71, green: 0.54, blue: 0.40), Color(red: 0.65, green: 0.59, blue: 0.70),
-        Color(red: 0.75, green: 0.62, blue: 0.54), Color(red: 0.43, green: 0.54, blue: 0.48)]
-    /// Human-readable names for the fixed Garden palette used by the category style menu.
-    /// Keep this array in lockstep with `colors`.
-    static let colorNames = ["番茄红", "鼠尾草绿", "暖黄", "雾蓝", "陶土棕", "灰紫", "豆沙粉", "松石绿"]
+    // Shared surfaces/radii for the main window and menu-bar popover. Keeping these
+    // tokens here prevents the two UI surfaces from drifting into separate visual systems.
+    static let surface = Color(red: 0.985, green: 0.965, blue: 0.925)
+    static let surfaceMuted = Color(red: 0.93, green: 0.88, blue: 0.79)
+    static let cornerSmall: CGFloat = 7
+    static let cornerMedium: CGFloat = 10
+    static let cornerLarge: CGFloat = 14
     /// Categories offered in the record editor. These are suggestions only: choosing one
     /// tags that record and nothing else — no sample records, no edits to existing ones,
     /// no invented statistics.
@@ -137,7 +166,7 @@ struct FocusChart: View {
         return result
     }
     private func tileWidth(_ record: FocusRecord, available: CGFloat) -> CGFloat {
-        min(max(1, available), max(44, min(200, CGFloat(record.seconds(in: summary.interval) / 60) * 4.0)))
+        min(max(1, available), max(64, min(200, CGFloat(record.seconds(in: summary.interval) / 60) * 4.0)))
     }
     private var dayChart: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -154,7 +183,7 @@ struct FocusChart: View {
                                 Button { onRecord(record) } label: {
                                     Image(systemName: FocusState.styleSymbol(in: styles, forCategory: record.category) ?? Garden.symbol(record.category)).font(.system(size: 22, weight: .medium))
                                         .foregroundColor(Garden.paper)
-                                        .frame(width: tileWidth(record, available: geometry.size.width - 8), height: 68)
+                                        .frame(width: tileWidth(record, available: geometry.size.width - 8), height: 64)
                                         .background(Garden.color(record.category, styles: styles).opacity(0.85))
                                         .cornerRadius(5)
                                 }.buttonStyle(.plain).help("\(record.name) · \(record.category) · \(focusDuration(record.seconds(in: summary.interval)))")

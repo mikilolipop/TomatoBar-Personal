@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-09-30，by Claude Code · 项目已迁入 `~/Developer/番茄钟项目/TomatoBar` 并调试通过；Drive 第二轮同步（分类颜色覆盖）已核验集成、补 18 项领域测试，领域 192 / 桥接 35 / 启动 8 全绿
+最后更新：2026-09-30，by Claude Code · Drive 第三~六轮云端同步全部核验集成（弹层重设计/待办清单/数值输入行/🚬彩蛋/主窗口扩写），领域 214 / 桥接 40 / 启动 8 全绿，本 commit 为云端 Widget 开发前的安全锚点
 
 ---
 
@@ -39,13 +39,13 @@ first process whose unix id is 40847（QA13 的 pid）  →  读到的 bid 是 c
 
 | 项 | 值 |
 |---|---|
-| ✅ **已安装版本** | **3.9.0（V1.3）**，`/Applications/TomatoBar Personal.app`（前轮构建安装；**本轮代码改动只过了 Release 构建验证,未重新构建安装、未重启应用**） |
-| HEAD | 顶部提交 = 2026-09-30 Drive 第二轮同步集成（分类颜色覆盖 symbol\|index 编码 + 18 项领域测试）← Drive UI 重构集成（View/MainWindow + State.allCategories + 测试/文档）← `79e13ad`（公开确认归档）← `4139124`/`60706a5`（评审第三轮） |
-| 工作区 | 干净，全部已提交推送（Drive 一次性探针文件已移出仓库，见「刚做完」） |
-| 测试 | **192 项领域 + 35 项真实桥接 + 8 项合成启动事件**全绿；Release 干净构建 + 严格签名通过 |
+| ✅ **已安装版本** | **3.9.0（V1.3）**，`/Applications/TomatoBar Personal.app`（未动；菜单栏实际跑的是 `/tmp` 最新构建，经 dev-run 启动，数据容器共用） |
+| HEAD | 顶部提交 = 2026-09-30 云端多轮同步集成的安全锚点（待办清单/数值输入行/🚬彩蛋/主窗口扩写）← Drive 第二轮同步集成（分类颜色覆盖）← Drive UI 重构集成 ← `79e13ad` ← `4139124`/`60706a5` |
+| 工作区 | 干净，全部已提交推送（约 1100 行云端代码 + 文档） |
+| 测试 | **214 项领域 + 40 项真实桥接 + 8 项合成启动事件**全绿；Release 干净构建 + 严格签名通过 |
 | **CI** | 推送后以 HEAD 最新 run 为准；本地四套检查均已复跑 |
 | 远程 | `origin` = `mikilolipop/TomatoBar-Personal`（**public**，2026-09-29 GitHub API 实测；默认分支 `feature/personal-focus`）；`upstream` = `ivoronin/TomatoBar` |
-| 用户真实数据 | 前轮记载 2 条；**本轮未读取、未写入正式容器，也未退出正式应用**，不把旧数据量当作当前复查结果 |
+| 用户真实数据 | 本轮实读容器：正式容器现 **1 条记录（「hi」，提前结束）+ 2 个待办**。9 月底的 2 条旧记录（「未命名专注」25分/「测试」1分）已不在盘上，**用户是否手动删除尚未确认**；完整快照在 `TomatoBarBuildBackups/sessions-prod-before-fixQA-20260929-103622.json`，需要时可恢复 |
 | QA 隔离环境 | 旧 QA13 app 未重建启动；本轮桥接检查只在 QA13 的新建 review-UUID 子目录做合成 IO，完成后清理该子目录；既有 QA13 sessions 未改 |
 | git 身份 | 本仓库 `--local`：`mikilolipop <207336577+mikilolipop@users.noreply.github.com>`（全局仍未设置） |
 
@@ -122,6 +122,41 @@ V1.3 已按用户决定定稿上线，不再往这个版本里加东西。后续
   `max(44, …)` 最小宽度分支。该分支在 UI 层，`scripts/test.sh` 编译不进去，**只能靠眼睛看**。
   注意：QA12 沙盒容器还在，但 **QA12 的 .app 本体已不存在**，需先造一个 QA12 bundle ID 的构建变体；
   QA13 已经在本轮建过并可用（见「QA13 复现方式」），不必复用 QA12。
+
+---
+
+## 刚做完（2026-09-30，Claude Code 编译闸门：Drive 第三~六轮云端同步逐轮核验 + 安全锚点提交）
+
+**分工变更（用户明确指令）**：云端 agent 负责改代码（git push 到 origin 或 Drive 直改工作区），
+本地 Claude Code **只做编译验证与把关**——四套闸门 + Release 构建全绿才放行,缺陷报告不顺手修。
+本 commit 即用户要求的「全绿安全锚点」，**下一站：桌面 Widget 开发**（云端主导）。
+
+**逐轮核验入库**（每轮都跑满 领域/桥接/构建/启动，全绿才继续）：
+1. **弹层重设计 + 设计 token**：`Garden.surface/surfaceMuted/corner*` 统一两套 UI；
+   `GardenPrimary/SecondaryButtonStyle` 替换系统按钮样式；空态换 `PixelSprout`（资源已确认存在）。
+2. **待办清单（FocusTodo）**：`FocusState.todos` + `activeTodoID` + `FocusRecord.todoID`（后改 `seriesTodoID`），
+   全部 `decodeIfPresent` 旧文件兼容；云端自带测试 174→204。
+3. **数值输入行 + 🚬 彩蛋**：Stepper 换成 `GardenNumberInputRow`（直输+clamp+焦点回滚）；
+   彩蛋仅 `@AppStorage` 驱动的 rest 菜单栏视觉,不碰业务逻辑；新增 `docs/USER_FEEDBACK.md`（匿名化规则）。
+4. **主窗口扩写 + 收尾**：MainWindow 约 337 行新 UI；204→214。
+
+**闸门抓到的唯一编译事故（已修+已转告）**：View.swift 用 SwiftUI `@FocusState` 属性包装器,
+被本模块领域类型 `struct FocusState` 遮蔽 → `BUILD FAILED`。修复：`@SwiftUI.FocusState` 模块限定名。
+**约定**：UI 代码凡用 SwiftUI `FocusState`/`$`投影,一律写限定名,否则同名领域类型一遮就挂。
+
+**上轮评审意见被云端吸收**：`deleteTodo` 现清理 `activeTodoID`/`seriesTodoID`；AGENTS 不变量 #1
+措辞已改为「计时逻辑不得直接读取隐式时钟,须显式 `now: Date`」（默认参数豁免成文）。
+**未确认项**：`startWork` 的 `preparedTodoID` 在 no-op 路径是否仍会被无条件清掉。
+
+**⚠️ Drive 元数据破坏（本轮 3 次）**：`dev-run.sh` 执行位被剥（100755→100644）、
+6 个源文件权限降成 600——均恢复。**每轮编译前检查 `git diff --summary` 的 mode change 与 ls -l。**
+
+**正式容器实录（读非写）**：一次 dev-run 被「专注记录尚未保存」退出闸门正确拦停（storageError 挂起,
+未强杀,数据无损）；用户处理后再跑通过。盘上现为 1 记录（「hi」）+ 2 待办；9 月底 2 条旧记录消失,
+是否用户手删**未确认**——备份快照可恢复,见「当前状态」表。
+
+**未做/待人工**：待办列表、输入行、彩蛋、主窗口新布局的**观感**均未实机验收（无屏幕录制权限）,
+用户目测中；`/Applications` 正式版未动,定版需另走安装流程。
 
 ---
 

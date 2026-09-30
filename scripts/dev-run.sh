@@ -1,5 +1,5 @@
 #!/bin/sh
-# dev-run.sh — 一键「退出旧实例 → 领域测试 → Release 构建 → 启动新版」的开发闭环。
+# dev-run.sh — 一键「退出旧实例 → 领域测试 → Release 构建 → 桥接/启动检查 → 启动新版」的开发闭环。
 # 供所有 AI（Claude Code / Codex / 经 Drive 改码的外部 agent）与用户本人统一调用:
 # 改完代码想目观感,跑这一个脚本,不要用 ⌘R,更不要自己拼 killall + xcodebuild。
 #
@@ -33,7 +33,7 @@ if pgrep -x "$APP" >/dev/null 2>&1; then
     *) quit_target="$BUNDLE" ;;
   esac
 
-  echo "1/4 优雅退出旧实例（若有未保存的专注记录会被拦下,脚本随之中止,不杀）..."
+  echo "1/5 优雅退出旧实例（若有未保存的专注记录会被拦下,脚本随之中止,不杀）..."
   if [ "$quit_target" = "$BUNDLE" ]; then
     osascript -e "with timeout of 10 seconds
       tell application id \"$BUNDLE\" to quit
@@ -56,17 +56,17 @@ if pgrep -x "$APP" >/dev/null 2>&1; then
     exit 1
   fi
 else
-  echo "1/4 没有在跑的实例,跳过退出。"
+  echo "1/5 没有在跑的实例,跳过退出。"
 fi
 
-echo "2/4 领域测试闸门..."
+echo "2/5 领域测试闸门..."
 if [ "${SKIP_TESTS:-0}" = "1" ]; then
   echo "  （SKIP_TESTS=1,已跳过）"
 else
   sh scripts/test.sh | tail -1
 fi
 
-echo "3/4 Release 构建 + 严格签名（scripts/build.sh）..."
+echo "3/5 Release 构建 + 严格签名（scripts/build.sh）..."
 sh scripts/build.sh > /tmp/tomatobar-dev-run-build.log 2>&1 || {
   echo "✗ 构建失败,日志尾部:" >&2
   tail -25 /tmp/tomatobar-dev-run-build.log >&2
@@ -75,7 +75,15 @@ sh scripts/build.sh > /tmp/tomatobar-dev-run-build.log 2>&1 || {
 grep -q "BUILD SUCCEEDED" /tmp/tomatobar-dev-run-build.log
 echo "  BUILD SUCCEEDED（日志:/tmp/tomatobar-dev-run-build.log）"
 
-echo "4/4 启动新版（/tmp 构建产物;容器与正式版共用,数据无损延续）..."
+echo "4/5 桥接 + 启动上下文回归检查..."
+if [ "${SKIP_TESTS:-0}" = "1" ]; then
+  echo "  （SKIP_TESTS=1,已跳过）"
+else
+  sh scripts/test-bridge.sh | tail -1
+  sh scripts/test-launch-context.sh | tail -1
+fi
+
+echo "5/5 启动新版（/tmp 构建产物;容器与正式版共用,数据无损延续）..."
 [ -d "$NEW_APP" ] || { echo "✗ 产物缺失:$NEW_APP" >&2; exit 1; }
 open "$NEW_APP"
 sleep 1

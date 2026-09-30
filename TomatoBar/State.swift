@@ -17,9 +17,11 @@ struct FocusRecord: Codable, Identifiable, Equatable {
     let completed: Bool
     let segments: [FocusSegment]
     var tags: [String]
+    /// Optional task link. Older records decode with nil, so existing history stays intact.
+    let todoID: UUID?
 
     init(id: UUID, name: String, startedAt: Date, endedAt: Date, plannedSeconds: TimeInterval,
-         completed: Bool, segments: [FocusSegment], tags: [String] = []) {
+         completed: Bool, segments: [FocusSegment], tags: [String] = [], todoID: UUID? = nil) {
         self.id = id
         self.name = name
         self.startedAt = startedAt
@@ -28,10 +30,11 @@ struct FocusRecord: Codable, Identifiable, Equatable {
         self.completed = completed
         self.segments = segments
         self.tags = Self.normalizedTags(tags)
+        self.todoID = todoID
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, startedAt, endedAt, plannedSeconds, completed, segments, tags
+        case id, name, startedAt, endedAt, plannedSeconds, completed, segments, tags, todoID
     }
 
     init(from decoder: Decoder) throws {
@@ -44,6 +47,7 @@ struct FocusRecord: Codable, Identifiable, Equatable {
         completed = try values.decode(Bool.self, forKey: .completed)
         segments = try values.decode([FocusSegment].self, forKey: .segments)
         tags = Self.normalizedTags(try values.decodeIfPresent([String].self, forKey: .tags) ?? [])
+        todoID = try values.decodeIfPresent(UUID.self, forKey: .todoID)
     }
 
     static func normalizedTags(_ tags: [String]) -> [String] {
@@ -85,6 +89,23 @@ struct FocusRecord: Codable, Identifiable, Equatable {
     }
 }
 
+struct FocusTodo: Codable, Identifiable, Equatable {
+    let id: UUID
+    var title: String
+    var isCompleted: Bool
+    let createdAt: Date
+    var completedAt: Date?
+
+    init(id: UUID = UUID(), title: String, isCompleted: Bool = false,
+         createdAt: Date, completedAt: Date? = nil) {
+        self.id = id
+        self.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.isCompleted = isCompleted
+        self.createdAt = createdAt
+        self.completedAt = completedAt
+    }
+}
+
 /// All timing decisions accept a clock value so pause, completion and recovery are testable.
 struct FocusState: Codable {
     var phase: FocusPhase = .idle
@@ -98,7 +119,17 @@ struct FocusState: Codable {
     var segments: [FocusSegment] = []
     var rounds = 0
     var records: [FocusRecord] = []
-    var checkpoint = Date()
+    /// Lightweight task list shared by the main window and the menu-bar popover.
+    /// Array order is the user's manual order; completion never auto-deletes an item.
+    var todos: [FocusTodo] = []
+    /// The task associated with the currently running focus, if any.
+    var activeTodoID: UUID?
+    /// The task context for the current Pomodoro set. Unlike `activeTodoID`, this survives
+    /// work completion and rest so 「开始下一轮」 keeps attributing later rounds to the same
+    /// task. It is cleared when the set ends, the focus is cancelled, the task is completed
+    /// or deleted, or the user explicitly prepares a different/manual target.
+    var seriesTodoID: UUID?
+    var checkpoint = Date.distantPast
     /// Per-category visual overrides, keyed by lowercased category name. Values keep the
     /// original bare-SF-Symbol format and may also carry a colour palette index, so old
     /// sessions.json files remain compatible while icon and colour can be edited separately.
@@ -106,7 +137,7 @@ struct FocusState: Codable {
 
     private enum CodingKeys: String, CodingKey {
         case phase, paused, name, startedAt, segmentStart, deadline, remaining, planned,
-             segments, rounds, records, checkpoint, categoryStyles
+             segments, rounds, records, todos, activeTodoID, seriesTodoID, checkpoint, categoryStyles
     }
 
     /// Declaring any init suppresses the implicit memberwise one, and every property has
@@ -129,6 +160,18 @@ struct FocusState: Codable {
         segments = try v.decode([FocusSegment].self, forKey: .segments)
         rounds = try v.decode(Int.self, forKey: .rounds)
         records = try v.decode([FocusRecord].self, forKey: .records)
+        todos = try v.decodeIfPresent([FocusTodo].self, forKey: .todos) ?? []
+        activeTodoID = try v.decodeIfPresent(UUID.self, forKey: .activeTodoID)
+        seriesTodoID = try v.decodeIfPresent(UUID.self, forKey: .seriesTodoID)
+        // Compatibility for states written before seriesTodoID existed. A live work can
+        // reuse its active link; finished/rest states can reuse the newest record's link.
+        if seriesTodoID == nil {
+            if phase == .work {
+                seriesTodoID = activeTodoID
+            } else if phase == .workFinished || phase == .rest || phase == .restFinished {
+                seriesTodoID = records.first?.todoID
+            }
+        }
         checkpoint = try v.decode(Date.self, forKey: .checkpoint)
         categoryStyles = try v.decodeIfPresent([String: String].self, forKey: .categoryStyles) ?? [:]
     }
@@ -155,6 +198,54 @@ struct FocusState: Codable {
     func filteredRecords(tag: String?) -> [FocusRecord] {
         guard let tag = tag else { return records }
         return records.filter { $0.hasTag(tag) }
+    }
+
+    var pendingTodos: [FocusTodo] { todos.filter { !$0.isCompleted } }
+
+    func focusSeconds(forTodo id: UUID) -> TimeInterval {
+        records.filter { $0.todoID == id }.reduce(0) { $0 + $1.seconds }
+    }
+
+    @discardableResult
+    mutating func addTodo(title: String, at now: Date) -> UUID? {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let todo = FocusTodo(title: trimmed, createdAt: now)
+        todos.append(todo)
+        return todo.id
+    }
+
+    mutating func renameTodo(id: UUID, title: String) {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let index = todos.firstIndex(where: { $0.id == id }) else { return }
+        todos[index].title = trimmed
+    }
+
+    mutating func toggleTodo(id: UUID, at now: Date) {
+        guard let index = todos.firstIndex(where: { $0.id == id }) else { return }
+        todos[index].isCompleted.toggle()
+        todos[index].completedAt = todos[index].isCompleted ? now : nil
+        // Completing a task means the NEXT round should not keep inheriting it. Preserve
+        // activeTodoID so a currently running focus still records the task it started from.
+        if todos[index].isCompleted, seriesTodoID == id { seriesTodoID = nil }
+    }
+
+    mutating func deleteTodo(id: UUID) {
+        todos.removeAll { $0.id == id }
+        if activeTodoID == id { activeTodoID = nil }
+        if seriesTodoID == id { seriesTodoID = nil }
+    }
+
+    /// Reorder by identity so drag/drop remains stable even when completion state changes.
+    mutating func moveTodo(id: UUID, before targetID: UUID?) {
+        guard id != targetID, let source = todos.firstIndex(where: { $0.id == id }) else { return }
+        let item = todos.remove(at: source)
+        guard let targetID = targetID,
+              let target = todos.firstIndex(where: { $0.id == targetID }) else {
+            todos.append(item)
+            return
+        }
+        todos.insert(item, at: target)
     }
 
     /// `categoryStyles` defaults to nil so callers that only rename or retag leave the
@@ -266,10 +357,15 @@ struct FocusState: Codable {
         max(0, deadline?.timeIntervalSince(now) ?? remaining)
     }
 
-    mutating func startWork(name: String, seconds: TimeInterval, at now: Date) {
+    mutating func startWork(name: String, seconds: TimeInterval, todoID: UUID? = nil, at now: Date) {
         guard phase == .idle || phase == .restFinished else { return }
         self.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         if self.name.isEmpty { self.name = "未命名专注" }
+        // An explicit task selection wins. Otherwise only a rest-finished round inherits
+        // the existing series; a fresh idle start never accidentally revives stale context.
+        let resolvedTodoID = todoID ?? (phase == .restFinished ? seriesTodoID : nil)
+        activeTodoID = resolvedTodoID
+        seriesTodoID = resolvedTodoID
         phase = .work
         startedAt = now
         segments = []
@@ -333,6 +429,8 @@ struct FocusState: Codable {
         segmentStart = nil
         remaining = 0
         paused = false
+        activeTodoID = nil
+        seriesTodoID = nil
         rounds = 0
     }
 
@@ -345,6 +443,8 @@ struct FocusState: Codable {
         phase = .idle
         startedAt = nil
         segments = []
+        activeTodoID = nil
+        seriesTodoID = nil
         deadline = nil
         segmentStart = nil
         remaining = 0
@@ -367,9 +467,11 @@ struct FocusState: Codable {
     private mutating func addRecord(completed: Bool, at now: Date) {
         guard let start = startedAt else { return }
         records.insert(FocusRecord(id: UUID(), name: name, startedAt: start, endedAt: now,
-                                   plannedSeconds: planned, completed: completed, segments: segments), at: 0)
+                                   plannedSeconds: planned, completed: completed, segments: segments,
+                                   todoID: activeTodoID), at: 0)
         startedAt = nil
         segments = []
+        activeTodoID = nil
     }
 }
 

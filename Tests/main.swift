@@ -94,9 +94,9 @@ let backupData = try Data(contentsOf: backup)
 check(backupData == legacyData, "legacy backup retains exact bytes")
 let original = editable.records[0]
 let originalPhase = editable.phase
-try editable.editRecord(id: original.id, name: "  材料力学作业  ", tags: [" 学习 ", "", "学习", "Swift", "swift", "材料力学"])
+try editable.editRecord(id: original.id, name: "  课程任务  ", tags: [" 学习 ", "", "学习", "Swift", "swift", "课程"])
 let edited = editable.records[0]
-check(edited.name == "材料力学作业" && edited.tags == ["学习", "Swift", "材料力学"], "rename and normalize tags")
+check(edited.name == "课程任务" && edited.tags == ["学习", "Swift", "课程"], "rename and normalize tags")
 check(edited.id == original.id && edited.startedAt == original.startedAt && edited.endedAt == original.endedAt && edited.completed == original.completed && edited.plannedSeconds == original.plannedSeconds && edited.seconds == original.seconds && editable.phase == originalPhase, "editing preserves identity, timing, status and active phase")
 check(editable.filteredRecords(tag: "SWIFT").map(\.id) == [original.id], "filter tags case-insensitively")
 check(editable.filteredRecords(tag: nil).count == editable.records.count && editable.filteredRecords(tag: "不存在").isEmpty, "all and empty tag filters")
@@ -446,6 +446,9 @@ func legacyMatches(_ object: [String: Any]) throws -> Bool {
     let left = try JSONSerialization.jsonObject(with: JSONEncoder().encode(legacy)) as! NSDictionary
     var right = try JSONSerialization.jsonObject(with: JSONEncoder().encode(current)) as! [String: Any]
     right.removeValue(forKey: "categoryStyles")
+    right.removeValue(forKey: "todos")
+    right.removeValue(forKey: "activeTodoID")
+    right.removeValue(forKey: "seriesTodoID")
     return left.isEqual(to: right)
 }
 func bothReject(_ object: [String: Any]) throws -> Bool {
@@ -579,3 +582,110 @@ check(catState.allCategories.count == 3 && catState.allCategories.contains("科�
 check(catState.allCategories == catState.allCategories.sorted { $0.localizedStandardCompare($1) == .orderedAscending },
       "allCategories is sorted the same way as allTags")
 print("PASS: \(checks) total checks including primary-category menu contract")
+
+
+// Todo list + focus linkage (2026-09-30): tasks persist independently from focus records.
+// Completing a focus must NEVER auto-complete its task; the task checkmark is an explicit user action.
+var todoState = FocusState()
+let todoA = todoState.addTodo(title: "  阅读章节  ", at: base)!
+let todoB = todoState.addTodo(title: "整理笔记", at: base.addingTimeInterval(1))!
+let todoC = todoState.addTodo(title: "项目整理", at: base.addingTimeInterval(2))!
+check(todoState.todos.map(\.title) == ["阅读章节", "整理笔记", "项目整理"],
+      "todo titles are trimmed and preserve manual insertion order")
+check(todoState.pendingTodos.count == 3, "new todos start unfinished")
+todoState.moveTodo(id: todoC, before: todoA)
+check(todoState.todos.map(\.id) == [todoC, todoA, todoB], "todo reorder is identity-based and stable")
+todoState.renameTodo(id: todoA, title: "阅读第二章")
+check(todoState.todos.first { $0.id == todoA }?.title == "阅读第二章", "todo rename persists the edited title")
+todoState.startWork(name: "阅读第二章", seconds: 60, todoID: todoA, at: base)
+todoState.tick(at: base.addingTimeInterval(60))
+check(todoState.records.first?.todoID == todoA, "finished focus keeps the originating todo id")
+check(todoState.seriesTodoID == todoA && todoState.activeTodoID == nil,
+      "work completion keeps the series task but clears the per-round active link")
+check(todoState.focusSeconds(forTodo: todoA) == 60, "todo aggregates linked focus duration")
+check(todoState.todos.first { $0.id == todoA }?.isCompleted == false,
+      "finishing a focus does not auto-complete the todo")
+
+// Multi-round regression: work -> rest -> next work must keep attributing every round to
+// the same task until the user ends the set, completes/deletes it, or explicitly switches.
+todoState.startRest(seconds: 10, at: base.addingTimeInterval(61))
+todoState.tick(at: base.addingTimeInterval(71))
+check(todoState.phase == .restFinished && todoState.seriesTodoID == todoA,
+      "rest completion preserves the current task series")
+todoState.startWork(name: "阅读第二章", seconds: 60, at: base.addingTimeInterval(72))
+check(todoState.activeTodoID == todoA && todoState.seriesTodoID == todoA,
+      "next round inherits the series task without a new explicit todo id")
+todoState.tick(at: base.addingTimeInterval(132))
+check(todoState.records.prefix(2).allSatisfy { $0.todoID == todoA } &&
+      todoState.focusSeconds(forTodo: todoA) == 120,
+      "multiple rounds aggregate under one todo")
+todoState.stop(at: base.addingTimeInterval(133))
+check(todoState.phase == .idle && todoState.seriesTodoID == nil,
+      "ending the set clears the carried todo context")
+
+todoState.toggleTodo(id: todoA, at: base.addingTimeInterval(134))
+check(todoState.todos.first { $0.id == todoA }?.isCompleted == true &&
+      todoState.todos.first { $0.id == todoA }?.completedAt != nil,
+      "todo completion is explicit and records a completion time")
+todoState.toggleTodo(id: todoA, at: base.addingTimeInterval(135))
+check(todoState.todos.first { $0.id == todoA }?.isCompleted == false &&
+      todoState.todos.first { $0.id == todoA }?.completedAt == nil,
+      "uncompleting a todo clears its completion time")
+let todoEncoded = try JSONEncoder().encode(todoState)
+let todoRoundTrip = try JSONDecoder().decode(FocusState.self, from: todoEncoded)
+check(todoRoundTrip.todos == todoState.todos && todoRoundTrip.records.first?.todoID == todoA &&
+      todoRoundTrip.seriesTodoID == nil,
+      "todos, record linkage and cleared series context survive save/load")
+var todoLegacyObject = try JSONSerialization.jsonObject(with: todoEncoded) as! [String: Any]
+todoLegacyObject.removeValue(forKey: "todos")
+todoLegacyObject.removeValue(forKey: "activeTodoID")
+todoLegacyObject.removeValue(forKey: "seriesTodoID")
+var todoLegacyRecords = todoLegacyObject["records"] as! [[String: Any]]
+for index in todoLegacyRecords.indices { todoLegacyRecords[index].removeValue(forKey: "todoID") }
+todoLegacyObject["records"] = todoLegacyRecords
+let todoLegacyData = try JSONSerialization.data(withJSONObject: todoLegacyObject)
+let todoLegacy = try JSONDecoder().decode(FocusState.self, from: todoLegacyData)
+check(todoLegacy.todos.isEmpty && todoLegacy.activeTodoID == nil && todoLegacy.seriesTodoID == nil &&
+      todoLegacy.records.allSatisfy { $0.todoID == nil },
+      "pre-todo sessions.json files still decode with empty task state")
+todoState.deleteTodo(id: todoB)
+check(!todoState.todos.contains { $0.id == todoB }, "deleting a todo removes only that task")
+
+// A pre-series saved state can still recover continuation from the newest linked record.
+var preSeries = FocusState()
+let legacySeriesTodo = preSeries.addTodo(title: "兼容任务", at: base)!
+preSeries.startWork(name: "兼容任务", seconds: 30, todoID: legacySeriesTodo, at: base)
+preSeries.tick(at: base.addingTimeInterval(30))
+preSeries.startRest(seconds: 10, at: base.addingTimeInterval(31))
+preSeries.tick(at: base.addingTimeInterval(41))
+var preSeriesObject = try JSONSerialization.jsonObject(with: JSONEncoder().encode(preSeries)) as! [String: Any]
+preSeriesObject.removeValue(forKey: "seriesTodoID")
+let recoveredSeries = try JSONDecoder().decode(FocusState.self, from: JSONSerialization.data(withJSONObject: preSeriesObject))
+check(recoveredSeries.phase == .restFinished && recoveredSeries.seriesTodoID == legacySeriesTodo,
+      "pre-series rest state infers continuation from the newest linked focus")
+
+// Completing a task between rounds stops continuation without rewriting the focus record
+// that just finished.
+var completionBreak = FocusState()
+let completionTodo = completionBreak.addTodo(title: "完成后停止", at: base)!
+completionBreak.startWork(name: "完成后停止", seconds: 10, todoID: completionTodo, at: base)
+completionBreak.tick(at: base.addingTimeInterval(10))
+completionBreak.toggleTodo(id: completionTodo, at: base.addingTimeInterval(11))
+check(completionBreak.seriesTodoID == nil && completionBreak.records.first?.todoID == completionTodo,
+      "completing a todo stops future inheritance but keeps finished history linked")
+
+// Deleting the task linked to an in-progress focus must clear both live and series links.
+// Otherwise the record written at completion would persist a dangling todoID.
+var activeTodoState = FocusState()
+let activeTodo = activeTodoState.addTodo(title: "临时任务", at: base)!
+activeTodoState.startWork(name: "临时任务", seconds: 60, todoID: activeTodo, at: base)
+check(activeTodoState.phase == .work && activeTodoState.activeTodoID == activeTodo &&
+      activeTodoState.seriesTodoID == activeTodo,
+      "starting from a todo records the live and series task association")
+activeTodoState.deleteTodo(id: activeTodo)
+check(activeTodoState.phase == .work && activeTodoState.activeTodoID == nil && activeTodoState.seriesTodoID == nil,
+      "deleting the active todo clears task links without interrupting focus")
+activeTodoState.tick(at: base.addingTimeInterval(60))
+check(activeTodoState.records.first?.todoID == nil,
+      "a focus completed after its todo was deleted does not persist a dangling todo id")
+print("PASS: \(checks) total checks including todo persistence and multi-round linkage")

@@ -22,7 +22,7 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let reminder = TBReminder()
     private var launchContext = LaunchContext()
     static var shared: TBStatusItem?
-    private static let mainWindowMinContent = NSSize(width: 780, height: 620)
+    private static let mainWindowMinContent = NSSize(width: 960, height: 620)
 
     func applicationWillFinishLaunching(_: Notification) {
         launchContext.observe(NSAppleEventManager.shared().currentAppleEvent)
@@ -77,7 +77,7 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func showMainWindow() {
         popover.performClose(nil)
         if mainWindow == nil {
-            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1120, height: 800),
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1180, height: 760),
                 styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
             window.title = "TomatoBar · 专注时光"
             window.titlebarAppearsTransparent = true
@@ -91,7 +91,7 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
             // controller's own minimum (≈0 once sizingOptions is cleared), so this must
             // run after the assignment or the window can shrink past the layout's floor.
             window.contentMinSize = Self.mainWindowMinContent
-            window.setContentSize(NSSize(width: 1120, height: 800))
+            window.setContentSize(NSSize(width: 1180, height: 760))
             window.center()
             window.setFrameAutosaveName("TomatoBarMainWindow")
             mainWindow = window
@@ -147,6 +147,21 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
         statusBarItem?.button?.toolTip = "番茄钟 · \(model.phaseLabel)"
     }
     func setIcon(name: NSImage.Name) { statusBarItem?.button?.image = NSImage(named: name) }
+    /// Render the easter-egg emoji as a real status-item image so the normal timer title
+    /// can remain beside it. Keep it non-template to preserve the native color emoji.
+    func setEmojiIcon(_ emoji: String) {
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
+            let text = NSAttributedString(string: emoji, attributes: [
+                .font: NSFont.systemFont(ofSize: 13.5)
+            ])
+            let size = text.size()
+            text.draw(at: NSPoint(x: (rect.width - size.width) / 2,
+                                  y: (rect.height - size.height) / 2 - 0.5))
+            return true
+        }
+        image.isTemplate = false
+        statusBarItem?.button?.image = image
+    }
     func showPopover(_ sender: AnyObject?) {
         guard let button = statusBarItem?.button else { return }
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)

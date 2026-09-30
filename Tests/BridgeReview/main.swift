@@ -141,5 +141,47 @@ check(freezable.editRecord(id: staleDraft.id, name: "旧草稿覆盖", tags: sta
       "bridge refuses the stale draft with an error")
 let p26Disk = try freezeStore.load()
 check(p26Disk.records[0].name == "另一窗口改名", "a refused bridge edit never reaches the disk")
+
+// Todo continuation regression: a task selected for one Pomodoro set survives the rest
+// boundary, so ReminderView's plain `startWork()` still attributes the next round.
+let todoChainDir = scratch.appendingPathComponent("todo-chain")
+let todoChainStore = FocusStore(url: todoChainDir.appendingPathComponent("sessions.json"))
+var todoChainSeed = FocusState()
+let chainTodoID = todoChainSeed.addTodo(title: "阅读章节", at: now)!
+todoChainSeed.phase = .restFinished
+todoChainSeed.name = "阅读章节"
+todoChainSeed.rounds = 1
+todoChainSeed.seriesTodoID = chainTodoID
+try todoChainStore.save(todoChainSeed)
+let todoChain = TBTimer(store: todoChainStore)
+todoChain.setEventName("阅读章节")
+todoChain.startWork()
+check(todoChain.state.phase == .work && todoChain.state.activeTodoID == chainTodoID &&
+      todoChain.state.seriesTodoID == chainTodoID,
+      "bridge next round inherits the persisted todo series")
+todoChain.stop()
+check(todoChain.state.records.first?.todoID == chainTodoID && todoChain.state.seriesTodoID == nil,
+      "bridge records the continued todo and ending the set clears continuation")
+
+// Editing the name after rest is an explicit manual switch and must drop the carried task
+// before the next focus starts.
+let manualDir = scratch.appendingPathComponent("todo-manual-switch")
+let manualStore = FocusStore(url: manualDir.appendingPathComponent("sessions.json"))
+var manualSeed = FocusState()
+let manualTodoID = manualSeed.addTodo(title: "任务 A", at: now)!
+manualSeed.phase = .restFinished
+manualSeed.name = "任务 A"
+manualSeed.rounds = 1
+manualSeed.seriesTodoID = manualTodoID
+try manualStore.save(manualSeed)
+let manualTimer = TBTimer(store: manualStore)
+manualTimer.setEventName("手动任务")
+check(manualTimer.state.seriesTodoID == nil, "manual name edit clears carried todo context")
+manualTimer.startWork()
+check(manualTimer.state.phase == .work && manualTimer.state.activeTodoID == nil,
+      "manual next round does not inherit the previous todo")
+let manualDisk = try manualStore.load()
+check(manualDisk.seriesTodoID == nil, "manual context switch persists before the next round")
+
 print("PASS: \(checks) actual TBTimer bridge checks; isolated QA13 IO, no UI interaction")
 withExtendedLifetime(observation) {}
