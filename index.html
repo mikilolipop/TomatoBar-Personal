@@ -53,6 +53,11 @@ h2{font-size:24px;margin-bottom:22px;text-align:center}
 .step{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;font-size:14.5px;color:var(--muted)}
 .step b{display:block;color:var(--ink);margin-bottom:6px;font-size:15.5px}
 .step code{display:block;background:rgba(179,77,61,.08);border-radius:8px;padding:9px 10px;margin-top:8px;font-size:12px;color:var(--ink);overflow-x:auto;white-space:nowrap}
+.thanks{max-width:720px;margin:0 auto;text-align:center;padding:28px 24px}
+.thanks h2{margin-bottom:10px}
+.thanks p{font-size:15px;color:var(--muted)}
+.thanks .names{list-style:none;display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin:22px 0 18px}
+.thanks .names li{border:1px solid var(--line);border-radius:999px;padding:7px 20px;font-size:17px;font-weight:600;color:var(--ink)}
 footer{margin-top:64px;border-top:1px solid var(--line);padding:26px 0 34px;font-size:13.5px;color:var(--muted);text-align:center}
 footer .links{display:flex;gap:18px;justify-content:center;margin-bottom:8px;flex-wrap:wrap}
 </style>
@@ -108,8 +113,22 @@ footer .links{display:flex;gap:18px;justify-content:center;margin-bottom:8px;fle
     </div>
   </section>
 
+  <section id="thanks" aria-labelledby="thanks-title">
+    <div class="card thanks">
+      <h2 id="thanks-title">鸣谢</h2>
+      <p>感谢第一批客户</p>
+      <ul class="names" aria-label="第一批客户">
+        <li>nafi</li>
+        <li>Chiwawa</li>
+        <li>ElF</li>
+      </ul>
+      <p>谢谢你们在 TomatoBar Personal 起步时给予的信任与支持。</p>
+    </div>
+  </section>
+
   <footer>
     <div class="links">
+      <a href="#thanks">鸣谢</a>
       <a href="https://github.com/mikilolipop/TomatoBar-Personal">源码仓库</a>
       <a href="https://github.com/mikilolipop/TomatoBar-Personal/releases">发布记录</a>
       <a href="https://github.com/mikilolipop/TomatoBar-Personal/blob/feature/personal-focus/docs/V1.3.1%E6%9B%B4%E6%96%B0%E8%AF%B4%E6%98%8E.md">更新说明</a>
