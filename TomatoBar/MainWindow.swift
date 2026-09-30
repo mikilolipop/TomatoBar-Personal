@@ -31,73 +31,75 @@ struct MainWindowView: View {
         }
     }
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Rectangle().fill(Garden.line).frame(height: 1)
-            VStack(alignment: .leading, spacing: 12) {
-                if !historyTab {
-                    heading
-                    HStack(alignment: .top, spacing: 14) {
-                        summaryPanel
-                            .padding(16)
-                            .frame(width: 350)
-                            .frame(maxHeight: .infinity, alignment: .topLeading)
-                            .background(
-                                RoundedRectangle(cornerRadius: Garden.cornerLarge)
-                                    .fill(Garden.surface.opacity(0.36))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Garden.cornerLarge)
-                                    .stroke(Garden.line.opacity(0.34), lineWidth: 1)
-                            )
-                        FocusChart(summary: filtered, styles: timer.state.categoryStyles, activity: timer.windowActivity, period: period, onDay: { date = $0; period = .day }, onRecord: { editing = $0 })
-                            .padding(16)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                            .background(
-                                RoundedRectangle(cornerRadius: Garden.cornerLarge)
-                                    .fill(Garden.surface.opacity(0.36))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Garden.cornerLarge)
-                                    .stroke(Garden.line.opacity(0.34), lineWidth: 1)
-                            )
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                header
+                Rectangle().fill(Garden.line).frame(height: 1)
+                VStack(alignment: .leading, spacing: 12) {
+                    if !historyTab {
+                        heading
+                        HStack(alignment: .top, spacing: 14) {
+                            summaryPanel
+                                .padding(16)
+                                .frame(width: sidebarWidth(for: geometry.size.width))
+                                .frame(maxHeight: .infinity, alignment: .topLeading)
+                                .background(
+                                    RoundedRectangle(cornerRadius: Garden.cornerLarge)
+                                        .fill(Garden.surface.opacity(0.36))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: Garden.cornerLarge)
+                                        .stroke(Garden.line.opacity(0.34), lineWidth: 1)
+                                )
+                            FocusChart(summary: filtered, styles: timer.state.categoryStyles, activity: timer.windowActivity, period: period, onDay: { date = $0; period = .day }, onRecord: { editing = $0 })
+                                .padding(16)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                                .background(
+                                    RoundedRectangle(cornerRadius: Garden.cornerLarge)
+                                        .fill(Garden.surface.opacity(0.36))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: Garden.cornerLarge)
+                                        .stroke(Garden.line.opacity(0.34), lineWidth: 1)
+                                )
+                        }
+                        .frame(height: overviewPanelHeight(for: geometry.size.height))
                     }
-                    .frame(minHeight: 150, idealHeight: 158, maxHeight: 164)
-                }
-                if let message = deleteError {
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill").foregroundColor(Garden.red)
-                        Text(message).font(.caption).foregroundColor(Garden.red)
-                        Spacer()
-                        Button("知道了") { deleteError = nil }.font(.caption)
-                    }.padding(.vertical, 6).padding(.horizontal, 10)
-                        .background(Garden.red.opacity(0.08)).cornerRadius(6)
-                }
-                if historyTab {
-                    VStack(alignment: .leading, spacing: 10) {
-                        recordHeader
-                        recordList
+                    if let message = deleteError {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill").foregroundColor(Garden.red)
+                            Text(message).font(.caption).foregroundColor(Garden.red)
+                            Spacer()
+                            Button("知道了") { deleteError = nil }.font(.caption)
+                        }.padding(.vertical, 6).padding(.horizontal, 10)
+                            .background(Garden.red.opacity(0.08)).cornerRadius(6)
                     }
-                    .padding(14)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .background(
-                        RoundedRectangle(cornerRadius: Garden.cornerLarge)
-                            .fill(Garden.surface.opacity(0.30))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Garden.cornerLarge)
-                            .stroke(Garden.line.opacity(0.34), lineWidth: 1)
-                    )
-                } else {
-                    overviewLowerSection
+                    if historyTab {
+                        VStack(alignment: .leading, spacing: 10) {
+                            recordHeader
+                            recordList
+                        }
+                        .padding(14)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .background(
+                            RoundedRectangle(cornerRadius: Garden.cornerLarge)
+                                .fill(Garden.surface.opacity(0.30))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Garden.cornerLarge)
+                                .stroke(Garden.line.opacity(0.34), lineWidth: 1)
+                        )
+                    } else {
+                        overviewLowerSection(sidebarWidth: sidebarWidth(for: geometry.size.width))
+                    }
                 }
-            }
-            .padding(.horizontal, 28)
-            .padding(.top, 14)
-            TimerCard(timer: timer, expanded: $expandedTimer)
                 .padding(.horizontal, 28)
-                .padding(.top, 10)
-                .padding(.bottom, 14)
+                .padding(.top, 14)
+                TimerCard(timer: timer, expanded: $expandedTimer)
+                    .padding(.horizontal, 28)
+                    .padding(.top, 10)
+                    .padding(.bottom, 14)
+            }
         }.background(Garden.paper).foregroundColor(Garden.ink).accentColor(Garden.red)
             .preferredColorScheme(.light)
             .sheet(item: $editing) { record in
@@ -131,6 +133,12 @@ struct MainWindowView: View {
             // shared list whenever it changes, not only after this view's own save.
             .onChange(of: history.records) { _ in clearStaleFilter() }
     }
+    private func sidebarWidth(for width: CGFloat) -> CGFloat {
+        min(340, max(300, width * 0.29))
+    }
+    private func overviewPanelHeight(for height: CGFloat) -> CGFloat {
+        period == .month ? min(300, max(246, height * 0.36)) : min(272, max(236, height * 0.34))
+    }
     /// `.alert(presenting:)` wants a Bool binding plus the item. Deriving the Bool from
     /// pendingDelete means dismissing the alert can never leave a stale record behind.
     private var deleteConfirmationShown: Binding<Bool> {
@@ -162,7 +170,7 @@ struct MainWindowView: View {
                 .foregroundColor(historyTab ? Garden.red : Garden.muted)
             Spacer()
             Text("让专注，慢慢生长").font(.caption).foregroundColor(Garden.muted)
-            Button { settings = true } label: { Image(systemName: "gearshape").font(.system(size: 18)) }
+            Button { settings = true } label: { GardenActionIcon(name: "gearshape", pointSize: 18, color: Garden.ink, targetSize: 28) }
                 .padding(.leading, 16).help("设置").accessibilityLabel("设置")
         }.buttonStyle(.plain).padding(.horizontal, 28).frame(height: 58)
     }
@@ -171,11 +179,13 @@ struct MainWindowView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(period == .day ? (Calendar.current.isDateInToday(date) ? "今天，把时间留给了什么？" : "这一天，把时间留给了什么？") : period == .week ? "这一周的专注时光" : "这个月，留下的点点滴滴")
                     .font(.system(size: 32, weight: .semibold))
+                    .lineLimit(1).minimumScaleFactor(0.8)
                 HStack(spacing: 10) {
-                    Button { step(-1) } label: { Image(systemName: "chevron.left") }.help("上一\(period.rawValue)")
+                    Button { step(-1) } label: { GardenActionIcon(name: "chevron.left", pointSize: 12) }
+                        .help("上一\(period.rawValue)").accessibilityLabel("上一\(period.rawValue)")
                     Text(dateTitle).font(.system(size: 13))
-                    Button { step(1) } label: { Image(systemName: "chevron.right") }
-                        .disabled(summary.interval.end > Date()).help("下一\(period.rawValue)")
+                    Button { step(1) } label: { GardenActionIcon(name: "chevron.right", pointSize: 12) }
+                        .disabled(summary.interval.end > Date()).help("下一\(period.rawValue)").accessibilityLabel("下一\(period.rawValue)")
                     if !summary.interval.contains(Date()) { Button("回到今天") { date = Date() } }
                 }.buttonStyle(.plain).foregroundColor(Garden.muted)
             }
@@ -208,7 +218,7 @@ struct MainWindowView: View {
                 .font(.system(size: 12))
                 .foregroundColor(Garden.muted)
             Text(focusDuration(summary.seconds))
-                .font(.system(size: 42, weight: .semibold, design: .rounded))
+                .font(.system(size: 36, weight: .semibold, design: .rounded))
                 .foregroundColor(Garden.red)
                 .minimumScaleFactor(0.72)
                 .lineLimit(1)
@@ -221,9 +231,11 @@ struct MainWindowView: View {
                                 Text(category.name).lineLimit(1)
                                 Spacer()
                                 Text(focusDuration(category.seconds)).foregroundColor(Garden.muted)
-                            }.font(.system(size: 14)).padding(.vertical, 1)
+                            }.font(.system(size: 13)).padding(.vertical, 2)
                                 .background(selectedCategory == category.name ? Garden.line.opacity(0.4) : .clear)
                         }.buttonStyle(.plain)
+                            .accessibilityLabel("筛选主分类：\(category.name)，\(focusDuration(category.seconds))")
+                            .accessibilityValue(selectedCategory == category.name ? "已选中" : "未选中")
                     }
                     if summary.categories.count > 5 {
                         Button(showAllCategories ? "收起标签" : "展开其余 \(summary.categories.count - 5) 个标签") { showAllCategories.toggle() }
@@ -233,17 +245,17 @@ struct MainWindowView: View {
                 }.padding(.trailing, 8)
             }
             HStack {
-                GardenArt(name: "PixelSprout", activity: timer.windowActivity).frame(width: 38, height: 29)
+                GardenArt(name: "PixelSprout", activity: timer.windowActivity).frame(width: 30, height: 24)
                 Text("每一段投入，都有迹可循").font(.caption2).foregroundColor(Garden.muted)
                 Spacer()
             }
         }
     }
-    private var overviewLowerSection: some View {
+    private func overviewLowerSection(sidebarWidth: CGFloat) -> some View {
         HStack(alignment: .top, spacing: 14) {
             todoPanel
                 .padding(14)
-                .frame(width: 350)
+                .frame(width: sidebarWidth)
                 .frame(maxHeight: .infinity, alignment: .top)
                 .background(
                     RoundedRectangle(cornerRadius: Garden.cornerLarge)
@@ -352,12 +364,12 @@ struct MainWindowView: View {
     private func todoRow(_ todo: FocusTodo) -> some View {
         HStack(spacing: 8) {
             Button { timer.toggleTodo(id: todo.id) } label: {
-                Image(systemName: todo.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(todo.isCompleted ? Garden.red : Garden.muted)
+                GardenActionIcon(name: todo.isCompleted ? "checkmark.circle.fill" : "circle", pointSize: 15,
+                                 color: todo.isCompleted ? Garden.red : Garden.muted)
             }
             .buttonStyle(.plain)
             .help(todo.isCompleted ? "标记为未完成" : "标记完成")
+            .accessibilityLabel("\(todo.isCompleted ? "标记为未完成" : "标记完成")：\(todo.title)")
 
             if editingTodoID == todo.id {
                 TextField("待办名称", text: $editingTodoTitle)
@@ -365,11 +377,11 @@ struct MainWindowView: View {
                     .font(.system(size: 13))
                     .onSubmit { commitTodoRename(todo.id) }
                 Button { commitTodoRename(todo.id) } label: {
-                    Image(systemName: "checkmark").font(.caption)
-                }.buttonStyle(.plain)
+                    GardenActionIcon(name: "checkmark", pointSize: 12)
+                }.buttonStyle(.plain).accessibilityLabel("保存待办名称")
                 Button { editingTodoID = nil } label: {
-                    Image(systemName: "xmark").font(.caption)
-                }.buttonStyle(.plain)
+                    GardenActionIcon(name: "xmark", pointSize: 12)
+                }.buttonStyle(.plain).accessibilityLabel("取消重命名")
             } else {
                 Button {
                     timer.prepareTodo(todo)
@@ -396,12 +408,11 @@ struct MainWindowView: View {
                         timer.prepareTodo(todo)
                         timer.startWork()
                     } label: {
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 9))
-                            .foregroundColor(Garden.red)
+                        GardenActionIcon(name: "play.fill", pointSize: 12, color: Garden.red)
                     }
                     .buttonStyle(.plain)
                     .help("立即开始这项待办")
+                    .accessibilityLabel("开始待办：\(todo.title)")
                     .disabled(timer.state.isTiming || timer.state.needsAttention || timer.storageError != nil)
                 }
 
@@ -417,13 +428,13 @@ struct MainWindowView: View {
                     Divider()
                     Button("删除待办", role: .destructive) { timer.deleteTodo(id: todo.id) }
                 } label: {
-                    Image(systemName: "ellipsis")
-                        .foregroundColor(Garden.muted)
-                        .frame(width: 18)
+                    Color.clear.frame(width: 24, height: 24).contentShape(Rectangle())
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
-                .fixedSize()
+                .frame(width: 24, height: 24)
+                .overlay(GardenActionIcon(name: "ellipsis", pointSize: 13).allowsHitTesting(false))
+                .accessibilityLabel("更多待办操作：\(todo.title)").help("待办操作")
             }
         }
         .padding(.horizontal, 9)
@@ -475,31 +486,22 @@ struct MainWindowView: View {
             if visibleRecords.isEmpty {
                 VStack(spacing: 10) {
                     Text(historyTab ? "没有匹配的记录" : "这里会记下你做过的事情").font(.headline)
-                    Text("从下方开始一段专注，结束后再为它添加标签。").font(.caption).foregroundColor(Garden.muted)
+                    Text(historyTab && (selectedCategory != nil || !search.isEmpty)
+                         ? "试试其他关键词，或清除标签筛选。"
+                         : "从下方开始一段专注，结束后再为它添加标签。")
+                        .font(.caption).foregroundColor(Garden.muted)
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(visibleRecords) { record in
-                            HStack(spacing: 12) {
+                            HStack(spacing: 10) {
                                 Circle().fill(Garden.color(record.category, styles: timer.state.categoryStyles)).frame(width: 8, height: 8)
-                                Group {
-                                    if historyTab || period != .day {
-                                        Text(record.startedAt, format: .dateTime.month().day().hour().minute())
-                                    } else {
-                                        Text("\(record.startedAt.formatted(date: .omitted, time: .shortened)) – \(record.endedAt.formatted(date: .omitted, time: .shortened))")
-                                    }
-                                }.font(.system(size: 12).monospacedDigit()).foregroundColor(Garden.muted)
-                                    .frame(width: 125, alignment: .leading)
-                                    .help("\(record.startedAt.formatted()) — \(record.endedAt.formatted())；暂停不计入专注时长")
-                                Text(record.name).font(.system(size: 15)).lineLimit(1).help(record.name)
-                                Spacer()
-                                Text(record.tags.isEmpty ? "未分类" : record.tags.joined(separator: " · ")).font(.caption).foregroundColor(Garden.color(record.category, styles: timer.state.categoryStyles)).lineLimit(1).frame(maxWidth: 140, alignment: .trailing)
-                                if !record.completed { Text("提前结束").font(.caption2).foregroundColor(Garden.muted) }
+                                recordInformation(record).frame(maxWidth: .infinity, alignment: .leading)
                                 Text(focusDuration(historyTab ? record.seconds : record.seconds(in: summary.interval)))
-                                    .font(.system(size: 13).monospacedDigit()).frame(width: 90, alignment: .trailing)
+                                    .font(.system(size: 13).monospacedDigit()).frame(width: 72, alignment: .trailing)
                                 Button { pendingDelete = record } label: {
-                                    Image(systemName: "trash").foregroundColor(Garden.red)
+                                    GardenActionIcon(name: "trash", color: Garden.red)
                                 }.buttonStyle(.plain)
                                     .opacity(hoverDelete == record.id ? 1 : 0)
                                     .allowsHitTesting(hoverDelete == record.id)
@@ -508,8 +510,9 @@ struct MainWindowView: View {
                                     Button("编辑记录") { editing = record }
                                     Button("删除记录", role: .destructive) { pendingDelete = record }
                                 } label: {
-                                    Image(systemName: "ellipsis.circle").foregroundColor(Garden.muted)
-                                }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                                    Color.clear.frame(width: 24, height: 24).contentShape(Rectangle())
+                                }.menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 24, height: 24)
+                                    .overlay(GardenActionIcon(name: "ellipsis.circle").allowsHitTesting(false))
                                     .help("编辑或删除").accessibilityLabel("更多操作：\(record.name)")
                             }.padding(.vertical, 10)
                             .onHover { inside in
@@ -522,6 +525,47 @@ struct MainWindowView: View {
                 }
             }
         }.frame(maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private func recordInformation(_ record: FocusRecord) -> some View {
+        if historyTab {
+            HStack(spacing: 12) {
+                recordTimestamp(record).frame(width: 115, alignment: .leading)
+                Text(record.name).font(.system(size: 15)).lineLimit(1).help(record.name)
+                Spacer(minLength: 8)
+                recordTags(record).frame(maxWidth: 140, alignment: .trailing)
+                if !record.completed { Text("提前结束").font(.caption2).foregroundColor(Garden.muted) }
+            }
+        } else {
+            // Give the name the full flexible column; metadata no longer competes with
+            // it in one line at the minimum window width.
+            VStack(alignment: .leading, spacing: 5) {
+                Text(record.name).font(.system(size: 14, weight: .medium)).lineLimit(1).help(record.name)
+                HStack(spacing: 8) {
+                    recordTimestamp(record).fixedSize()
+                    recordTags(record)
+                    if !record.completed {
+                        Text("提前结束").font(.caption2).foregroundColor(Garden.muted).fixedSize()
+                    }
+                }
+            }
+        }
+    }
+    private func recordTags(_ record: FocusRecord) -> some View {
+        Text(record.tags.isEmpty ? "未分类" : record.tags.joined(separator: " · "))
+            .font(.caption).foregroundColor(Garden.color(record.category, styles: timer.state.categoryStyles))
+            .lineLimit(1).help(record.tags.isEmpty ? "未分类" : record.tags.joined(separator: " · "))
+    }
+    private func recordTimestamp(_ record: FocusRecord) -> some View {
+        Group {
+            if historyTab || period != .day {
+                Text(record.startedAt, format: .dateTime.month().day().hour().minute())
+            } else {
+                Text("\(record.startedAt.formatted(date: .omitted, time: .shortened)) – \(record.endedAt.formatted(date: .omitted, time: .shortened))")
+            }
+        }.font(.system(size: historyTab ? 12 : 11).monospacedDigit()).foregroundColor(Garden.muted)
+            .help("\(record.startedAt.formatted()) — \(record.endedAt.formatted())；暂停不计入专注时长")
     }
 }
 
@@ -547,7 +591,7 @@ struct TimerCard: View {
                 if timer.state.isTiming { Text(timer.timeLeft).font(.system(size: 28, weight: .medium, design: .rounded).monospacedDigit()) }
                 Button(timer.state.isTiming ? (timer.state.paused ? "继续" : "暂停") : timer.state.needsAttention ? "查看提醒" : "开始专注") { timer.primaryAction() }
                     .buttonStyle(.borderedProminent).disabled(timer.storageError != nil && timer.state.phase == .idle)
-                Button { expanded = true } label: { Image(systemName: "arrow.up.left.and.arrow.down.right") }
+                Button { expanded = true } label: { GardenActionIcon(name: "arrow.up.left.and.arrow.down.right") }
                     .buttonStyle(.plain).help("展开倒计时").accessibilityLabel("展开倒计时")
             }
             if let error = timer.storageError {
@@ -590,7 +634,7 @@ struct ExpandedTimer: View {
                 Button { timer.primaryAction() } label: {
                     Text(timer.state.isTiming ? (timer.state.paused ? "继续专注" : "暂停") : timer.state.needsAttention ? "查看提醒" : "开始专注")
                         .frame(maxWidth: .infinity)
-                }.buttonStyle(.borderedProminent).controlSize(.large)
+                }.buttonStyle(GardenPrimaryButtonStyle())
                 if timer.state.isTiming {
                     HStack(spacing: 10) {
                         Button { timer.stop() } label: {

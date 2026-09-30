@@ -106,6 +106,23 @@ enum Garden {
     }
 }
 
+/// Keep small actions optically consistent while giving each a usable macOS hit area.
+struct GardenActionIcon: View {
+    let name: String
+    var pointSize: CGFloat = 14
+    var color: Color = Garden.muted
+    var targetSize: CGFloat = 24
+
+    var body: some View {
+        Image(systemName: name)
+            .font(.system(size: pointSize, weight: .medium))
+            .foregroundColor(color)
+            .frame(width: targetSize, height: targetSize)
+            .contentShape(Rectangle())
+            .accessibilityHidden(true)
+    }
+}
+
 struct GardenArt: View {
     let name: String
     @ObservedObject var activity: WindowActivity
@@ -175,7 +192,8 @@ struct FocusChart: View {
                 VStack(alignment: .leading, spacing: 9) {
                     if summary.records.isEmpty {
                         Text("还没有足迹。完成一段专注后，它会留在这里。")
-                            .foregroundColor(Garden.muted).padding(.vertical, 50)
+                            .font(.system(size: 13)).foregroundColor(Garden.muted)
+                            .frame(maxWidth: .infinity, minHeight: geometry.size.height, alignment: .center)
                     }
                     ForEach(Array(rows(width: geometry.size.width - 8).enumerated()), id: \.offset) { _, row in
                         HStack(spacing: 8) {
@@ -225,21 +243,26 @@ struct FocusChart: View {
         let offset = (calendar.component(.weekday, from: summary.interval.start) + 5) % 7
         let maxSeconds = max(1, summary.days.map(\.seconds).max() ?? 1)
         return GeometryReader { geometry in
-        let rowCount = Double((offset + summary.days.count + 6) / 7)
-        let cellHeight = max(20, min(38, (geometry.size.height - 60) / rowCount))
+        let rowCount = (offset + summary.days.count + 6) / 7
+        // Reserve the actual weekday/legend heights and grid gaps. A minimum cell
+        // height here used to force the last week out of its card and over the records.
+        let gridHeight = max(0, geometry.size.height - 36 - CGFloat(rowCount - 1) * 5)
+        let cellHeight = min(34, gridHeight / CGFloat(rowCount))
         VStack(spacing: 5) {
             HStack { ForEach(["一", "二", "三", "四", "五", "六", "日"], id: \.self) { Text($0).font(.caption).frame(maxWidth: .infinity) } }
                 .foregroundColor(Garden.muted)
+                .frame(height: 14)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 5) {
                 ForEach(0..<offset, id: \.self) { _ in Color.clear.frame(height: cellHeight) }
                 ForEach(summary.days) { day in
                     Button { onDay(day.date) } label: {
                         Text("\(calendar.component(.day, from: day.date))").font(.system(size: 12, weight: calendar.isDateInToday(day.date) ? .bold : .regular))
                             .frame(maxWidth: .infinity).frame(height: cellHeight)
-                            .background(day.seconds > 0 ? Garden.red.opacity(0.12 + 0.56 * day.seconds / maxSeconds) : Garden.line.opacity(0.32))
-                            .overlay(Rectangle().stroke(calendar.isDateInToday(day.date) ? Garden.red : .clear, lineWidth: 1))
+                            .background(RoundedRectangle(cornerRadius: 3).fill(day.seconds > 0 ? Garden.red.opacity(0.12 + 0.56 * day.seconds / maxSeconds) : Garden.line.opacity(0.32)))
+                            .overlay(RoundedRectangle(cornerRadius: 3).stroke(calendar.isDateInToday(day.date) ? Garden.red : .clear, lineWidth: 1))
                     }.buttonStyle(.plain).disabled(day.date > Date()).opacity(day.date > Date() ? 0.35 : 1)
                         .help("\(day.date.formatted(date: .abbreviated, time: .omitted)) · \(focusDuration(day.seconds))")
+                        .accessibilityLabel("\(day.date.formatted(date: .abbreviated, time: .omitted))，专注\(focusDuration(day.seconds))")
                 }
             }
             HStack(spacing: 4) {
@@ -247,6 +270,7 @@ struct FocusChart: View {
                 ForEach(0..<5) { index in Rectangle().fill(Garden.red.opacity(0.12 + Double(index) * 0.14)).frame(width: 13, height: 9) }
                 Text("多")
             }.font(.caption2).foregroundColor(Garden.muted)
+                .frame(height: 12)
         }
         }
     }

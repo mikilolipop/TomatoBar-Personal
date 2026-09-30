@@ -32,14 +32,14 @@ private struct ReminderView: View {
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: timer.state.phase == .workFinished ? "checkmark.circle.fill" : "sun.max.fill")
-                .font(.system(size: 44)).foregroundColor(.accentColor)
+                .font(.system(size: 44)).foregroundColor(Garden.red).accessibilityHidden(true)
             Text(timer.phaseLabel).font(.system(size: 26, weight: .semibold))
             Text(timer.state.phase == .workFinished
                  ? "「\(timer.state.name)」已完成。\n站起来活动一下，让眼睛休息一会儿。"
                  : "休息结束了。\n准备好后，再开始下一轮专注。")
                 .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
             Text("等待你确认后，才会开始下一段计时。")
-                .font(.caption).foregroundColor(.secondary)
+                .font(.caption).foregroundColor(Garden.muted)
             HStack(spacing: 14) {
                 Button("结束本组") {
                     timer.stop()
@@ -61,5 +61,7 @@ private struct ReminderView: View {
                 }
             }
         }.padding(30).frame(width: 420)
+            .background(Garden.paper).foregroundColor(Garden.ink).accentColor(Garden.red)
+            .preferredColorScheme(.light)
     }
 }

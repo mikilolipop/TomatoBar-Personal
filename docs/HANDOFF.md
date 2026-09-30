@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-09-30，by cloud agent · 用户明确决定全面取消桌面 Widget；保留 Personal Team 自动签名契约，回退 Widget target/App Group/snapshot/deep-link 相关实现。
+最后更新：2026-09-30，by Codex · Computer Use 实机 UI 精修完成；日/周/月布局、动作图标、编辑器与设置已复验。Widget 仍全面取消，Personal Team 自动签名契约保留。
 
 ---
 
@@ -33,6 +33,11 @@ first process whose unix id is 40847（QA13 的 pid）  →  读到的 bid 是 c
 另：本机**没有屏幕录制权限**，`screencapture` 报 `could not create image from display`，
 所以视觉验收做不了，只能靠辅助功能树 + 落盘数据比对。
 
+**2026-09-30 新链路补充**：本轮使用 `@oai/sky` Computer Use，已实际截取并检查主窗口、
+popover 和到时提醒窗。上面的限制来自旧 System Events / screencapture 链路，不能据此否定本轮截图。
+原生确认框截图仍为空白，原生菜单层未被截入，二者只确认 AX 文本与安全返回；完整 VoiceOver、
+键盘遍历、真实登录/Dock/Space 未验收。详情见 [`UI精细化检查-2026-09-30.md`](UI精细化检查-2026-09-30.md)。
+
 ---
 
 ## 当前状态
@@ -40,13 +45,13 @@ first process whose unix id is 40847（QA13 的 pid）  →  读到的 bid 是 c
 | 项 | 值 |
 |---|---|
 | ✅ **已安装版本** | **3.9.0（V1.3）**，`/Applications/TomatoBar Personal.app`（未动；菜单栏实际跑的是 `/tmp` 最新构建，经 dev-run 启动，数据容器共用） |
-| HEAD | 顶部提交 = 2026-09-30 云端多轮同步集成的安全锚点（待办清单/数值输入行/🚬彩蛋/主窗口扩写）← Drive 第二轮同步集成（分类颜色覆盖）← Drive UI 重构集成 ← `79e13ad` ← `4139124`/`60706a5` |
-| 工作区 | 干净，全部已提交推送（约 1100 行云端代码 + 文档） |
+| HEAD | 顶部提交 = 2026-09-30 Computer Use UI 精修；此前安全锚点 `6d8c0ef` |
+| 工作区 | UI 精修源码与本轮文档提交推送至 origin；截图和数据快照仅保留本地 |
 | 测试 | **214 项领域 + 40 项真实桥接 + 8 项合成启动事件**全绿；Release 干净构建 + 严格签名通过 |
 | **CI** | 推送后以 HEAD 最新 run 为准；本地四套检查均已复跑 |
 | 远程 | `origin` = `mikilolipop/TomatoBar-Personal`（**public**，2026-09-29 GitHub API 实测；默认分支 `feature/personal-focus`）；`upstream` = `ivoronin/TomatoBar` |
-| 用户真实数据 | 本轮实读容器：正式容器现 **1 条记录（「hi」，提前结束）+ 2 个待办**。9 月底的 2 条旧记录（「未命名专注」25分/「测试」1分）已不在盘上，**用户是否手动删除尚未确认**；完整快照在 `TomatoBarBuildBackups/sessions-prod-before-fixQA-20260929-103622.json`，需要时可恢复 |
-| QA 隔离环境 | 旧 QA13 app 未重建启动；本轮桥接检查只在 QA13 的新建 review-UUID 子目录做合成 IO，完成后清理该子目录；既有 QA13 sessions 未改 |
+| 用户真实数据 | 本轮检查前后 **4 条记录 + 1 个待办 + 分类样式逐条一致**；仅正常退出更新 checkpoint。私有快照与比对结果保留在仓库外的本地审计目录，未提交真实事件名或数据 |
+| QA 隔离环境 | 本轮 UI 使用新建 UIAudit Bundle ID，24 条合成记录 + 4 个合成待办，实际完成计时新增 1 条；空状态另以隔离快照检查。桥接仍使用 QA13 新建临时子目录，既有 QA13 sessions 未改 |
 | git 身份 | 本仓库 `--local`：`mikilolipop <207336577+mikilolipop@users.noreply.github.com>`（全局仍未设置） |
 
 ### 原版 TomatoBar 已退役
@@ -194,6 +199,19 @@ CI 产物明确标注**只是编译门,不可运行**。pbxproj 中云端引入�
 macosx 专属 identity 行,属本机契约的一部分,不要 Drive 反向覆盖;改动前先 `git pull`。
 
 ---
+
+## 刚做完（2026-09-30，Codex Computer Use UI 精修）
+
+- 根据修改前截图修复上部统计卡片过矮、日色块第二行裁切、月历越界、概览记录名称拥挤。
+  实际检查 960×620 / 1180×760 / 1460×920，以及 2026 年 8 月的六行月历。
+- 小动作图标统一命中区域；待办播放图标放大，复选/更多/编辑/日期导航/展开/重命名确认取消比例统一，补充动作及分类选中 AX 标签。
+- 时长输入四行对齐；分类下拉采用可见覆盖层，保持原生 Menu；菜单栏编辑时收起下一任务区域，表单高度 380pt。
+- 展开计时主按钮共享 42pt 样式，提醒窗使用 Garden 配色；搜索空结果提示指向关键词/筛选。
+- 合成实例实际走完 1 分钟专注 → 完成提醒 → 1 分钟休息 → 休息完成提醒 → 结束本组。
+  提醒截图复拍说明与未验收边界见本轮检查文档。
+- 临时 UI 检查菜单与窗口尺寸控制已全部移除，`App.swift` 无最终改动。
+- `scripts/dev-run.sh` 全流程通过：214 领域 + 40 真实桥接 + 8 合成启动；Release + Automatic Personal Team + 严格签名通过。
+  `/tmp` 新版已运行，`/Applications` 正式安装副本未覆盖；真实数据已逐条比对。
 
 ## 刚做完（2026-09-30，Claude Code 编译闸门：Drive 第三~六轮云端同步逐轮核验 + 安全锚点提交）
 

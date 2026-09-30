@@ -5,7 +5,7 @@ import SwiftUI
 
 extension KeyboardShortcuts.Name { static let startStopTimer = Self("startStopTimer") }
 
-private struct GardenPrimaryButtonStyle: ButtonStyle {
+struct GardenPrimaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
@@ -95,7 +95,7 @@ struct GardenNumberInputRow: View {
                 .accessibilityValue("\(value)\(unit)")
             Text(unit)
                 .foregroundColor(Garden.muted)
-                .frame(minWidth: unit == "分钟" ? 28 : 48, alignment: .leading)
+                .frame(width: 48, alignment: .leading)
         }
         .font(.system(size: 13))
     }
@@ -201,7 +201,7 @@ struct TBPopoverView: View {
             .foregroundColor(Garden.muted)
             .padding(.horizontal, 2)
 
-            if canPrepareNext {
+            if canPrepareNext && editingRecord == nil {
                 nextTodoSection
             }
 
@@ -228,7 +228,9 @@ struct TBPopoverView: View {
                 if tab == 0 { history }
                 else if tab == 1 { intervals }
                 else { settings }
-            }.frame(height: canPrepareNext ? 235 : 320)
+            // Editing needs its own space; keeping the next-task list above it squeezed
+            // the category controls into a tiny second scroll area.
+            }.frame(height: editingRecord != nil ? 380 : canPrepareNext ? 235 : 320)
 
             Rectangle().fill(Garden.line.opacity(0.7)).frame(height: 1)
             HStack {
@@ -286,12 +288,11 @@ struct TBPopoverView: View {
                 ForEach(Array(timer.state.pendingTodos.prefix(3))) { todo in
                     HStack(spacing: 7) {
                         Button { timer.toggleTodo(id: todo.id) } label: {
-                            Image(systemName: "circle")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(Garden.muted)
+                            GardenActionIcon(name: "circle", pointSize: 14)
                         }
                         .buttonStyle(.plain)
                         .help("标记完成")
+                        .accessibilityLabel("标记完成：\(todo.title)")
 
                         Button { timer.prepareTodo(todo) } label: {
                             Text(todo.title)
@@ -307,12 +308,11 @@ struct TBPopoverView: View {
                             timer.prepareTodo(todo)
                             timer.startWork()
                         } label: {
-                            Image(systemName: "play.fill")
-                                .font(.system(size: 8))
-                                .foregroundColor(Garden.red)
+                            GardenActionIcon(name: "play.fill", pointSize: 11, color: Garden.red)
                         }
                         .buttonStyle(.plain)
                         .help("立即开始")
+                        .accessibilityLabel("开始待办：\(todo.title)")
                         .disabled(timer.storageError != nil || timer.state.needsAttention || timer.state.isTiming)
                     }
                     .padding(.horizontal, 8)
@@ -433,7 +433,7 @@ struct TBPopoverView: View {
                                         Spacer()
                                         Text(duration(record.seconds)).font(.subheadline.monospacedDigit())
                                         Button { editingRecord = record } label: {
-                                            Image(systemName: "pencil")
+                                            GardenActionIcon(name: "pencil", pointSize: 12)
                                         }.buttonStyle(.borderless)
                                             .foregroundColor(Garden.muted)
                                             .help("编辑名称和标签")
@@ -680,6 +680,7 @@ struct RecordEditor: View {
             }
             Text("时长和完成状态保持不变").font(.caption2).foregroundColor(.secondary)
         }
+        .foregroundColor(Garden.ink).accentColor(Garden.red).preferredColorScheme(.light)
         // role: .destructive keeps macOS from making the delete the default button, and
         // .cancelAction binds Escape to cancelling, so the safe action is the default one.
         .alert("删除这段专注记录？", isPresented: $confirmDelete) {
@@ -785,17 +786,23 @@ struct RecordEditor: View {
                         }
                     }
                 } label: {
-                    HStack(spacing: 6) {
-                        Text(category).lineLimit(1)
-                        menuChevron
-                    }
-                    .padding(.horizontal, 9)
-                    .frame(height: 34)
-                    .background(RoundedRectangle(cornerRadius: 7).fill(Garden.line.opacity(0.22)))
+                    Color.clear.frame(height: 34).contentShape(RoundedRectangle(cornerRadius: 7))
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
-                .frame(maxWidth: 190, alignment: .leading)
+                .frame(width: 170, height: 34)
+                .overlay {
+                    HStack(spacing: 6) {
+                        Text(category).font(.system(size: 13)).lineLimit(1)
+                        Spacer(minLength: 4)
+                        menuChevron
+                    }
+                    .foregroundColor(Garden.ink)
+                    .padding(.horizontal, 9)
+                    .frame(height: 34)
+                    .background(RoundedRectangle(cornerRadius: 7).fill(Garden.line.opacity(0.22)))
+                    .allowsHitTesting(false).accessibilityHidden(true)
+                }
                 .help("每条记录只计入一个主分类")
                 .accessibilityLabel("主分类：\(category)")
                 Spacer(minLength: 0)
