@@ -158,6 +158,31 @@ build.sh 现行契约过不了）。实验矩阵：
 用户当时正在 workFinished 流程,未强杀。**请用户在弹层完成/取消本段后,把两个实例都退出**
 （弹出层「退出」按钮）,然后重跑 `sh scripts/dev-run.sh` 恢复单实例基线。
 
+### 后续（同日,签名契约已定案,新 blocker 出现)
+
+**定案过程**：用户登录 Xcode Apple ID → GUI 给两个 target 切 Personal Team +
+Enable Development Signing（Team 实际标识 `Z9PY2WFY9C`,证书名里的 `W37XN6F9LP` 是另一层 id,别混）。
+CLI 复验：普通 `xcodebuild` 即成功,`codesign --deep --strict` 过,**appex 在 pluginkit 注册成功**
+（`com.dilyar.TomatoBarPersonal.Widget(3.9.0)`）——真证书路线对,此前 ad-hoc 产物根本不注册。
+
+**新 blocker（待决策,非 bug）**：免费 Personal Team 生成的 Xcode Managed Profile
+**不含 `com.apple.security.application-groups`**（解码 `embedded.provisionprofile` 实证）→
+运行时容器不挂载、`containerURL` 返回 nil、快照静默不落盘（catch+NSLog）,Widget 永远 placeholder。
+App Groups 是付费开发者计划能力。三条路：
+1. **入付费开发者计划**（$69/年）——现有代码零改动,profile 重新生成即通,最干净；
+2. **换无沙盒数据通道**——主 app+appex 去掉 App Sandbox（直接分发不强制沙盒）,
+   快照走普通共享路径（如 `~/Library/Application Support/TomatoBarPersonal/`）,
+   代价：放弃沙盒卫生 + 数据容器迁移路径要想清楚（现 sessions.json 在沙盒容器里）;
+3. **搁置 Widget**——保留注册好的壳,数据通道等 1/2 定案。
+决策属产品级 → 用户 + 云端。**在此之前 Widget 视为「已编译、已注册、无数据」状态。**
+
+**契约落码（本 commit）**：`build.sh` 弃用 ad-hoc 三连参数,改项目自带 Automatic 签名 +
+`-allowProvisioningUpdates`（免费 profile 7 天滚动,CLI 可自动续）；CI 无账号,改为
+「CODE_SIGNING_ALLOWED=NO 构建 + ad-hoc 重签 appex/app + 严格校验」（本机验证过整条管线）,
+CI 产物明确标注**只是编译门,不可运行**。pbxproj 中云端引入的 `SYSTEM_FRAMEWORK_SEARCH_PATHS`
+已删且未被 Xcode GUI 重新引入。**云端注意**:pbxproj 现含 Team `Z9PY2WFY9C` 与
+macosx 专属 identity 行,属本机契约的一部分,不要 Drive 反向覆盖;改动前先 `git pull`。
+
 ---
 
 ## 刚做完（2026-09-30，Claude Code 编译闸门：Drive 第三~六轮云端同步逐轮核验 + 安全锚点提交）

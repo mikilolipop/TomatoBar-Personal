@@ -83,7 +83,10 @@ scripts/dev-run.sh  # 一键开发闭环：优雅退出旧实例 → 测试闸�
                     # 它只从 /tmp 起开发实例，/Applications 正式版不动；SKIP_TESTS=1 跳闸门。
 scripts/test-launch-context.sh # 8 项 AppKit 合成启动事件检查，不访问用户数据
 scripts/test-bridge.sh # 先 build.sh，再运行真实 TBTimer 检查（当前 40 项）；只使用 QA13 新建临时子目录
-scripts/build.sh    # Release 构建到 /tmp/TomatoBar-personal-build，ad-hoc 签名 + codesign --verify --deep --strict
+scripts/build.sh    # Release 构建到 /tmp/TomatoBar-personal-build。Widget 轮起用项目自带
+                    # Automatic 签名（免费 Personal Team，profile 由 -allowProvisioningUpdates
+                    # 自动续期），产物过 codesign --verify --deep --strict。CI 上无账号，
+                    # 走「不签名构建 + ad-hoc 重签」编译门路线，产物不可当运行版。
 scripts/seed-qa.py  # 只写入隔离的 QA12 沙盒，运行前先退出该 App
 scripts/compare-design.py
 scripts/deploy-site.sh # 把 site/ 发布到 gh-pages 分支（GitHub Pages）；幂等，用临时 worktree 不碰工作区

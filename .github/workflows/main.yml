@@ -33,20 +33,26 @@ jobs:
       - name: Domain tests
         run: sh scripts/test.sh
 
-      # scripts/test.sh only compiles 3 of the 9 Swift files. The UI and bridging
-      # layer (App, Timer, View, MainWindow, FocusCharts, Notifications) is covered
-      # by nothing else, so a compile check is the only guard against a typo there.
-      - name: Build Release (ad-hoc signed)
+      # Since the Widget round the project signs Automatically with a Personal Team,
+      # which the runner has no account for. The runner therefore builds unsigned and
+      # re-signs ad-hoc (entitlements and all) — a compile gate only; that product can
+      # register no widget and must never be treated as a runnable release.
+      - name: Build Release (unsigned, then ad-hoc re-signed)
         run: |
           xcodebuild -project TomatoBar.xcodeproj -scheme TomatoBar -configuration Release \
             -derivedDataPath build \
-            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
+            CODE_SIGNING_ALLOWED=NO \
             ONLY_ACTIVE_ARCH=NO build
 
       - name: Verify product
         run: |
           app="build/Build/Products/Release/TomatoBar Personal.app"
           test -d "$app"
+          codesign -s - --force --options runtime \
+            --entitlements TomatoBarWidget/TomatoBarWidget.entitlements \
+            "$app/Contents/PlugIns/TomatoBarWidget.appex"
+          codesign -s - --force --options runtime \
+            --entitlements TomatoBar/TomatoBar.entitlements "$app"
           codesign --verify --deep --strict "$app"
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist" \
             | grep -x 'com.dilyar.TomatoBarPersonal'
