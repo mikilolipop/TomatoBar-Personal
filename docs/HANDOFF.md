@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-09-30，by Claude Code · Drive 第三~六轮云端同步全部核验集成（弹层重设计/待办清单/数值输入行/🚬彩蛋/主窗口扩写），领域 214 / 桥接 40 / 启动 8 全绿，本 commit 为云端 Widget 开发前的安全锚点
+最后更新：2026-09-30，by cloud agent · 用户明确决定全面取消桌面 Widget；保留 Personal Team 自动签名契约，回退 Widget target/App Group/snapshot/deep-link 相关实现。
 
 ---
 
@@ -125,7 +125,17 @@ V1.3 已按用户决定定稿上线，不再往这个版本里加东西。后续
 
 ---
 
-## 刚做完（2026-09-30，Widget 第一轮：编译被炸根因定位+修复，签名契约悬而未决）
+## 最新决策（2026-09-30，Widget 全面取消）
+
+用户明确决定**不再保留桌面 Widget**。当前清理范围：删除 `TomatoBarWidget` appex target 与目录、`WidgetSnapshot.swift`、App Group entitlement、Timer 的 WidgetKit/snapshot 发布、App 的 Widget `open/todo` deep-link 分支，以及测试/CI 对 Widget 文件或 appex 的依赖。
+
+**保留项**：Personal Team（Team `Z9PY2WFY9C`）Automatic signing + `-allowProvisioningUpdates` 的本地签名契约继续有效；CI 仍是「不签名构建 + ad-hoc 重签主 app」的编译门。主 App 继续保留 App Sandbox，`sessions.json` 数据位置与现有用户数据均不迁移。
+
+下面的 Widget 第一轮/签名排障记录仅作为**历史 postmortem**，不再代表当前产品方向。后续 agent 不应重新加入 Widget target、App Group 或 WidgetSnapshot，除非用户再次明确提出。
+
+---
+
+## 历史记录（已取消）：2026-09-30 Widget 第一轮：编译被炸根因定位+修复，签名契约悬而未决
 
 **云端经 Drive 交了 Widget 初版**：`TomatoBarWidget/`（appex target + Info.plist + entitlements）、
 `WidgetSnapshot.swift`（纯 Foundation 领域文件，已并入 test.sh 编译,214 项全绿）、
@@ -189,7 +199,7 @@ macosx 专属 identity 行,属本机契约的一部分,不要 Drive 反向覆盖
 
 **分工变更（用户明确指令）**：云端 agent 负责改代码（git push 到 origin 或 Drive 直改工作区），
 本地 Claude Code **只做编译验证与把关**——四套闸门 + Release 构建全绿才放行,缺陷报告不顺手修。
-本 commit 即用户要求的「全绿安全锚点」，**下一站：桌面 Widget 开发**（云端主导）。
+本 commit 曾是 Widget 开发前安全锚点；Widget 方向现已由用户取消，见上方「最新决策」。
 
 **逐轮核验入库**（每轮都跑满 领域/桥接/构建/启动，全绿才继续）：
 1. **弹层重设计 + 设计 token**：`Garden.surface/surfaceMuted/corner*` 统一两套 UI；

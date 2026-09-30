@@ -33,10 +33,9 @@ jobs:
       - name: Domain tests
         run: sh scripts/test.sh
 
-      # Since the Widget round the project signs Automatically with a Personal Team,
-      # which the runner has no account for. The runner therefore builds unsigned and
-      # re-signs ad-hoc (entitlements and all) — a compile gate only; that product can
-      # register no widget and must never be treated as a runnable release.
+      # The project signs Automatically with the user's Personal Team, which the
+      # runner has no account for. CI therefore builds unsigned and ad-hoc re-signs the
+      # host app as a compile gate only; this artifact is not the locally signed release.
       - name: Build Release (unsigned, then ad-hoc re-signed)
         run: |
           xcodebuild -project TomatoBar.xcodeproj -scheme TomatoBar -configuration Release \
@@ -48,9 +47,6 @@ jobs:
         run: |
           app="build/Build/Products/Release/TomatoBar Personal.app"
           test -d "$app"
-          codesign -s - --force --options runtime \
-            --entitlements TomatoBarWidget/TomatoBarWidget.entitlements \
-            "$app/Contents/PlugIns/TomatoBarWidget.appex"
           codesign -s - --force --options runtime \
             --entitlements TomatoBar/TomatoBar.entitlements "$app"
           codesign --verify --deep --strict "$app"

@@ -1,8 +1,5 @@
 import KeyboardShortcuts
 import SwiftUI
-#if canImport(WidgetKit)
-import WidgetKit
-#endif
 
 final class FocusHistory: ObservableObject {
     @Published var records: [FocusRecord] = []
@@ -59,7 +56,6 @@ final class TBTimer: ObservableObject {
         ticker = Foundation.Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.tick()
         }
-        publishWidgetSnapshot()
     }
 
     private static func clamped(_ value: Int, to range: ClosedRange<Int>) -> Int {
@@ -217,7 +213,6 @@ final class TBTimer: ObservableObject {
             lastSave = updated.checkpoint
             lastFailedSave = .distantPast
             storageError = nil
-            publishWidgetSnapshot()
             return nil
         } catch let error as RecordEditError {
             return error.localizedDescription
@@ -245,7 +240,6 @@ final class TBTimer: ObservableObject {
             lastSave = updated.checkpoint
             lastFailedSave = .distantPast
             storageError = nil
-            publishWidgetSnapshot()
             return nil
         } catch let error as RecordEditError {
             return error.localizedDescription
@@ -286,7 +280,6 @@ final class TBTimer: ObservableObject {
             storageError = nil
             lastSave = Date()
             updateStatus()
-            publishWidgetSnapshot()
         } catch {
             storageError = "仍然无法读取专注记录，原文件已保留。请修复文件后重试，或重启应用。"
         }
@@ -309,7 +302,6 @@ final class TBTimer: ObservableObject {
         mutation(&state, now)
         persist()
         updateStatus()
-        publishWidgetSnapshot()
         if state.needsAttention && previous != state.phase { onAttention?() }
     }
     private func tick() {
@@ -319,7 +311,6 @@ final class TBTimer: ObservableObject {
         guard state.isTiming && !state.paused else {
             if !Calendar.current.isDate(now, inSameDayAs: freshNow) {
                 now = freshNow
-                publishWidgetSnapshot()
             }
             return
         }
@@ -330,37 +321,7 @@ final class TBTimer: ObservableObject {
             persist()
         }
         updateStatus()
-        if previous != state.phase { publishWidgetSnapshot() }
         if state.needsAttention && previous != state.phase { onAttention?() }
-    }
-
-    private func publishWidgetSnapshot() {
-        guard storageError == nil, !loadFailed else { return }
-        let snapshot = WidgetSnapshot(
-            updatedAt: now,
-            phase: state.phase.rawValue,
-            phaseLabel: phaseLabel,
-            currentName: state.name.isEmpty ? nil : state.name,
-            paused: state.paused,
-            deadline: state.deadline,
-            remainingSeconds: state.timeLeft(at: now),
-            todaySeconds: todaySeconds,
-            todayCount: todayCount,
-            pendingTodoCount: state.pendingTodos.count,
-            todos: state.pendingTodos.prefix(3).map {
-                WidgetTodoSnapshot(id: $0.id, title: $0.title)
-            }
-        )
-        do {
-            try WidgetSnapshotStore.save(snapshot)
-            #if canImport(WidgetKit)
-            WidgetCenter.shared.reloadTimelines(ofKind: "TomatoBarWidget")
-            #endif
-        } catch {
-            // The widget is optional. A missing/unavailable App Group must never make the
-            // focus timer or its primary sessions.json persistence fail.
-            NSLog("TomatoBar: widget snapshot unavailable: %@", String(describing: error))
-        }
     }
 
     private func persist() {

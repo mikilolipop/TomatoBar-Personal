@@ -19,7 +19,6 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var popover = NSPopover()
     private var statusBarItem: NSStatusItem?
     private var model: TBTimer!
-    private var pendingOpenURLs: [URL] = []
     private let reminder = TBReminder()
     private var launchContext = LaunchContext()
     static var shared: TBStatusItem?
@@ -45,11 +44,6 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self.reminder.show(timer: self.model)
         }
         model.updateStatus()
-        if !pendingOpenURLs.isEmpty {
-            let urls = pendingOpenURLs
-            pendingOpenURLs.removeAll()
-            handleOpenURLs(urls)
-        }
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(willSleep),
             name: NSWorkspace.willSleepNotification, object: nil)
         // Suppress both restored windows on login; retain needsAttention so the user
@@ -76,30 +70,8 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
         return true
     }
     func application(_ application: NSApplication, open urls: [URL]) {
-        guard model != nil else {
-            pendingOpenURLs.append(contentsOf: urls)
-            return
-        }
-        handleOpenURLs(urls)
-    }
-
-    private func handleOpenURLs(_ urls: [URL]) {
         for url in urls where url.scheme?.lowercased() == "tomatobar-personal" {
-            switch url.host?.lowercased() {
-            case "startstop":
-                model.primaryAction()
-            case "open":
-                showMainWindow()
-            case "todo":
-                guard let rawID = url.pathComponents.dropFirst().first,
-                      let id = UUID(uuidString: rawID),
-                      let todo = model.state.todos.first(where: { $0.id == id && !$0.isCompleted })
-                else { continue }
-                model.prepareTodo(todo)
-                showMainWindow()
-            default:
-                continue
-            }
+            if url.host?.lowercased() == "startstop" { model.primaryAction() }
         }
     }
     func showMainWindow() {
