@@ -9,7 +9,7 @@ macOS 菜单栏番茄钟 · [TomatoBar](https://github.com/ivoronin/TomatoBar) �
 完全无声 · 事件记录 · 日／周／月复盘
 
 [![tests](https://github.com/mikilolipop/TomatoBar-Personal/actions/workflows/main.yml/badge.svg?branch=feature/personal-focus)](https://github.com/mikilolipop/TomatoBar-Personal/actions/workflows/main.yml)
-[![download](https://img.shields.io/badge/下载-V1.3.1-orange)](https://github.com/mikilolipop/TomatoBar-Personal/releases/latest)
+[![download](https://img.shields.io/badge/下载-V1.3.2-orange)](https://github.com/mikilolipop/TomatoBar-Personal/releases/latest)
 [![website](https://img.shields.io/badge/官网-mikilolipop.github.io-8a6d3b)](https://mikilolipop.github.io/TomatoBar-Personal/)
 ![macOS](https://img.shields.io/badge/macOS-12.3%2B-blue)
 ![Swift](https://img.shields.io/badge/Swift-SwiftUI%20%2B%20AppKit-orange)
@@ -41,6 +41,7 @@ macOS 菜单栏番茄钟 · [TomatoBar](https://github.com/ivoronin/TomatoBar) �
 
 | 版本 | 内容 |
 |---|---|
+| V1.3.2（3.9.2） | 修复记录编辑器主分类下拉箭头点击无响应。[更新说明](docs/V1.3.2更新说明.md) |
 | V1.3.1（3.9.1） | 待办、分类配色、数值输入及 UI 精修；包含近期存储和计时修复。[更新说明](docs/V1.3.1更新说明.md) |
 | V1.3（3.9.0） | 删除单条记录；分类入口常驻、可选图标。[更新说明](docs/V1.3更新说明.md) |
 | V1.2（3.8.0） | 原生主窗口，日／周／月复盘，紧凑与大倒计时。[更新说明](docs/V1.2更新说明.md) |
