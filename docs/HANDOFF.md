@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-10-01，by Codex · 主分类点击修复已推送；按用户要求准备 V1.3.2（3.9.2 / build 3）GitHub 发布。本机安装副本已有修复，版本标记仍为 3.9.1 / build 2。Widget 仍全面取消，Personal Team 自动签名契约保留。
+最后更新：2026-10-01，by Codex · V1.3.2（3.9.2 / build 3）已在 GitHub 正式发布，包含主分类下拉点击修复；DMG、ZIP、更新说明与官网下载页均已同步并核对。本机安装副本已有相同修复，版本标记仍为 3.9.1 / build 2。Widget 仍全面取消，Personal Team 自动签名契约保留。
 
 ---
 
@@ -44,13 +44,13 @@ popover 和到时提醒窗。上面的限制来自旧 System Events / screencapt
 
 | 项 | 值 |
 |---|---|
-| ✅ **已安装版本** | **3.9.1（V1.3.1，build 2）+ 本机主分类点击补丁**，`/Applications/TomatoBar Personal.app` 已替换并从该路径运行，安装副本实测箭头展开；本机开发签名，arm64 + x86_64；公开下载包尚不含本补丁 |
-| HEAD | 顶部提交 = V1.3.2 发布元数据与更新说明；主分类修复核心为 `273f8e0`，此前公开发布锚点为 `9100c67` |
-| 工作区 | V1.3.2 版本元数据、更新说明及下载页链接准备提交至 origin；真实数据、打包产物与验收截图均保留在仓库外 |
+| ✅ **已安装版本** | **3.9.1（V1.3.1，build 2）+ 本机主分类点击补丁**，`/Applications/TomatoBar Personal.app` 已替换并从该路径运行，安装副本实测箭头展开；本机开发签名，arm64 + x86_64；公开 V1.3.2（3.9.2 / build 3）已包含同一补丁，本轮只同步 GitHub，未重装本机版本标签 |
+| HEAD | 顶部提交 = V1.3.2 发布确认交接；发布标签 `v3.9.2` 锚点为 `8d4836e`，主分类修复核心为 `273f8e0` |
+| 工作区 | V1.3.2 版本元数据、更新说明、源码/tag 与官网下载页已推送；发布确认交接单独提交。真实数据、打包产物与验收截图均保留在仓库外 |
 | 测试 | **214 项领域 + 40 项真实桥接 + 8 项合成启动事件**全绿；Release 干净构建 + 严格签名通过 |
-| **CI** | 推送后以 HEAD 最新 run 为准；本地四套检查均已复跑 |
+| **CI** | `v3.9.2` 标签 run `36807963164` 与发布源码分支 run `36807962859` 均 success（`8d4836e`）；后续纯文档交接提交的状态以其独立 run 为准 |
 | 远程 | `origin` = `mikilolipop/TomatoBar-Personal`（**public**，2026-09-29 GitHub API 实测；默认分支 `feature/personal-focus`）；`upstream` = `ivoronin/TomatoBar` |
-| 发布入口 | [V1.3.1 / v3.9.1](https://github.com/mikilolipop/TomatoBar-Personal/releases/tag/v3.9.1)，DMG + ZIP；[下载页](https://mikilolipop.github.io/TomatoBar-Personal/) 的兜底链接、更新说明及宣传图同步为本版 |
+| 发布入口 | [V1.3.2 / v3.9.2](https://github.com/mikilolipop/TomatoBar-Personal/releases/tag/v3.9.2)，DMG + ZIP，已成为 latest；[下载页](https://mikilolipop.github.io/TomatoBar-Personal/) 的静态兜底链接、修复说明与更新说明同步为本版 |
 | 用户真实数据 | 本次主分类补丁检查前后 **6 条记录 + 1 个待办 + 分类样式逐条一致**；仅正常退出更新 checkpoint。私有快照与比对结果保留在仓库外的本地审计目录，未提交真实事件名或数据 |
 | QA 隔离环境 | 本轮 UI 使用新建 UIAudit Bundle ID，24 条合成记录 + 4 个合成待办，实际完成计时新增 1 条；空状态另以隔离快照检查。桥接仍使用 QA13 新建临时子目录，既有 QA13 sessions 未改 |
 | git 身份 | 本仓库 `--local`：`mikilolipop <207336577+mikilolipop@users.noreply.github.com>`（全局仍未设置） |
@@ -86,7 +86,7 @@ tarball 是首次提交前的应急措施。有了 git + 远程后必要性下�
 
 ## 进行中
 
-**V1.3.1 已正式安装**（内部版本 3.9.1，build 2，见 [`V1.3.1更新说明.md`](V1.3.1更新说明.md)）。
+**V1.3.2 已正式发布**（内部版本 3.9.2，build 3，见 [`V1.3.2更新说明.md`](V1.3.2更新说明.md)）；本机仍运行带相同主分类修复的 3.9.1 / build 2 安装副本。
 用户明确要求：这一版先把已经做完的功能定稿装上用，剩余问题不在本轮范围内解决。
 
 分类视觉方案在 [`分类视觉设计.md`](分类视觉设计.md)，**设计已定稿，代码尚未按新格式实现**
@@ -201,12 +201,13 @@ macosx 专属 identity 行,属本机契约的一部分,不要 Drive 反向覆盖
 
 ---
 
-## 进行中（2026-10-01，V1.3.2 GitHub 同步）
+## 刚做完（2026-10-01，V1.3.2 GitHub 同步）
 
 - 版本升为 3.9.2 / build 3；新增 V1.3.2 更新说明，README 与下载页指向新版。此前发布内容及标签保留。
 - 214 项领域、40 项桥接、8 项合成启动事件检查通过；universal Release 与严格签名通过。
 - DMG / ZIP 从本次构建的副本制作并重签为 ad-hoc，移除开发 profile；只读挂载、解压、版本、架构、签名、可执行文件一致性及 SHA-256 均已验证。
-- 下一步：提交并推送源码/tag，上传两个包后正式发布，再部署与核对下载页。
+- GitHub release 已正式发布并成为 latest，两个资产的远端 digest 与本地一致；通过公开下载链接重新下载，两包 SHA-256 均匹配。
+- `v3.9.2` / `8d4836e` 的分支与标签 CI 均 success；官网下载页部署至 gh-pages 提交 `acb658e`，Pages 状态 built，HTTPS 实读新版 DMG/ZIP、修复说明及更新说明链接全部正确。
 - 本轮未替换或重启正在使用的本机安装副本；它已包含同一主分类修复，版本标记仍为 3.9.1 / build 2。
 
 ## 刚做完（2026-10-01，Codex 主分类菜单点击修复）
