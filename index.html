@@ -4,160 +4,64 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="site/ published by scripts/deploy-site.sh">
-<title>TomatoBar Personal · 专注时光</title>
-<meta name="description" content="完全无声的 macOS 菜单栏番茄钟：专注事件记录、标签分类、日/周/月复盘。TomatoBar 的个人定制 fork，开源 MIT。">
-<meta property="og:title" content="TomatoBar Personal · 专注时光">
-<meta property="og:description" content="完全无声的 macOS 菜单栏番茄钟：专注事件记录、标签分类、日/周/月复盘。">
+<title>TomatoBar Personal · 给眼前的事，一段安静的专注时间</title>
+<meta name="description" content="安静的 macOS 菜单栏番茄钟。无声计时、随时暂停，为每段专注写下名字，按日、周、月回看时间去向。记录留在本机，MIT 开源。">
+<meta property="og:title" content="TomatoBar Personal · 一段安静的专注时间">
+<meta property="og:description" content="无声计时，随时暂停。为每段专注写下名字，回看时间去了哪里。">
 <meta property="og:image" content="https://mikilolipop.github.io/TomatoBar-Personal/hero-day.png">
 <meta property="og:type" content="website">
+<meta property="og:url" content="https://mikilolipop.github.io/TomatoBar-Personal/">
 <link rel="icon" type="image/png" href="icon.png">
-<style>
-:root{
-  --paper:#f7f0e2; --card:#fffaf0; --ink:#4a3326; --muted:#8c7861;
-  --red:#b34d3d; --red-deep:#9a4234; --green:#879c6e; --gold:#cfA657; --line:#dbcfb5;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--paper);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;line-height:1.6}
-a{color:var(--red);text-decoration:none}
-a:hover{text-decoration:underline}
-.wrap{max-width:1060px;margin:0 auto;padding:0 24px}
-header{display:flex;align-items:center;gap:12px;padding:20px 0}
-header img{width:36px;height:36px}
-header .name{font-size:18px;font-weight:700;color:var(--ink)}
-header nav{margin-left:auto;display:flex;gap:18px;font-size:14px}
-.hero{display:grid;grid-template-columns:1fr;gap:28px;padding:36px 0 8px;text-align:center}
-.hero h1{font-size:clamp(30px,5vw,46px);font-weight:700;letter-spacing:.01em}
-.hero h1 em{font-style:normal;color:var(--red)}
-.hero p.sub{color:var(--muted);font-size:clamp(15px,2vw,18px);max-width:640px;margin:0 auto}
-.pills{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
-.pills span{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 12px}
-.dl{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:6px}
-.btn{display:inline-flex;align-items:center;gap:8px;border-radius:12px;padding:13px 26px;font-size:16px;font-weight:600;border:1px solid transparent;transition:transform .12s ease, box-shadow .12s ease}
-.btn:hover{text-decoration:none;transform:translateY(-1px)}
-.btn.primary{background:var(--red);color:#fdf7ec;box-shadow:0 6px 18px rgba(179,77,61,.28)}
-.btn.primary:hover{background:var(--red-deep)}
-.btn.ghost{background:var(--card);color:var(--ink);border-color:var(--line)}
-.btn small{font-weight:400;opacity:.75;font-size:12px}
-.dlmeta{margin-top:10px;font-size:13px;color:var(--muted);text-align:center;min-height:20px}
-.shot{margin:34px auto 10px;max-width:920px}
-.shot img{width:100%;border-radius:14px;box-shadow:0 24px 60px rgba(74,51,38,.22),0 2px 8px rgba(74,51,38,.12)}
-.shot figcaption{text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px}
-section{padding:52px 0 8px}
-h2{font-size:24px;margin-bottom:22px;text-align:center}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
-.card h3{font-size:16px;display:flex;align-items:center;gap:9px;margin-bottom:6px}
-.card h3 svg{flex:none}
-.card p{font-size:14px;color:var(--muted)}
-.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;counter-reset:s}
-.step{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;font-size:14.5px;color:var(--muted)}
-.step b{display:block;color:var(--ink);margin-bottom:6px;font-size:15.5px}
-.step code{display:block;background:rgba(179,77,61,.08);border-radius:8px;padding:9px 10px;margin-top:8px;font-size:12px;color:var(--ink);overflow-x:auto;white-space:nowrap}
-.thanks{max-width:720px;margin:0 auto;text-align:center;padding:28px 24px}
-.thanks h2{margin-bottom:10px}
-.thanks p{font-size:15px;color:var(--muted)}
-.thanks .names{list-style:none;display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin:22px 0 18px}
-.thanks .names li{border:1px solid var(--line);border-radius:999px;padding:7px 20px;font-size:17px;font-weight:600;color:var(--ink)}
-footer{margin-top:64px;border-top:1px solid var(--line);padding:26px 0 34px;font-size:13.5px;color:var(--muted);text-align:center}
-footer .links{display:flex;gap:18px;justify-content:center;margin-bottom:8px;flex-wrap:wrap}
-</style>
+<link rel="stylesheet" href="styles.css">
+<script src="script.js" defer></script>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <img src="icon.png" alt="TomatoBar Personal 图标">
-    <span class="name">TomatoBar Personal</span>
-    <nav>
-      <a href="#features">功能</a>
-      <a href="#install">安装</a>
-      <a href="https://github.com/mikilolipop/TomatoBar-Personal" rel="noopener">GitHub</a>
-    </nav>
-  </header>
-
-  <div class="hero">
-    <h1>让专注，<em>慢慢生长</em></h1>
-    <p class="sub">完全无声的 macOS 菜单栏番茄钟。每一段专注都留下名字与分类，日／周／月随时回顾时间去向。</p>
-    <div class="pills">
-      <span>macOS 12.3+</span><span>Apple Silicon &amp; Intel</span><span>约 4 MB</span><span>MIT 开源</span><span>数据不离开本机</span>
+<a class="skip-link" href="#main">跳到正文</a>
+<header class="site-header container">
+  <a class="brand" href="#" aria-label="TomatoBar Personal 首页"><img class="pixel-art" src="assets/pixel-tomato.png" alt="" width="40" height="40"><span>TomatoBar Personal</span></a>
+  <nav aria-label="主导航"><a class="nav-section" href="#features">功能</a><a class="nav-section" href="#install">安装</a><a href="https://github.com/mikilolipop/TomatoBar-Personal">GitHub</a><a class="nav-download" href="#download">下载</a></nav>
+</header>
+<main id="main">
+  <section class="hero container" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <p class="eyebrow">专为 macOS 而生</p>
+      <h1 id="hero-title"><span>给眼前的事，</span><span>一段安静的</span><span class="accent">专注时间。</span></h1>
+      <p class="hero-description">无声计时，随时暂停。<br>为每段专注写下名字，回看时间去了哪里。</p>
+      <div class="actions" id="download"><a class="button button-primary" id="btn-dmg" data-download="dmg" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.9.2/TomatoBarPersonal-3.9.2.dmg">下载 macOS 版<img class="ui-icon" src="assets/download.svg" alt="" width="20" height="20"></a><a class="button button-secondary" href="#install">安装指南<img class="ui-icon" src="assets/arrow-right.svg" alt="" width="18" height="18"></a></div>
+      <p class="compatibility">macOS 12.3+ · Apple Silicon / Intel<br><span data-release-version>v3.9.2</span> · MIT 开源 · <span data-download-size="dmg">3.9 MB</span></p>
+      <p class="download-alternatives"><a id="btn-zip" data-download="zip" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.9.2/TomatoBarPersonal-3.9.2.zip">下载 ZIP</a><span aria-hidden="true">·</span><a href="https://github.com/mikilolipop/TomatoBar-Personal/releases/latest">查看更新</a></p>
     </div>
-    <div class="dl">
-      <a class="btn primary" id="btn-dmg" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.9.2/TomatoBarPersonal-3.9.2.dmg">下载 .dmg <small id="dmg-size"></small></a>
-      <a class="btn ghost" id="btn-zip" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.9.2/TomatoBarPersonal-3.9.2.zip">下载 .zip <small id="zip-size"></small></a>
-    </div>
-    <div class="dlmeta" id="dl-meta">最新版本 v3.9.2 · <a href="https://github.com/mikilolipop/TomatoBar-Personal/releases/latest">查看全部版本与更新说明 →</a></div>
-    <p class="dlmeta">V1.3.2：修复记录编辑器中主分类下拉箭头点击无响应。</p>
-  </div>
-
-  <figure class="shot">
-    <img src="hero-day.png" alt="TomatoBar Personal 主窗口：日视图专注足迹与专注记录（示例数据）">
-    <figcaption>原生主窗口 · 日／周／月三种复盘视图（截图为示例数据）</figcaption>
-  </figure>
-
-  <section id="features">
-    <h2>为什么是它</h2>
-    <div class="grid">
-      <div class="card"><h3><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="none" stroke="#b34d3d" stroke-width="1.6"/><path d="M5 9h8M9 5v8" stroke="#b34d3d" stroke-width="1.6" transform="rotate(45 9 9)"/></svg>完全无声</h3><p>移除了全部音频代码与素材。休息到点弹出的是无声置顶提醒窗，连系统通知权限都不需要。</p></div>
-      <div class="card"><h3><svg width="18" height="18" viewBox="0 0 18 18"><rect x="2.5" y="2" width="13" height="14" rx="2.5" fill="none" stroke="#879c6e" stroke-width="1.6"/><path d="M5.5 6.5h7M5.5 9.5h7M5.5 12.5h4" stroke="#879c6e" stroke-width="1.6"/></svg>有名字的记录</h3><p>开始前写下「这次做什么」，结束后可改名、打多个标签、分统计类别——每段专注都可回溯、可删除。</p></div>
-      <div class="card"><h3><svg width="18" height="18" viewBox="0 0 18 18"><path d="M9 2v14M2 9h14" stroke="#cfa657" stroke-width="1.6" opacity="0"/><rect x="4" y="4" width="3.5" height="10" rx="1.2" fill="#cfa657"/><rect x="10.5" y="4" width="3.5" height="10" rx="1.2" fill="#cfa657"/></svg>暂停与继续</h3><p>工作和休息都能暂停。电脑睡眠、退出应用自动暂停，中断恢复最多只差 5 秒检查点。</p></div>
-      <div class="card"><h3><svg width="18" height="18" viewBox="0 0 18 18"><rect x="2" y="9" width="3.5" height="7" rx="1" fill="#7d9e9e"/><rect x="7.2" y="5" width="3.5" height="11" rx="1" fill="#b58a68"/><rect x="12.4" y="2" width="3.5" height="14" rx="1" fill="#a797b8"/></svg>日 / 周 / 月复盘</h3><p>色块流看一天的节奏，堆叠柱看一周的积累，热力日历看一个月的坚持。统计分类由你定义。</p></div>
-      <div class="card"><h3><svg width="18" height="18" viewBox="0 0 18 18"><path d="M9 2l6 2.5v4c0 3.5-2.4 6.5-6 7.5-3.6-1-6-4-6-7.5v-4L9 2z" fill="none" stroke="#b34d3d" stroke-width="1.6"/></svg>数据只在你手里</h3><p>无网络请求、无遥测。记录原子写入本机 sessions.json，损坏保护 + 读盘恢复，界面可直接打开数据文件夹。</p></div>
-      <div class="card"><h3><svg width="18" height="18" viewBox="0 0 18 18"><circle cx="6.5" cy="9" r="4" fill="none" stroke="#8c7861" stroke-width="1.6"/><circle cx="11.5" cy="9" r="4" fill="none" stroke="#b34d3d" stroke-width="1.6"/></svg>与原版共存</h3><p>独立 Bundle ID 与数据目录，TomatoBar 原版可以同时装。基于上游改造，代码开源、版本可追溯。</p></div>
+    <figure class="hero-preview">
+      <button class="screenshot-button" type="button" data-preview aria-label="查看 TomatoBar Personal 主窗口大图"><img class="app-screenshot" src="hero-day.png" alt="TomatoBar Personal 完整主窗口：专注足迹、分类、待办与记录（示例数据）" width="2360" height="1584" fetchpriority="high"></button>
+      <figcaption>原生 macOS 界面 · 示例数据<span aria-hidden="true"> / </span><button class="text-link" type="button" data-preview>查看大图</button></figcaption>
+    </figure>
+  </section>
+  <section class="journey container" id="features" aria-labelledby="journey-title">
+    <h2 id="journey-title">从开始，到看见积累。</h2>
+    <div class="journey-grid">
+      <article class="journey-item"><span class="step-number" aria-hidden="true">01</span><div><h3>写下这一刻</h3><p>给这段专注一个清晰的名字。选择分类与标签，让当下的投入，日后也有迹可循。</p></div></article>
+      <article class="journey-item"><span class="step-number" aria-hidden="true">02</span><div><h3>安静投入</h3><p>在菜单栏静静计时，随时暂停或继续。到点以无声窗口提醒，陪你保持自己的节奏。</p></div></article>
+      <article class="journey-item"><span class="step-number" aria-hidden="true">03</span><div><h3>回看足迹</h3><p>按日、周、月回顾专注记录。看见时间去了哪里，也看见一段段积累。</p></div></article>
     </div>
   </section>
-
-  <section id="install">
-    <h2>三步开始</h2>
-    <div class="steps">
-      <div class="step"><b>1 · 下载</b>点上方按钮，选 dmg 或 zip（同一个 universal 版本，Intel / M 系列芯片通用）。</div>
-      <div class="step"><b>2 · 安装</b>dmg 打开后把番茄拖进 Applications；zip 解压后移入 Applications。</div>
-      <div class="step"><b>3 · 首次打开</b>本应用为 ad-hoc 签名（未做付费公证），若被 Gatekeeper 拦截，终端执行一次：<code>xattr -dr com.apple.quarantine "/Applications/TomatoBar Personal.app"</code></div>
-    </div>
+  <section class="privacy container" aria-labelledby="privacy-title">
+    <div class="privacy-heading"><p class="eyebrow">专注属于你，记录也是。</p><h2 id="privacy-title">你的记录，<br>留在你的 Mac。</h2></div>
+    <div class="privacy-copy"><p>专注记录保存在本机。应用无网络请求，无遥测，<br class="desktop-break">你的时间，无需交给别处。</p><p>TomatoBar Personal 是 MIT 开源项目。<br class="desktop-break">源码与构建方式公开，你可以随时查看。</p><a class="text-link source-link" href="https://github.com/mikilolipop/TomatoBar-Personal">在 GitHub 上查看源码<img class="ui-icon" src="assets/arrow-right.svg" alt="" width="18" height="18"></a></div>
   </section>
-
-  <section id="thanks" aria-labelledby="thanks-title">
-    <div class="card thanks">
-      <h2 id="thanks-title">鸣谢</h2>
-      <p>感谢第一批客户</p>
-      <ul class="names" aria-label="第一批客户">
-        <li>nafi</li>
-        <li>Chiwawa</li>
-        <li>ElF</li>
-      </ul>
-      <p>谢谢你们在 TomatoBar Personal 起步时给予的信任与支持。</p>
-    </div>
+  <section class="closing container" aria-labelledby="closing-title">
+    <div class="closing-copy"><h2 id="closing-title">下一段，专注什么？</h2><p>在安静中，积累每一段有意义的时间。</p></div>
+    <div class="closing-download"><div class="actions"><a class="button button-primary" data-download="dmg" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.9.2/TomatoBarPersonal-3.9.2.dmg">下载 macOS 版<img class="ui-icon" src="assets/download.svg" alt="" width="20" height="20"></a><a class="button button-secondary" href="#install">安装指南<img class="ui-icon" src="assets/arrow-right.svg" alt="" width="18" height="18"></a></div><p class="compatibility">macOS 12.3+ · Apple Silicon / Intel · <span data-release-version>v3.9.2</span></p></div>
+    <img class="closing-tomato pixel-art" src="assets/pixel-tomato.png" alt="" width="120" height="120" loading="lazy">
   </section>
-
-  <footer>
-    <div class="links">
-      <a href="#thanks">鸣谢</a>
-      <a href="https://github.com/mikilolipop/TomatoBar-Personal">源码仓库</a>
-      <a href="https://github.com/mikilolipop/TomatoBar-Personal/releases">发布记录</a>
-      <a href="https://github.com/mikilolipop/TomatoBar-Personal/blob/feature/personal-focus/docs/V1.3.2%E6%9B%B4%E6%96%B0%E8%AF%B4%E6%98%8E.md">更新说明</a>
-      <a href="https://github.com/ivoronin/TomatoBar">上游 TomatoBar</a>
-    </div>
-    <p>基于 <a href="https://github.com/ivoronin/TomatoBar">ivoronin/TomatoBar</a>（MIT）的个人定制 fork · 本仓库与全部改动同为 MIT 许可</p>
-    <p>🍅 种自己的番茄，让别人说去吧</p>
-  </footer>
-</div>
-<script>
-// 自动指向最新 Release：静态链接是兜底，脚本负责刷新版本、链接与体积
-fetch("https://api.github.com/repos/mikilolipop/TomatoBar-Personal/releases/latest", {headers: {Accept: "application/vnd.github+json"}})
-  .then(function (r) { if (!r.ok) throw 0; return r.json(); })
-  .then(function (rel) {
-    var mb = function (n) { return (n / 1048576).toFixed(1) + " MB"; };
-    rel.assets.forEach(function (a) {
-      var size = document.getElementById(a.name.endsWith(".dmg") ? "dmg-size" : a.name.endsWith(".zip") ? "zip-size" : null);
-      var btn = a.name.endsWith(".dmg") ? "btn-dmg" : a.name.endsWith(".zip") ? "btn-zip" : null;
-      if (btn) { document.getElementById(btn).href = a.browser_download_url; }
-      if (size) { size.textContent = "· " + mb(a.size); }
-    });
-    document.getElementById("dl-meta").textContent = "最新版本 " + rel.tag_name + " · 发布于 " + rel.published_at.slice(0, 10) + " · ";
-    var more = document.createElement("a");
-    more.href = "https://github.com/mikilolipop/TomatoBar-Personal/releases/latest";
-    more.textContent = "查看全部版本与更新说明 →";
-    document.getElementById("dl-meta").appendChild(more);
-  })
-  .catch(function () { /* 拉取失败时静态兜底链接仍然可用 */ });
-</script>
+  <section class="installation container" id="install" aria-label="安装指南">
+    <details id="install-details"><summary><span>首次安装？从这里开始。</span><span class="summary-hint">展开安装指南</span></summary>
+      <ol class="installation-steps"><li><h3>下载</h3><p>选择 DMG 或 ZIP。两个安装包均支持 Apple Silicon 与 Intel，无需区分芯片。</p><a class="text-link" data-download="zip" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.9.2/TomatoBarPersonal-3.9.2.zip">下载 ZIP · <span data-download-size="zip">3.5 MB</span></a></li><li><h3>移入 Applications</h3><p>打开 DMG，把应用拖进 Applications 文件夹；使用 ZIP 时，解压后将应用移入该文件夹。</p></li><li><h3>首次打开</h3><p>公开安装包采用 ad-hoc 签名，未做付费公证。如果 macOS 拦截首次打开，请参照下面的说明。</p></li></ol>
+      <div class="first-open"><h3>如果 macOS 提示无法打开</h3><p>确认安装包来自本页的 GitHub 发布链接，并已放入 Applications。在终端执行以下命令后重新打开：</p><div class="command-row"><code id="install-command">xattr -dr com.apple.quarantine "/Applications/TomatoBar Personal.app"</code><button class="copy-button" id="copy-command" type="button">复制命令</button></div><p class="copy-feedback" id="copy-feedback" role="status" aria-live="polite"></p></div>
+    </details>
+  </section>
+  <section class="thanks container" id="thanks" aria-labelledby="thanks-title"><h2 id="thanks-title">感谢最早的支持</h2><p>谢谢你们在 TomatoBar Personal 起步时给予的信任。</p><ul aria-label="第一批客户"><li>nafi</li><li>Chiwawa</li><li>ElF</li></ul></section>
+</main>
+<footer class="site-footer container"><nav aria-label="页脚导航"><a href="https://github.com/mikilolipop/TomatoBar-Personal">GitHub</a><a href="https://github.com/mikilolipop/TomatoBar-Personal/releases">发布记录</a><a href="https://github.com/mikilolipop/TomatoBar-Personal/releases/latest">更新说明</a><a href="https://github.com/mikilolipop/TomatoBar-Personal/blob/feature/personal-focus/LICENSE">MIT 开源</a></nav><p>基于 <a href="https://github.com/ivoronin/TomatoBar">ivoronin/TomatoBar</a>（MIT）的个人定制 fork。</p><p class="footer-signoff">一点专注，一点积累。</p></footer>
+<dialog class="preview-dialog" id="preview-dialog" aria-labelledby="preview-title"><div class="preview-toolbar"><h2 id="preview-title">TomatoBar Personal · 完整界面</h2><button class="close-preview" id="close-preview" type="button" autofocus>关闭</button></div><img src="hero-day.png" alt="TomatoBar Personal 主窗口完整截图，展示日视图、分类、待办与记录（示例数据）" width="2360" height="1584"><p>截图为示例数据。<a href="hero-day.png" target="_blank" rel="noopener">打开原图</a></p></dialog>
 </body>
 </html>
