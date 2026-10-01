@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-10-01，by Codex · GitHub README 与下载页新增第一批客户鸣谢。V1.3.1（3.9.1 / build 2）正式安装与发布状态延续，Widget 仍全面取消，Personal Team 自动签名契约保留。
+最后更新：2026-10-01，by Codex · 修复记录编辑器主分类箭头点击无响应。本机安装副本含此补丁；公开 V1.3.1（3.9.1 / build 2）下载包仍是此前发布内容，未重新发布。Widget 仍全面取消，Personal Team 自动签名契约保留。
 
 ---
 
@@ -44,14 +44,14 @@ popover 和到时提醒窗。上面的限制来自旧 System Events / screencapt
 
 | 项 | 值 |
 |---|---|
-| ✅ **已安装版本** | **3.9.1（V1.3.1，build 2）**，`/Applications/TomatoBar Personal.app` 已替换并从该路径运行；设置页实读 `Personal · 3.9.1`；本机开发签名，arm64 + x86_64 |
-| HEAD | 顶部提交 = README 与网页第一批客户鸣谢；应用发布源码锚点 `9100c67`，包含 UI 精修 `41cb08e`，此前安全锚点 `6d8c0ef` |
-| 工作区 | 客户鸣谢随 README 与下载页提交推送至 origin；真实使用数据与验收截图仅保留本地 |
+| ✅ **已安装版本** | **3.9.1（V1.3.1，build 2）+ 本机主分类点击补丁**，`/Applications/TomatoBar Personal.app` 已替换并从该路径运行，安装副本实测箭头展开；本机开发签名，arm64 + x86_64；公开下载包尚不含本补丁 |
+| HEAD | 顶部提交 = 主分类菜单点击修复；公开应用发布源码锚点仍为 `9100c67`，包含 UI 精修 `41cb08e`，此前安全锚点 `6d8c0ef` |
+| 工作区 | 主分类点击补丁与交接记录提交推送至 origin；真实使用数据与验收截图仅保留本地 |
 | 测试 | **214 项领域 + 40 项真实桥接 + 8 项合成启动事件**全绿；Release 干净构建 + 严格签名通过 |
 | **CI** | 推送后以 HEAD 最新 run 为准；本地四套检查均已复跑 |
 | 远程 | `origin` = `mikilolipop/TomatoBar-Personal`（**public**，2026-09-29 GitHub API 实测；默认分支 `feature/personal-focus`）；`upstream` = `ivoronin/TomatoBar` |
 | 发布入口 | [V1.3.1 / v3.9.1](https://github.com/mikilolipop/TomatoBar-Personal/releases/tag/v3.9.1)，DMG + ZIP；[下载页](https://mikilolipop.github.io/TomatoBar-Personal/) 的兜底链接、更新说明及宣传图同步为本版 |
-| 用户真实数据 | 本轮检查前后 **4 条记录 + 1 个待办 + 分类样式逐条一致**；仅正常退出更新 checkpoint。私有快照与比对结果保留在仓库外的本地审计目录，未提交真实事件名或数据 |
+| 用户真实数据 | 本次主分类补丁检查前后 **6 条记录 + 1 个待办 + 分类样式逐条一致**；仅正常退出更新 checkpoint。私有快照与比对结果保留在仓库外的本地审计目录，未提交真实事件名或数据 |
 | QA 隔离环境 | 本轮 UI 使用新建 UIAudit Bundle ID，24 条合成记录 + 4 个合成待办，实际完成计时新增 1 条；空状态另以隔离快照检查。桥接仍使用 QA13 新建临时子目录，既有 QA13 sessions 未改 |
 | git 身份 | 本仓库 `--local`：`mikilolipop <207336577+mikilolipop@users.noreply.github.com>`（全局仍未设置） |
 
@@ -200,6 +200,16 @@ CI 产物明确标注**只是编译门,不可运行**。pbxproj 中云端引入�
 macosx 专属 identity 行,属本机契约的一部分,不要 Drive 反向覆盖;改动前先 `git pull`。
 
 ---
+
+## 刚做完（2026-10-01，Codex 主分类菜单点击修复）
+
+- 用户报告：记录编辑器主分类右侧箭头点击无响应。此前 `41cb08e` 使用空 `Color.clear` 菜单标签，在更宽的 overlay 绘制分类名称与箭头；原生菜单的鼠标目标没有随 overlay 扩大，辅助功能点击能展开不能证明可见箭头可点。
+- `View.swift` 新增局部 `CategoryMenuButton`：使用明确尺寸的 `NSPopUpButton`，原生控件负责完整 170×34 点击区域与菜单选择；原有配色、名称与箭头通过不接收事件的 overlay 绘制，关闭原生额外箭头。保留已有/建议分类分组、当前分类标记、辅助功能名称与草稿提交逻辑。
+- 实机验证：主窗口记录编辑器中，以截图坐标点击右侧箭头和名称区域均展开菜单，选择建议分类后主分类及图标更新；取消草稿返回。最终安装副本再次通过右侧箭头鼠标点击检查。未点击保存或删除真实记录。菜单栏编辑器复用相同控件，但其独立入口未在本轮实测。
+- 验证：`scripts/dev-run.sh` 的 214 项领域、40 项真实桥接、8 项合成启动事件检查与 universal Release/严格签名校验通过。原生菜单内容以 AX 树核验，菜单层截图仍不作为完整视觉验收证据。
+- 安装边界：仅更新本机 `/Applications/TomatoBar Personal.app`，保留旧应用及数据快照；版本元数据仍为 3.9.1 / build 2。公开 release/tag/下载页与发布包未更新，不能把此次修复当作已分发给其他用户。
+- 安装前后快照逐条比对：6 条记录、1 个待办、分类样式均一致，只有 checkpoint 改变。Sky 在替换同路径应用并重启后曾缓存旧进程，使坐标点击报 `noWindowsAvailable`；重置 `node_repl` 并重新获取当前应用状态后恢复，不能据此误判应用菜单失效。
+- 已否决：直接把自定义 HStack 放回 SwiftUI `Menu` 标签，原生 borderless 渲染仍压缩宽度并把图像移到左侧，未达到原有布局与完整点击区域的要求。
 
 ## 刚做完（2026-10-01，Codex 第一批客户鸣谢）
 

@@ -520,6 +520,65 @@ func cancelFocusMessage(_ state: FocusState) -> String {
     return "「\(state.name)」\(started.isEmpty ? "" : "\n\(started)")\n\n取消后，这段专注将被丢弃，不会保存为记录。"
 }
 
+/// A native menu with an explicit mouse target matching the custom label's full frame.
+/// SwiftUI's borderless Menu reduces a label to its native title/image, so framing an
+/// empty label or drawing a wider overlay does not enlarge the native button itself.
+private struct CategoryMenuButton: NSViewRepresentable {
+    let selection: String
+    let available: [String]
+    let suggestions: [String]
+    let onSelect: (String) -> Void
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeCoordinator() -> Coordinator { Coordinator(onSelect: onSelect) }
+
+    func makeNSView(context: Context) -> NSPopUpButton {
+        let button = NSPopUpButton(frame: .zero, pullsDown: true)
+        button.isBordered = false
+        // Transparent NSButtons still track mouse/keyboard events. SwiftUI draws the
+        // label, while this native view owns the entire 170 x 34 interaction area.
+        button.isTransparent = true
+        (button.cell as? NSPopUpButtonCell)?.arrowPosition = .noArrow
+        button.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.selectCategory(_:))
+        return button
+    }
+
+    func updateNSView(_ button: NSPopUpButton, context: Context) {
+        context.coordinator.onSelect = onSelect
+        button.isEnabled = isEnabled
+        button.setAccessibilityLabel("主分类：\(selection)")
+        button.toolTip = "每条记录只计入一个主分类"
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        // A pull-down menu reserves its first item for the button's title.
+        menu.addItem(NSMenuItem(title: selection, action: nil, keyEquivalent: ""))
+        for (heading, categories) in [("已有主分类", available), ("建议分类", suggestions)] where !categories.isEmpty {
+            if menu.items.count > 1 { menu.addItem(.separator()) }
+            let header = NSMenuItem(title: heading, action: nil, keyEquivalent: "")
+            header.isEnabled = false
+            menu.addItem(header)
+            for category in categories {
+                let item = NSMenuItem(title: category, action: nil, keyEquivalent: "")
+                item.representedObject = category
+                item.state = category == selection ? .on : .off
+                menu.addItem(item)
+            }
+        }
+        button.menu = menu
+    }
+
+    final class Coordinator: NSObject {
+        var onSelect: (String) -> Void
+        init(onSelect: @escaping (String) -> Void) { self.onSelect = onSelect }
+        @objc func selectCategory(_ sender: NSPopUpButton) {
+            guard let category = sender.selectedItem?.representedObject as? String else { return }
+            onSelect(category)
+        }
+    }
+}
+
 struct RecordEditor: View {
     let availableCategories: [String]
     let onCancel: () -> Void
@@ -771,25 +830,8 @@ struct RecordEditor: View {
                 .accessibilityLabel(category == "未分类" ? "未分类，设置主分类后可修改样式" : "分类样式，点击修改图标和颜色")
                 .disabled(category == "未分类")
 
-                Menu {
-                    if !availableCategories.isEmpty {
-                        Text("已有主分类").font(.caption)
-                        ForEach(availableCategories, id: \.self) { item in
-                            Button(item) { setCategory(item) }
-                        }
-                    }
-                    if !availableCategories.isEmpty && !unusedSuggestions.isEmpty { Divider() }
-                    if !unusedSuggestions.isEmpty {
-                        Text("建议分类").font(.caption)
-                        ForEach(unusedSuggestions, id: \.self) { item in
-                            Button(item) { setCategory(item) }
-                        }
-                    }
-                } label: {
-                    Color.clear.frame(height: 34).contentShape(RoundedRectangle(cornerRadius: 7))
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
+                CategoryMenuButton(selection: category, available: availableCategories,
+                                   suggestions: unusedSuggestions, onSelect: setCategory)
                 .frame(width: 170, height: 34)
                 .overlay {
                     HStack(spacing: 6) {
