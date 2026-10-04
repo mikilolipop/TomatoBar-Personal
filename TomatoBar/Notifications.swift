@@ -40,7 +40,7 @@ private struct ReminderView: View {
                 .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
             Text("等待你确认后，才会开始下一段计时。")
                 .font(.caption).foregroundColor(Garden.muted)
-            HStack(spacing: 14) {
+            HStack(spacing: 12) {
                 Button("结束本组") {
                     timer.stop()
                     // stop() persists the newly idle state through change(). If that write
@@ -48,6 +48,12 @@ private struct ReminderView: View {
                     // open with its red warning instead of dismissing into a bare menu-bar
                     // dot (P27). Clicking again after the disk recovers dismisses normally.
                     if timer.storageError == nil { dismiss() }
+                }
+                if timer.state.phase == .workFinished {
+                    Button("跳过休息") {
+                        timer.skipRest()
+                        if timer.storageError == nil { dismiss() }
+                    }
                 }
                 Button(timer.state.phase == .workFinished ? "开始休息 · \(timer.restMinutes) 分钟" : "开始下一轮") {
                     if timer.state.phase == .workFinished { timer.startRest() } else { timer.startWork() }

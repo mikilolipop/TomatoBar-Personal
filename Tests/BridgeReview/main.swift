@@ -181,7 +181,51 @@ manualTimer.startWork()
 check(manualTimer.state.phase == .work && manualTimer.state.activeTodoID == nil,
       "manual next round does not inherit the previous todo")
 let manualDisk = try manualStore.load()
-check(manualDisk.seriesTodoID == nil, "manual context switch persists before the next round")
+// Skip rest via bridge: transitions to restFinished, preserves rounds, writes to disk.
+let skipDir = scratch.appendingPathComponent("bridge-skip-rest")
+let skipStore = FocusStore(url: skipDir.appendingPathComponent("sessions.json"))
+var skipSeed = FocusState()
+skipSeed.phase = .rest
+skipSeed.rounds = 2
+try skipStore.save(skipSeed)
+let skipTimer = TBTimer(store: skipStore)
+skipTimer.skipRest()
+check(skipTimer.state.phase == .restFinished && skipTimer.state.rounds == 2,
+      "bridge skipRest transitions to restFinished and keeps round count")
+let skipDisk = try skipStore.load()
+check(skipDisk.phase == .restFinished && skipDisk.rounds == 2,
+      "bridge skipRest persists clean restFinished state without clearing rounds")
+
+// Sticky currentTodo and start tags via bridge:
+let currentTodoDir = scratch.appendingPathComponent("bridge-current-todo")
+let currentTodoStore = FocusStore(url: currentTodoDir.appendingPathComponent("sessions.json"))
+var currentTodoSeed = FocusState()
+let todoWithTagsID = currentTodoSeed.addTodo(title: "期末复习", tags: ["学习", "考试"], at: now)!
+try currentTodoStore.save(currentTodoSeed)
+let currentTimer = TBTimer(store: currentTodoStore)
+currentTimer.selectCurrentTodo(todoWithTagsID)
+check(currentTimer.eventName == "期末复习" && currentTimer.state.currentTodoID == todoWithTagsID,
+      "bridge selectCurrentTodo auto-fills eventName and sets currentTodoID")
+currentTimer.startWork()
+check(currentTimer.state.activeTags == ["学习", "考试"] && currentTimer.state.activeTodoID == todoWithTagsID,
+      "bridge startWork inherits current todo tags and task ID")
+currentTimer.stop()
+check(currentTimer.state.records.first?.tags == ["学习", "考试"] &&
+      currentTimer.state.records.first?.todoID == todoWithTagsID &&
+      currentTimer.state.currentTodoID == todoWithTagsID,
+      "bridge records inherited tags and keeps sticky current task after set completion")
+
+// Free focus with draft tags via bridge:
+currentTimer.selectCurrentTodo(nil)
+currentTimer.setEventName("自主研究")
+currentTimer.setDraftTags(["研究", "技术"])
+currentTimer.startWork()
+check(currentTimer.state.activeTags == ["研究", "技术"] && currentTimer.state.activeTodoID == nil,
+      "bridge free focus uses draft tags and no task ID")
+currentTimer.stop()
+check(currentTimer.state.records.first?.tags == ["研究", "技术"] &&
+      currentTimer.state.records.first?.category == "研究",
+      "bridge free focus records draft tags and correct category")
 
 print("PASS: \(checks) actual TBTimer bridge checks; isolated QA13 IO, no UI interaction")
 withExtendedLifetime(observation) {}

@@ -296,7 +296,7 @@ struct MainWindowView: View {
             }
 
             HStack(spacing: 8) {
-                TextField("添加待办，例如：阅读章节", text: $newTodoTitle)
+                TextField("添加待办，例如：阅读章节 #学习", text: $newTodoTitle)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
                     .padding(.horizontal, 10)
@@ -362,6 +362,7 @@ struct MainWindowView: View {
 
     @ViewBuilder
     private func todoRow(_ todo: FocusTodo) -> some View {
+        let isCurrent = (timer.state.currentTodoID == todo.id || timer.preparedTodoID == todo.id)
         HStack(spacing: 8) {
             Button { timer.toggleTodo(id: todo.id) } label: {
                 GardenActionIcon(name: todo.isCompleted ? "checkmark.circle.fill" : "circle", pointSize: 15,
@@ -384,17 +385,29 @@ struct MainWindowView: View {
                 }.buttonStyle(.plain).accessibilityLabel("取消重命名")
             } else {
                 Button {
-                    timer.prepareTodo(todo)
+                    timer.selectCurrentTodo(todo.id)
                 } label: {
-                    Text(todo.title)
-                        .font(.system(size: 13, weight: timer.preparedTodoID == todo.id ? .semibold : .regular))
-                        .strikethrough(todo.isCompleted)
-                        .foregroundColor(todo.isCompleted ? Garden.muted : Garden.ink)
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: 5) {
+                        if isCurrent {
+                            Text("🎯")
+                                .font(.system(size: 11))
+                        }
+                        Text(todo.title)
+                            .font(.system(size: 13, weight: isCurrent ? .semibold : .regular))
+                            .strikethrough(todo.isCompleted)
+                            .foregroundColor(todo.isCompleted ? Garden.muted : Garden.ink)
+                            .lineLimit(1)
+                        if !todo.tags.isEmpty {
+                            Text(todo.tags.map { "#\($0)" }.joined(separator: " "))
+                                .font(.caption2)
+                                .foregroundColor(Garden.color(todo.tags.first ?? "", styles: timer.state.categoryStyles))
+                                .lineLimit(1)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.plain)
-                .help("设为下一段专注")
+                .help("设为当前专注任务")
 
                 let seconds = timer.state.focusSeconds(forTodo: todo.id)
                 if seconds > 0 {
@@ -405,7 +418,7 @@ struct MainWindowView: View {
 
                 if !todo.isCompleted {
                     Button {
-                        timer.prepareTodo(todo)
+                        timer.selectCurrentTodo(todo.id)
                         timer.startWork()
                     } label: {
                         GardenActionIcon(name: "play.fill", pointSize: 12, color: Garden.red)
@@ -417,7 +430,24 @@ struct MainWindowView: View {
                 }
 
                 Menu {
-                    Button("设为下一段") { timer.prepareTodo(todo) }
+                    Button("设为当前任务") { timer.selectCurrentTodo(todo.id) }
+                    Menu("设置标签") {
+                        if !todo.tags.isEmpty {
+                            Button("清除标签") { timer.setTodoTags(id: todo.id, tags: []) }
+                            Divider()
+                        }
+                        if !timer.state.knownTags.isEmpty {
+                            Text("已有标签")
+                            ForEach(timer.state.knownTags, id: \.self) { tag in
+                                Button(tag) { timer.setTodoTags(id: todo.id, tags: [tag]) }
+                            }
+                            Divider()
+                        }
+                        Text("常用建议")
+                        ForEach(Garden.suggestedCategories, id: \.self) { tag in
+                            Button(tag) { timer.setTodoTags(id: todo.id, tags: [tag]) }
+                        }
+                    }
                     Button("重命名") {
                         editingTodoID = todo.id
                         editingTodoTitle = todo.title
@@ -441,16 +471,16 @@ struct MainWindowView: View {
         .frame(height: 34)
         .background(
             RoundedRectangle(cornerRadius: Garden.cornerSmall)
-                .fill(timer.preparedTodoID == todo.id ? Garden.red.opacity(0.09) : Color.clear)
+                .fill(isCurrent ? Garden.red.opacity(0.10) : Color.clear)
         )
         .contentShape(Rectangle())
         .opacity(todo.isCompleted ? 0.68 : 1)
     }
 
     private func addTodo() {
-        let title = newTodoTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let (title, tags) = FocusTodo.parseInput(newTodoTitle)
         guard !title.isEmpty else { return }
-        timer.addTodo(title)
+        timer.addTodo(title, tags: tags)
         newTodoTitle = ""
     }
 
@@ -576,19 +606,150 @@ struct TimerCard: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 14) {
                 GardenArt(name: "PixelTomato", activity: timer.windowActivity).frame(width: 38, height: 38)
-                if timer.state.phase == .idle {
-                    TextField("下一段，想专注什么？", text: Binding(
-                        get: { timer.eventName },
-                        set: { timer.setEventName($0) }
-                    )).textFieldStyle(.plain).font(.system(size: 15))
+                if timer.state.phase == .idle || timer.state.phase == .restFinished {
+                    if let current = timer.state.currentTodo {
+                        HStack(spacing: 8) {
+                            Text("🎯")
+                                .font(.system(size: 13))
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 6) {
+                                    Text("当前任务")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundColor(Garden.red)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 1)
+                                        .background(Garden.red.opacity(0.12))
+                                        .cornerRadius(3)
+                                    if !current.tags.isEmpty {
+                                        Text(current.tags.map { "#\($0)" }.joined(separator: " "))
+                                            .font(.caption2)
+                                            .foregroundColor(Garden.color(current.tags.first ?? "", styles: timer.state.categoryStyles))
+                                    }
+                                }
+                                Text(current.title)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .lineLimit(1)
+                            }
+                            Menu {
+                                Button("切回自由专注") { timer.selectCurrentTodo(nil) }
+                                Divider()
+                                if timer.state.pendingTodos.count > 1 {
+                                    Text("切换到其他待办：")
+                                    ForEach(timer.state.pendingTodos.filter { $0.id != current.id }) { todo in
+                                        Button(todo.title) { timer.selectCurrentTodo(todo.id) }
+                                    }
+                                }
+                            } label: {
+                                GardenActionIcon(name: "chevron.up.chevron.down", pointSize: 11, color: Garden.muted)
+                            }
+                            .menuStyle(.borderlessButton)
+                            .menuIndicator(.hidden)
+                            .frame(width: 20, height: 20)
+
+                            Button {
+                                timer.selectCurrentTodo(nil)
+                            } label: {
+                                GardenActionIcon(name: "xmark.circle.fill", pointSize: 13, color: Garden.muted)
+                            }
+                            .buttonStyle(.plain)
+                            .help("切回自由专注")
+                        }
+                    } else {
+                        HStack(spacing: 8) {
+                            TextField("下一段，想专注什么？（支持 #标签）", text: Binding(
+                                get: { timer.eventName },
+                                set: { timer.setEventName($0) }
+                            )).textFieldStyle(.plain).font(.system(size: 14))
+
+                            if !timer.state.pendingTodos.isEmpty {
+                                Menu {
+                                    Text("选择已有待办专注：")
+                                    ForEach(timer.state.pendingTodos) { todo in
+                                        Button(todo.title) { timer.selectCurrentTodo(todo.id) }
+                                    }
+                                } label: {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "target")
+                                            .font(.system(size: 11))
+                                        Text("选任务")
+                                            .font(.system(size: 12, weight: .medium))
+                                    }
+                                    .foregroundColor(Garden.ink)
+                                    .padding(.horizontal, 7)
+                                    .frame(height: 28)
+                                    .background(Garden.surface)
+                                    .cornerRadius(Garden.cornerSmall)
+                                }
+                                .menuStyle(.borderlessButton)
+                                .menuIndicator(.hidden)
+                            }
+
+                            Menu {
+                                if !timer.state.draftTags.isEmpty {
+                                    Button("清除标签") { timer.setDraftTags([]) }
+                                    Divider()
+                                }
+                                if !timer.state.knownTags.isEmpty {
+                                    Text("已有标签")
+                                    ForEach(timer.state.knownTags, id: \.self) { tag in
+                                        Button(tag) {
+                                            if timer.state.draftTags.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) {
+                                                timer.setDraftTags(timer.state.draftTags.filter { $0.caseInsensitiveCompare(tag) != .orderedSame })
+                                            } else {
+                                                timer.setDraftTags(timer.state.draftTags + [tag])
+                                            }
+                                        }
+                                    }
+                                    Divider()
+                                }
+                                Text("常用建议")
+                                ForEach(Garden.suggestedCategories, id: \.self) { tag in
+                                    Button(tag) {
+                                        if timer.state.draftTags.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) {
+                                            timer.setDraftTags(timer.state.draftTags.filter { $0.caseInsensitiveCompare(tag) != .orderedSame })
+                                        } else {
+                                            timer.setDraftTags(timer.state.draftTags + [tag])
+                                        }
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "tag")
+                                        .font(.system(size: 10))
+                                    Text(timer.state.draftTags.isEmpty ? "标签" : timer.state.draftTags.map { "#\($0)" }.joined(separator: " "))
+                                        .font(.system(size: 12))
+                                }
+                                .foregroundColor(timer.state.draftTags.isEmpty ? Garden.muted : Garden.color(timer.state.draftTags.first ?? "", styles: timer.state.categoryStyles))
+                                .padding(.horizontal, 7)
+                                .frame(height: 28)
+                                .background(Garden.surface)
+                                .cornerRadius(Garden.cornerSmall)
+                            }
+                            .menuStyle(.borderlessButton)
+                            .menuIndicator(.hidden)
+                        }
+                    }
                 } else {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(timer.state.name.isEmpty ? timer.phaseLabel : timer.state.name).font(.system(size: 14, weight: .medium)).lineLimit(1)
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 6) {
+                            Text(timer.state.name.isEmpty ? timer.phaseLabel : timer.state.name).font(.system(size: 14, weight: .medium)).lineLimit(1)
+                            if !timer.state.activeTags.isEmpty {
+                                Text(timer.state.activeTags.map { "#\($0)" }.joined(separator: " "))
+                                    .font(.caption2)
+                                    .foregroundColor(Garden.color(timer.state.activeTags.first ?? "", styles: timer.state.categoryStyles))
+                            }
+                        }
                         Text(timer.phaseLabel).font(.caption).foregroundColor(Garden.muted)
                     }
                 }
                 Spacer()
-                if timer.state.isTiming { Text(timer.timeLeft).font(.system(size: 28, weight: .medium, design: .rounded).monospacedDigit()) }
+                if timer.state.isTiming {
+                    Text(timer.timeLeft).font(.system(size: 28, weight: .medium, design: .rounded).monospacedDigit())
+                    if timer.state.phase == .rest {
+                        Button("跳过休息") { timer.skipRest() }
+                            .buttonStyle(.bordered)
+                    }
+                }
                 Button(timer.state.isTiming ? (timer.state.paused ? "继续" : "暂停") : timer.state.needsAttention ? "查看提醒" : "开始专注") { timer.primaryAction() }
                     .buttonStyle(.borderedProminent).disabled(timer.storageError != nil && timer.state.phase == .idle)
                 Button { expanded = true } label: { GardenActionIcon(name: "arrow.up.left.and.arrow.down.right") }
@@ -621,11 +782,23 @@ struct ExpandedTimer: View {
             HStack { Spacer(); Button("收起", action: close).keyboardShortcut(.cancelAction) }
             GardenArt(name: "PixelTomato", activity: timer.windowActivity).frame(width: 110, height: 110)
             Text(timer.phaseLabel).foregroundColor(Garden.muted)
-            if timer.state.phase == .idle {
-                TextField("这次准备做什么？", text: Binding(
-                    get: { timer.eventName },
-                    set: { timer.setEventName($0) }
-                )).textFieldStyle(.roundedBorder).frame(width: 300)
+            if timer.state.phase == .idle || timer.state.phase == .restFinished {
+                if let current = timer.state.currentTodo {
+                    HStack(spacing: 8) {
+                        Text("🎯")
+                        Text(current.title).font(.title3).fontWeight(.medium)
+                        if !current.tags.isEmpty {
+                            Text(current.tags.map { "#\($0)" }.joined(separator: " "))
+                                .font(.subheadline)
+                                .foregroundColor(Garden.color(current.tags.first ?? "", styles: timer.state.categoryStyles))
+                        }
+                    }
+                } else {
+                    TextField("这次准备做什么？（支持 #标签）", text: Binding(
+                        get: { timer.eventName },
+                        set: { timer.setEventName($0) }
+                    )).textFieldStyle(.roundedBorder).frame(width: 300)
+                }
             }
             else { Text(timer.state.name).font(.title3).lineLimit(2) }
             Text(timer.state.isTiming ? timer.timeLeft : timer.state.needsAttention ? "完成" : "\(timer.workIntervalLength):00")
@@ -637,9 +810,20 @@ struct ExpandedTimer: View {
                 }.buttonStyle(GardenPrimaryButtonStyle())
                 if timer.state.isTiming {
                     HStack(spacing: 10) {
-                        Button { timer.stop() } label: {
-                            Text(timer.state.phase == .work ? "结束并记录" : "结束休息").frame(maxWidth: .infinity)
+                        Button {
+                            if timer.state.phase == .rest {
+                                timer.skipRest()
+                            } else {
+                                timer.stop()
+                            }
+                        } label: {
+                            Text(timer.state.phase == .work ? "结束并记录" : "跳过休息").frame(maxWidth: .infinity)
                         }.buttonStyle(.bordered)
+                        if timer.state.phase == .rest {
+                            Button { timer.stop() } label: {
+                                Text("结束本组").frame(maxWidth: .infinity)
+                            }.buttonStyle(.bordered).foregroundColor(Garden.muted)
+                        }
                         if timer.state.phase == .work {
                             Button {
                                 cancelWasPaused = timer.state.paused

@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-10-01，by Codex · 官网按用户选定的第二视觉方向重做，电脑/手机验收通过并已上线； V1.3.2（3.9.2 / build 3）已在 GitHub 正式发布，包含主分类下拉点击修复；DMG、ZIP、更新说明与官网下载页均已同步并核对。本机安装副本已有相同修复，版本标记仍为 3.9.1 / build 2。Widget 仍全面取消，Personal Team 自动签名契约保留。
+最后更新：2026-10-04，by Claude/Gemini · 实施跳过休息、输入前/待办选择标签、Popover 记录折叠与 Bluebird 风格专注任务流；242 领域 + 46 真实桥接 + 8 合成启动事件全绿；Release 构建与签名通过，开发版实例已正常运行验证。
 
 ---
 
@@ -46,8 +46,8 @@ popover 和到时提醒窗。上面的限制来自旧 System Events / screencapt
 |---|---|
 | ✅ **已安装版本** | **3.9.1（V1.3.1，build 2）+ 本机主分类点击补丁**，`/Applications/TomatoBar Personal.app` 已替换并从该路径运行，安装副本实测箭头展开；本机开发签名，arm64 + x86_64；公开 V1.3.2（3.9.2 / build 3）已包含同一补丁，本轮只同步 GitHub，未重装本机版本标签 |
 | HEAD | 顶部提交 = V1.3.2 发布确认交接；发布标签 `v3.9.2` 锚点为 `8d4836e`，主分类修复核心为 `273f8e0` |
-| 工作区 | V1.3.2 已发布；本轮只重做 site/：用户选第二方案，要求截图恢复原始比例、下方截图移除、番茄使用原生像素素材。本地及线上页面验收通过，已部署至 gh-pages `29e27a0`；QA 截图保留在仓库外 |
-| 测试 | **214 项领域 + 40 项真实桥接 + 8 项合成启动事件**全绿；Release 干净构建 + 严格签名通过 |
+| 工作区 | 实施跳过休息、任务关联与标签预设、Popover折叠面板、Bluebird专注工作流；/tmp 开发构建已启动运行 |
+| 测试 | **242 项领域 + 46 项真实桥接 + 8 项合成启动事件**全绿；Release 干净构建 + 严格签名通过 |
 | **CI** | `v3.9.2` 标签 run `36807963164` 与发布源码分支 run `36807962859` 均 success（`8d4836e`）；后续纯文档交接提交的状态以其独立 run 为准 |
 | 远程 | `origin` = `mikilolipop/TomatoBar-Personal`（**public**，2026-09-29 GitHub API 实测；默认分支 `feature/personal-focus`）；`upstream` = `ivoronin/TomatoBar` |
 | 发布入口 | [V1.3.2 / v3.9.2](https://github.com/mikilolipop/TomatoBar-Personal/releases/tag/v3.9.2)，DMG + ZIP，已成为 latest；[下载页](https://mikilolipop.github.io/TomatoBar-Personal/) 的静态兜底链接、修复说明与更新说明同步为本版 |
@@ -200,6 +200,36 @@ CI 产物明确标注**只是编译门,不可运行**。pbxproj 中云端引入�
 macosx 专属 identity 行,属本机契约的一部分,不要 Drive 反向覆盖;改动前先 `git pull`。
 
 ---
+
+## 刚做完（2026-10-04，跳过休息 + 任务标签关联与预设 + Popover 记录折叠 + Bluebird 风格专注工作流）
+
+针对用户指出的四个核心使用痛点（无法跳过休息、任务无法提前选标签、Popover 记录占用视线、多轮专注任务概念分散）完成全套领域、桥接与 UI 改造：
+
+1. **跳过休息（Skip Rest）**：
+   - `State.swift` 新增 `skipRest(at now: Date)`：支持从 `.rest` 或 `.workFinished` 瞬时进入 `.restFinished`（「准备下一轮」状态），保留已完成轮数 `rounds`，保留绑定任务与长休息周期，不记休息时间为专注时间。
+   - `Timer.swift` 新增 `skipRest()` 桥接并持久化落盘。
+   - UI 全面接入：
+     - 到时浮动提醒窗（`Notifications.swift`）在专注完成提示时提供 `[跳过休息]`，点击后直接停在准备下一轮状态，无需被迫进入休息或结束整组；
+     - 菜单栏 Popover（`View.swift`）在休息态区分 `[跳过休息]`（进入下一轮准备）与 `[结束本组]`（归零重置）；
+     - 主窗口 `TimerCard` 与 `ExpandedTimer`（`MainWindow.swift`）休息态同步提供跳过与结束本组。
+2. **任务标签关联与输入前/自由专注选标签**：
+   - `FocusTodo` 新增 `tags: [String]`（使用 `decodeIfPresent` 严格向后兼容历史旧 sessions.json，无迁移负担）。
+   - `FocusTodo.parseInput(_ raw: String)` 支持快速解析行内 `#标签` 语法（例如 `完成力学大作业 #学习 #期中复习`）。
+   - `FocusState` 新增 `draftTags`、`activeTags` 及 `knownTags`（聚合历史记录、待办和草稿标签）。
+   - Popover 和主窗口自由专注模式增加标签选择 Pill（支持已有标签与建议分类一键选择），专注开始时将草稿标签固化为记录首分类；待办行提供标签显示与快速设置菜单。
+3. **菜单栏 Popover 记录面板折叠**：
+   - `TBPopoverView` 增加 `@AppStorage("popoverTabsCollapsed") private var isTabsCollapsed = true`。
+   - 默认折叠下方记录/时长/设置面板，仅保留计时与专注输入区域，消除纵向视线干扰；
+   - 点击 Tab 标签或右侧 Chevron 可平滑展开/折叠，记忆偏好；编辑单条记录时自动展开以确保可用性。
+4. **Bluebird 风格专注任务流（绑定目标任务持续专注）**：
+   - `FocusState` 引入 `currentTodoID: UUID?`，任务选择具有粘性（Sticky），跨番茄钟轮次持久保持，无需每轮重新指定；
+   - 单任务累计专注时长清晰可见；
+   - Popover 与主窗口提供醒目的 `🎯 当前任务` 提示条（显示当前任务、对应标签及累计已专注时间），支持随时在待办间切换，或点 `✕` 切回自由专注；
+   - 完成任务或删除任务时自动解绑，不影响正在运行的专注记录归属。
+5. **测试与开发验证闭环**：
+   - 领域测试由 214 项扩充至 **242 项**（涵盖跳过休息、启动标签规范化、粘性任务生命周期、旧数据反序列化兼容性及 `#tag` 解析）；
+   - 真实 `TBTimer` 桥接测试由 40 项扩充至 **46 项**（验证真实磁盘存储事务、跳过休息落盘、当前任务上下文与草稿标签记录）；
+   - Universal Release 干净编译通过，codesign 严格校验通过；`scripts/dev-run.sh` 5 步全绿，新构建已在 `/tmp` 启动运行。
 
 ## 刚做完（2026-10-01，官网重设计，已发布）
 

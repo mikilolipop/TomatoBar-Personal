@@ -74,7 +74,7 @@ macOS 菜单栏番茄钟，是 [ivoronin/TomatoBar](https://github.com/ivoronin/
 ## 命令
 
 ```sh
-scripts/test.sh     # 领域检查（当前 214 项，**以末行 PASS 数为准**，历轮修复一直在加）
+scripts/test.sh     # 领域检查（当前 242 项，**以末行 PASS 数为准**，历轮修复一直在加）
 scripts/dev-run.sh  # 一键开发闭环：优雅退出旧实例 → 测试闸门 → build.sh → 从 /tmp 启动新版。
                     # **改完代码想看效果统一跑它**（人和所有 AI 都是）。不要自己拼
                     # killall + xcodebuild：进程名带空格（"TomatoBar Personal"）杀不干净，
@@ -82,7 +82,7 @@ scripts/dev-run.sh  # 一键开发闭环：优雅退出旧实例 → 测试闸�
                     # 「专注记录尚未保存」退出闸门。有未落盘记录时它会中止并保留现场。
                     # 它只从 /tmp 起开发实例，/Applications 正式版不动；SKIP_TESTS=1 跳闸门。
 scripts/test-launch-context.sh # 8 项 AppKit 合成启动事件检查，不访问用户数据
-scripts/test-bridge.sh # 先 build.sh，再运行真实 TBTimer 检查（当前 40 项）；只使用 QA13 新建临时子目录
+scripts/test-bridge.sh # 先 build.sh，再运行真实 TBTimer 检查（当前 46 项）；只使用 QA13 新建临时子目录
 scripts/build.sh    # universal Release（arm64 + x86_64）构建到 /tmp/TomatoBar-personal-build。使用项目自带
                     # Automatic 签名（免费 Personal Team，profile 由 -allowProvisioningUpdates
                     # 自动续期），产物过 codesign --verify --deep --strict。CI 上无账号，

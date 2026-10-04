@@ -49,6 +49,9 @@ final class TBTimer: ObservableObject {
             storageError = "无法读取专注记录，已保留原文件未覆盖。可打开记录文件夹检查，修复后点「重新读取」。"
         }
         history.records = state.records
+        if let current = state.currentTodo, eventName.isEmpty {
+            eventName = current.title
+        }
         sanitizeSettings()
         KeyboardShortcuts.onKeyUp(for: .startStopTimer) { [weak self] in
             DispatchQueue.main.async { self?.primaryAction() }
@@ -99,6 +102,12 @@ final class TBTimer: ObservableObject {
            state.todos.first(where: { $0.id == id })?.title != value {
             preparedTodoID = nil
         }
+        if let id = state.currentTodoID,
+           state.todos.first(where: { $0.id == id })?.title != value {
+            change { state, _ in
+                state.selectCurrentTodo(nil)
+            }
+        }
         // During the gap after a rest, editing away from the current task is an explicit
         // switch to manual work. Clear the persisted series context immediately so the
         // next round cannot be attributed to the previous Todo by accident.
@@ -111,20 +120,40 @@ final class TBTimer: ObservableObject {
         }
     }
 
-    func prepareTodo(_ todo: FocusTodo) {
-        preparedTodoID = todo.id
-        eventName = todo.title
+    func selectCurrentTodo(_ id: UUID?) {
+        guard storageError == nil else { return }
+        change { state, _ in
+            state.selectCurrentTodo(id)
+            if let id = id, let todo = state.todos.first(where: { $0.id == id }) {
+                self.eventName = todo.title
+            }
+        }
     }
 
-    func addTodo(_ title: String) {
+    func prepareTodo(_ todo: FocusTodo) {
+        preparedTodoID = todo.id
+        selectCurrentTodo(todo.id)
+    }
+
+    func addTodo(_ title: String, tags: [String] = []) {
         guard storageError == nil else { return }
-        change { state, date in _ = state.addTodo(title: title, at: date) }
+        change { state, date in _ = state.addTodo(title: title, tags: tags, at: date) }
+    }
+
+    func setTodoTags(id: UUID, tags: [String]) {
+        guard storageError == nil else { return }
+        change { state, _ in state.setTodoTags(id: id, tags: tags) }
+    }
+
+    func setDraftTags(_ tags: [String]) {
+        guard storageError == nil else { return }
+        change { state, _ in state.setDraftTags(tags) }
     }
 
     func renameTodo(id: UUID, title: String) {
         guard storageError == nil else { return }
         change { state, _ in state.renameTodo(id: id, title: title) }
-        if (preparedTodoID == id || state.seriesTodoID == id),
+        if (preparedTodoID == id || state.seriesTodoID == id || state.currentTodoID == id),
            let todo = state.todos.first(where: { $0.id == id }) {
             eventName = todo.title
         }
@@ -157,11 +186,12 @@ final class TBTimer: ObservableObject {
     }
     func startWork() {
         guard storageError == nil else { return }
-        let todoID = preparedTodoID
+        let todoID = preparedTodoID ?? state.currentTodoID
         let previousPhase = state.phase
         let minutes = Self.clamped(workIntervalLength, to: 1...180)
+        let tags: [String]? = (todoID != nil) ? nil : state.draftTags
         change { $0.startWork(name: eventName, seconds: Double(minutes * 60),
-                              todoID: todoID, at: $1) }
+                              todoID: todoID, tags: tags, at: $1) }
         if state.phase == .work && previousPhase != .work { preparedTodoID = nil }
     }
     func startRest() {
@@ -174,6 +204,10 @@ final class TBTimer: ObservableObject {
         guard storageError == nil else { return }
         let seconds = Double(max(1, restMinutes) * 60)
         change { $0.startRest(seconds: seconds, at: $1) }
+    }
+    func skipRest() {
+        guard storageError == nil else { return }
+        change { $0.skipRest(at: $1) }
     }
     func togglePause() {
         change { state, date in

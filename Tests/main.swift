@@ -449,6 +449,9 @@ func legacyMatches(_ object: [String: Any]) throws -> Bool {
     right.removeValue(forKey: "todos")
     right.removeValue(forKey: "activeTodoID")
     right.removeValue(forKey: "seriesTodoID")
+    right.removeValue(forKey: "currentTodoID")
+    right.removeValue(forKey: "draftTags")
+    right.removeValue(forKey: "activeTags")
     return left.isEqual(to: right)
 }
 func bothReject(_ object: [String: Any]) throws -> Bool {
@@ -689,3 +692,125 @@ activeTodoState.tick(at: base.addingTimeInterval(60))
 check(activeTodoState.records.first?.todoID == nil,
       "a focus completed after its todo was deleted does not persist a dangling todo id")
 print("PASS: \(checks) total checks including todo persistence and multi-round linkage")
+
+// Skipping rest must keep the set: rounds, carried task and long-rest schedule survive,
+// and nothing is recorded for the skipped break.
+var skip = FocusState()
+let skipTodo = skip.addTodo(title: "机械原理作业", at: base)!
+skip.startWork(name: "机械原理作业", seconds: 60, todoID: skipTodo, at: base)
+skip.tick(at: base.addingTimeInterval(60))
+check(skip.phase == .workFinished && skip.rounds == 1, "skip fixture finishes one round")
+skip.skipRest(at: base.addingTimeInterval(61))
+check(skip.phase == .restFinished && skip.rounds == 1 && skip.seriesTodoID == skipTodo && skip.records.count == 1,
+      "skipping rest from the reminder keeps the set and records nothing")
+skip.startWork(name: "机械原理作业", seconds: 60, at: base.addingTimeInterval(62))
+skip.tick(at: base.addingTimeInterval(122))
+check(skip.rounds == 2 && skip.records.prefix(2).allSatisfy { $0.todoID == skipTodo },
+      "the round after a skipped rest continues the same task and round count")
+skip.startRest(seconds: 300, at: base.addingTimeInterval(123))
+skip.pause(at: base.addingTimeInterval(150))
+skip.skipRest(at: base.addingTimeInterval(151))
+check(skip.phase == .restFinished && !skip.paused && skip.deadline == nil && skip.rounds == 2 &&
+      skip.seriesTodoID == skipTodo,
+      "skipping a running or paused rest lands in the ready-for-next-round state")
+check(skip.records.reduce(0) { $0 + $1.seconds } == 120, "skipped rest never adds focus time")
+var skipIdle = FocusState()
+skipIdle.skipRest(at: base)
+check(skipIdle.phase == .idle, "skipRest is a no-op outside rest phases")
+skipIdle.startWork(name: "专注中", seconds: 60, at: base)
+skipIdle.skipRest(at: base.addingTimeInterval(10))
+check(skipIdle.phase == .work, "skipRest never interrupts a running focus")
+
+// Start-time tags: free focus writes its draft tags; a task start writes the task's tags.
+var tagged = FocusState()
+tagged.records = [FocusRecord(id: UUID(), name: "旧", startedAt: base, endedAt: base.addingTimeInterval(60),
+                              plannedSeconds: 60, completed: true,
+                              segments: [FocusSegment(start: base, end: base.addingTimeInterval(60))],
+                              tags: ["学习"])]
+tagged.setDraftTags([" 学习 ", "复习", "学习"])
+check(tagged.draftTags == ["学习", "复习"], "draft tags are trimmed and deduplicated")
+tagged.startWork(name: "自由专注", seconds: 60, tags: tagged.draftTags, at: base.addingTimeInterval(100))
+tagged.tick(at: base.addingTimeInterval(160))
+check(tagged.records.first?.tags == ["学习", "复习"] && tagged.records.first?.category == "学习",
+      "free focus records the tags chosen before starting; first tag is the category")
+check(tagged.activeTags.isEmpty && tagged.draftTags == ["学习", "复习"],
+      "draft tags stay selected for the next free focus")
+tagged.stop(at: base.addingTimeInterval(161))
+let taggedTodo = tagged.addTodo(title: "画图", at: base)!
+tagged.setTodoTags(id: taggedTodo, tags: ["制图", "学习"])
+tagged.startWork(name: "画图", seconds: 60, todoID: taggedTodo, at: base.addingTimeInterval(200))
+tagged.tick(at: base.addingTimeInterval(260))
+check(tagged.records.first?.tags == ["制图", "学习"] && tagged.records.first?.todoID == taggedTodo,
+      "a task start inherits the task's tags")
+tagged.stop(at: base.addingTimeInterval(261))
+tagged.startWork(name: "大小写", seconds: 60, tags: ["学习".uppercased(), "ENGLISH"], at: base.addingTimeInterval(300))
+tagged.stop(at: base.addingTimeInterval(330))
+check(tagged.records.first?.tags.contains("ENGLISH") == true, "new start tags keep their spelling")
+var canonical = FocusState()
+canonical.records = [FocusRecord(id: UUID(), name: "旧", startedAt: base, endedAt: base.addingTimeInterval(60),
+                                 plannedSeconds: 60, completed: true,
+                                 segments: [FocusSegment(start: base, end: base.addingTimeInterval(60))],
+                                 tags: ["English"])]
+canonical.startWork(name: "背单词", seconds: 60, tags: ["english"], at: base.addingTimeInterval(100))
+canonical.stop(at: base.addingTimeInterval(130))
+check(canonical.records.first?.tags == ["English"], "start tags reuse the existing spelling of a category")
+check(canonical.knownTags == ["English"], "knownTags dedupes record tags case-insensitively")
+var cancelled = FocusState()
+cancelled.startWork(name: "放弃", seconds: 60, tags: ["临时"], at: base)
+cancelled.cancel(at: base.addingTimeInterval(5))
+check(cancelled.activeTags.isEmpty && cancelled.records.isEmpty, "cancel discards the active tags")
+
+// Sticky current task: survives ending the set, cleared by completion/deletion/free focus.
+var sticky = FocusState()
+let stickyA = sticky.addTodo(title: "任务 A", at: base)!
+let stickyB = sticky.addTodo(title: "任务 B", at: base)!
+sticky.selectCurrentTodo(stickyA)
+check(sticky.currentTodo?.id == stickyA, "selecting a task makes it current")
+sticky.startWork(name: "任务 A", seconds: 60, todoID: sticky.currentTodoID, at: base)
+sticky.tick(at: base.addingTimeInterval(60))
+sticky.stop(at: base.addingTimeInterval(61))
+check(sticky.currentTodoID == stickyA && sticky.seriesTodoID == nil,
+      "ending the set keeps the current task while clearing the set context")
+let stickyRoundTrip = try JSONDecoder().decode(FocusState.self, from: JSONEncoder().encode(sticky))
+check(stickyRoundTrip.currentTodoID == stickyA, "current task survives save/load")
+sticky.startWork(name: "任务 A", seconds: 60, todoID: stickyA, at: base.addingTimeInterval(100))
+sticky.tick(at: base.addingTimeInterval(160))
+sticky.startRest(seconds: 10, at: base.addingTimeInterval(161))
+sticky.skipRest(at: base.addingTimeInterval(162))
+sticky.selectCurrentTodo(nil)
+check(sticky.currentTodoID == nil && sticky.seriesTodoID == nil,
+      "switching to free focus between rounds drops the carried task")
+sticky.startWork(name: "自由", seconds: 60, at: base.addingTimeInterval(163))
+check(sticky.activeTodoID == nil, "the next round after choosing free focus is unlinked")
+sticky.selectCurrentTodo(stickyB)
+check(sticky.currentTodoID == stickyB && sticky.activeTodoID == nil,
+      "changing the current task mid-focus never relinks the running work")
+sticky.stop(at: base.addingTimeInterval(170))
+sticky.toggleTodo(id: stickyB, at: base.addingTimeInterval(171))
+check(sticky.currentTodoID == nil, "completing the current task clears it")
+sticky.selectCurrentTodo(stickyB)
+check(sticky.currentTodoID == nil, "a completed task cannot become current")
+sticky.selectCurrentTodo(stickyA)
+sticky.deleteTodo(id: stickyA)
+check(sticky.currentTodoID == nil && sticky.currentTodo == nil, "deleting the current task clears it")
+
+// Legacy files: no tags on todos, no currentTodoID / draftTags / activeTags keys.
+var legacyNew = FocusState()
+_ = legacyNew.addTodo(title: "旧待办", at: base)
+var legacyNewObject = try JSONSerialization.jsonObject(with: JSONEncoder().encode(legacyNew)) as! [String: Any]
+for key in ["currentTodoID", "draftTags", "activeTags"] { legacyNewObject.removeValue(forKey: key) }
+var legacyTodos = legacyNewObject["todos"] as! [[String: Any]]
+for index in legacyTodos.indices { legacyTodos[index].removeValue(forKey: "tags") }
+legacyNewObject["todos"] = legacyTodos
+let legacyNewDecoded = try JSONDecoder().decode(FocusState.self, from: JSONSerialization.data(withJSONObject: legacyNewObject))
+check(legacyNewDecoded.todos.first?.tags == [] && legacyNewDecoded.currentTodoID == nil &&
+      legacyNewDecoded.draftTags.isEmpty && legacyNewDecoded.activeTags.isEmpty,
+      "pre-current-task sessions.json files decode with empty task tags and selections")
+let (parsedTitle, parsedTags) = FocusTodo.parseInput("完成机械原理作业 #学习 #期中复习")
+check(parsedTitle == "完成机械原理作业" && parsedTags == ["学习", "期中复习"],
+      "parseInput extracts title and normalized tags")
+let (plainTitle, plainTags) = FocusTodo.parseInput("  纯任务名称  ")
+check(plainTitle == "纯任务名称" && plainTags.isEmpty, "parseInput works without tags")
+let (tagOnlyTitle, tagOnlyTags) = FocusTodo.parseInput("#仅标签")
+check(tagOnlyTitle == "#仅标签" && tagOnlyTags == ["仅标签"], "parseInput preserves standalone tag title fallback")
+print("PASS: \(checks) total checks including skip rest, start tags, sticky task and tag parsing")
