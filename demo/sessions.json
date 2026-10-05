@@ -1,0 +1,496 @@
+{
+  "activeTags" : [
+
+  ],
+  "categoryStyles" : {
+    "体验" : "sparkles",
+    "学习" : "graduationcap.fill",
+    "开发" : "hammer.fill",
+    "设计" : "paintbrush.fill",
+    "阅读" : "book.closed.fill"
+  },
+  "checkpoint" : -63114076800,
+  "currentTodoID" : "F5482440-323B-4589-A084-AAC3942B0E11",
+  "draftTags" : [
+
+  ],
+  "name" : "",
+  "paused" : false,
+  "phase" : "idle",
+  "planned" : 0,
+  "projects" : [
+    {
+      "createdAt" : 812937600,
+      "id" : "911D4FF3-BF79-418D-A265-97D0A57C0FA8",
+      "isArchived" : false,
+      "name" : "TomatoBar 架构演进与体验迭代",
+      "tags" : [
+        "开发"
+      ]
+    },
+    {
+      "createdAt" : 812939400,
+      "id" : "D7793CB3-EACD-4B55-A98B-4C4A29A124E3",
+      "isArchived" : false,
+      "name" : "Ivory & Terracotta 设计规范",
+      "tags" : [
+        "设计"
+      ]
+    }
+  ],
+  "records" : [
+    {
+      "completed" : true,
+      "endedAt" : 812944500,
+      "id" : "0E3EB92F-F9A2-4159-8046-831A0C7156CC",
+      "name" : "暗调与暖象牙白配色矩阵",
+      "plannedSeconds" : 1500,
+      "projectID" : "D7793CB3-EACD-4B55-A98B-4C4A29A124E3",
+      "segments" : [
+        {
+          "end" : 812944500,
+          "start" : 812943000
+        }
+      ],
+      "startedAt" : 812943000,
+      "tags" : [
+        "设计"
+      ]
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812947200,
+      "id" : "CE694F12-621F-4148-9567-E905EA6BBFF0",
+      "name" : "无声状态栏微交互调优",
+      "plannedSeconds" : 1500,
+      "projectID" : "911D4FF3-BF79-418D-A265-97D0A57C0FA8",
+      "segments" : [
+        {
+          "end" : 812947200,
+          "start" : 812945700
+        }
+      ],
+      "startedAt" : 812945700,
+      "tags" : [
+        "开发"
+      ],
+      "todoID" : "DD60AD8D-0CC6-4079-9111-9798FBA8B471"
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812960700,
+      "id" : "E99CA9E9-720E-489D-97AB-C440064C2CC0",
+      "name" : "《心流：最优体验心理学》精读",
+      "plannedSeconds" : 1500,
+      "segments" : [
+        {
+          "end" : 812960700,
+          "start" : 812959200
+        }
+      ],
+      "startedAt" : 812959200,
+      "tags" : [
+        "阅读"
+      ]
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812964900,
+      "id" : "F0B905CF-2A13-44B6-8FD3-A13D8970AE2E",
+      "name" : "微观足迹时间轴栅格对齐",
+      "plannedSeconds" : 1500,
+      "projectID" : "D7793CB3-EACD-4B55-A98B-4C4A29A124E3",
+      "segments" : [
+        {
+          "end" : 812964900,
+          "start" : 812963400
+        }
+      ],
+      "startedAt" : 812963400,
+      "tags" : [
+        "设计"
+      ]
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812970900,
+      "id" : "12344DE3-4F0C-4D5B-BC79-AD74ED5E6A31",
+      "name" : "大任务层级树与归属沉淀",
+      "plannedSeconds" : 2700,
+      "projectID" : "911D4FF3-BF79-418D-A265-97D0A57C0FA8",
+      "segments" : [
+        {
+          "end" : 812970900,
+          "start" : 812968200
+        }
+      ],
+      "startedAt" : 812968200,
+      "tags" : [
+        "开发"
+      ],
+      "todoID" : "F5482440-323B-4589-A084-AAC3942B0E11"
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812861100,
+      "id" : "3B5E9BCD-8FC8-41A1-9DF5-605E6D07540A",
+      "name" : "架构重构与性能优化",
+      "plannedSeconds" : 2700,
+      "projectID" : "911D4FF3-BF79-418D-A265-97D0A57C0FA8",
+      "segments" : [
+        {
+          "end" : 812861100,
+          "start" : 812858400
+        }
+      ],
+      "startedAt" : 812858400,
+      "tags" : [
+        "开发"
+      ],
+      "todoID" : "F5482440-323B-4589-A084-AAC3942B0E11"
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812877000,
+      "id" : "F5BB6920-F9BE-408C-8465-3E9CB7CCD4DB",
+      "name" : "设计评审与排版复盘",
+      "plannedSeconds" : 2400,
+      "projectID" : "D7793CB3-EACD-4B55-A98B-4C4A29A124E3",
+      "segments" : [
+        {
+          "end" : 812877000,
+          "start" : 812874600
+        }
+      ],
+      "startedAt" : 812874600,
+      "tags" : [
+        "设计"
+      ]
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812881500,
+      "id" : "C617FF21-3B78-4398-8B6C-D00BF3863534",
+      "name" : "技术方案阅读笔记",
+      "plannedSeconds" : 1500,
+      "segments" : [
+        {
+          "end" : 812881500,
+          "start" : 812880000
+        }
+      ],
+      "startedAt" : 812880000,
+      "tags" : [
+        "阅读"
+      ]
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812774700,
+      "id" : "BC3482D3-494E-4184-8D82-429C2F9EEFA9",
+      "name" : "架构重构与性能优化",
+      "plannedSeconds" : 2700,
+      "projectID" : "911D4FF3-BF79-418D-A265-97D0A57C0FA8",
+      "segments" : [
+        {
+          "end" : 812774700,
+          "start" : 812772000
+        }
+      ],
+      "startedAt" : 812772000,
+      "tags" : [
+        "开发"
+      ],
+      "todoID" : "F5482440-323B-4589-A084-AAC3942B0E11"
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812790600,
+      "id" : "2DB9A59E-BC05-45C1-B1CA-57BEE7BF2C5A",
+      "name" : "设计评审与排版复盘",
+      "plannedSeconds" : 2400,
+      "projectID" : "D7793CB3-EACD-4B55-A98B-4C4A29A124E3",
+      "segments" : [
+        {
+          "end" : 812790600,
+          "start" : 812788200
+        }
+      ],
+      "startedAt" : 812788200,
+      "tags" : [
+        "设计"
+      ]
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812795100,
+      "id" : "B39436D6-0586-4FD0-A8ED-58D5F443A303",
+      "name" : "技术方案阅读笔记",
+      "plannedSeconds" : 1500,
+      "segments" : [
+        {
+          "end" : 812795100,
+          "start" : 812793600
+        }
+      ],
+      "startedAt" : 812793600,
+      "tags" : [
+        "阅读"
+      ]
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812688300,
+      "id" : "E6BAF82C-E186-42BD-92E8-F451561B8DB3",
+      "name" : "架构重构与性能优化",
+      "plannedSeconds" : 2700,
+      "projectID" : "911D4FF3-BF79-418D-A265-97D0A57C0FA8",
+      "segments" : [
+        {
+          "end" : 812688300,
+          "start" : 812685600
+        }
+      ],
+      "startedAt" : 812685600,
+      "tags" : [
+        "开发"
+      ],
+      "todoID" : "F5482440-323B-4589-A084-AAC3942B0E11"
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812704200,
+      "id" : "2EF41B40-636A-4C17-80D8-75B1476F80CC",
+      "name" : "设计评审与排版复盘",
+      "plannedSeconds" : 2400,
+      "projectID" : "D7793CB3-EACD-4B55-A98B-4C4A29A124E3",
+      "segments" : [
+        {
+          "end" : 812704200,
+          "start" : 812701800
+        }
+      ],
+      "startedAt" : 812701800,
+      "tags" : [
+        "设计"
+      ]
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812708700,
+      "id" : "8EE9F2ED-1AE4-4C2D-8D2D-5CEB53F1DFBA",
+      "name" : "技术方案阅读笔记",
+      "plannedSeconds" : 1500,
+      "segments" : [
+        {
+          "end" : 812708700,
+          "start" : 812707200
+        }
+      ],
+      "startedAt" : 812707200,
+      "tags" : [
+        "阅读"
+      ]
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812601900,
+      "id" : "AC948DC3-2A3E-4F5D-A30F-97E361726C8A",
+      "name" : "架构重构与性能优化",
+      "plannedSeconds" : 2700,
+      "projectID" : "911D4FF3-BF79-418D-A265-97D0A57C0FA8",
+      "segments" : [
+        {
+          "end" : 812601900,
+          "start" : 812599200
+        }
+      ],
+      "startedAt" : 812599200,
+      "tags" : [
+        "开发"
+      ],
+      "todoID" : "F5482440-323B-4589-A084-AAC3942B0E11"
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812617800,
+      "id" : "12B41C91-94B6-4DEA-AD92-A40ECCD52666",
+      "name" : "设计评审与排版复盘",
+      "plannedSeconds" : 2400,
+      "projectID" : "D7793CB3-EACD-4B55-A98B-4C4A29A124E3",
+      "segments" : [
+        {
+          "end" : 812617800,
+          "start" : 812615400
+        }
+      ],
+      "startedAt" : 812615400,
+      "tags" : [
+        "设计"
+      ]
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812622300,
+      "id" : "6AFAF6A1-074C-47B1-BBDB-F0A8DE3BA32B",
+      "name" : "技术方案阅读笔记",
+      "plannedSeconds" : 1500,
+      "segments" : [
+        {
+          "end" : 812622300,
+          "start" : 812620800
+        }
+      ],
+      "startedAt" : 812620800,
+      "tags" : [
+        "阅读"
+      ]
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812515500,
+      "id" : "8EF603DA-4178-49F4-9C1A-AC6263C12D65",
+      "name" : "架构重构与性能优化",
+      "plannedSeconds" : 2700,
+      "projectID" : "911D4FF3-BF79-418D-A265-97D0A57C0FA8",
+      "segments" : [
+        {
+          "end" : 812515500,
+          "start" : 812512800
+        }
+      ],
+      "startedAt" : 812512800,
+      "tags" : [
+        "开发"
+      ],
+      "todoID" : "F5482440-323B-4589-A084-AAC3942B0E11"
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812531400,
+      "id" : "A384CD23-217E-4527-9A10-F3EA0B970EB9",
+      "name" : "设计评审与排版复盘",
+      "plannedSeconds" : 2400,
+      "projectID" : "D7793CB3-EACD-4B55-A98B-4C4A29A124E3",
+      "segments" : [
+        {
+          "end" : 812531400,
+          "start" : 812529000
+        }
+      ],
+      "startedAt" : 812529000,
+      "tags" : [
+        "设计"
+      ]
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812535900,
+      "id" : "D3E14AF9-CC01-48A6-8AE0-0D36F321A5EA",
+      "name" : "技术方案阅读笔记",
+      "plannedSeconds" : 1500,
+      "segments" : [
+        {
+          "end" : 812535900,
+          "start" : 812534400
+        }
+      ],
+      "startedAt" : 812534400,
+      "tags" : [
+        "阅读"
+      ]
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812429100,
+      "id" : "7195B889-7523-4F8D-9341-4126C55C3485",
+      "name" : "架构重构与性能优化",
+      "plannedSeconds" : 2700,
+      "projectID" : "911D4FF3-BF79-418D-A265-97D0A57C0FA8",
+      "segments" : [
+        {
+          "end" : 812429100,
+          "start" : 812426400
+        }
+      ],
+      "startedAt" : 812426400,
+      "tags" : [
+        "开发"
+      ],
+      "todoID" : "F5482440-323B-4589-A084-AAC3942B0E11"
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812445000,
+      "id" : "0F310385-46DD-4062-9811-DCE9AB652706",
+      "name" : "设计评审与排版复盘",
+      "plannedSeconds" : 2400,
+      "projectID" : "D7793CB3-EACD-4B55-A98B-4C4A29A124E3",
+      "segments" : [
+        {
+          "end" : 812445000,
+          "start" : 812442600
+        }
+      ],
+      "startedAt" : 812442600,
+      "tags" : [
+        "设计"
+      ]
+    },
+    {
+      "completed" : true,
+      "endedAt" : 812449500,
+      "id" : "B09D9012-A485-4782-B1C0-92387D91BF80",
+      "name" : "技术方案阅读笔记",
+      "plannedSeconds" : 1500,
+      "segments" : [
+        {
+          "end" : 812449500,
+          "start" : 812448000
+        }
+      ],
+      "startedAt" : 812448000,
+      "tags" : [
+        "阅读"
+      ]
+    }
+  ],
+  "remaining" : 0,
+  "rounds" : 5,
+  "segments" : [
+
+  ],
+  "todos" : [
+    {
+      "createdAt" : 812941200,
+      "id" : "F5482440-323B-4589-A084-AAC3942B0E11",
+      "isCompleted" : false,
+      "projectID" : "911D4FF3-BF79-418D-A265-97D0A57C0FA8",
+      "tags" : [
+        "开发"
+      ],
+      "title" : "大任务层级树与归属沉淀"
+    },
+    {
+      "completedAt" : 812950200,
+      "createdAt" : 812942100,
+      "id" : "DD60AD8D-0CC6-4079-9111-9798FBA8B471",
+      "isCompleted" : true,
+      "projectID" : "911D4FF3-BF79-418D-A265-97D0A57C0FA8",
+      "tags" : [
+        "开发"
+      ],
+      "title" : "无声状态栏微交互调优"
+    },
+    {
+      "createdAt" : 812943000,
+      "id" : "C9CB085C-84D1-46A4-96E1-43494E9D10FC",
+      "isCompleted" : false,
+      "projectID" : "911D4FF3-BF79-418D-A265-97D0A57C0FA8",
+      "tags" : [
+        "开发"
+      ],
+      "title" : "快捷按键流线响应验证"
+    }
+  ]
+}

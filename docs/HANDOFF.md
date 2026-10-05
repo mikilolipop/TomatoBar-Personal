@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-10-05，by Gemini · 完成官网全面升级与上线：延续暖米色/人文简约风（Ivory & Terracotta），深度展示 V1.4.1 核心特性（长期大任务层级体系、智能标签继承与合并、Hover Actions 悬浮交互、调色盘齿轮图标与自定义标签）；上线实时 #标签 解析 Playground 微互动组件；新增版本动态日志板块；通过 1440/1000/768/390/320 多端全量响应式校验与交互测试（无横向溢出）；已通过 scripts/deploy-site.sh 自动部署至 gh-pages 分支，GitHub Pages CI 校验已 success 且线上实时核验通过。
+最后更新：2026-10-06，by Gemini · 完成公开官网配图数据源的彻底物理隔离与全自动化构建方案：建立 `demo/sessions.json` 与 `scripts/seed-showcase.swift` 专有公开演示数据源（严禁夹杂任何私人真实备考、课业或赛事任务）；开发 `scripts/capture-window.swift` 与 `scripts/generate-showcase-screenshot.sh` 脚本，通过无沙盒独立宿主直接载入演示数据完成 1920x1410 视网膜高清截图；配图完美展示 V1.4.1 的大任务层级树、子任务累积 🎯 5小时40分、SF 像素图标与主界面；通过 scripts/deploy-site.sh 重新发布 gh-pages 并增加静态资源防缓存标识，全量 263 项领域测试全绿。
 
 ---
 
