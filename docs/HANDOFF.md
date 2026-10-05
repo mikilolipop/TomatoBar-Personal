@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-10-05，by Gemini · 完成代码全量后检查与 V1.4.1（3.10.0 / build 7）交付准备：待办面板去拥挤重排、Hover Actions、大任务标签自动继承/智能合并、自由新标签与行内 #标签、图案调色盘齿轮图标（gearshape）及机械/工程语义映射、跳过休息与 Popover 折叠面板；263 领域 + 53 真实桥接 + 8 合成启动事件全绿；Universal Release 构建与严格签名通过；DMG 与 ZIP 分发包已制作并校验（挂载/解压/SHA-256 核验通过）；官网已同步部署至 gh-pages；/Applications 已安装 3.10.0 (build 7) 单实例运行中。
+最后更新：2026-10-05，by Gemini · 完成官网全面升级与上线：延续暖米色/人文简约风（Ivory & Terracotta），深度展示 V1.4.1 核心特性（长期大任务层级体系、智能标签继承与合并、Hover Actions 悬浮交互、调色盘齿轮图标与自定义标签）；上线实时 #标签 解析 Playground 微互动组件；新增版本动态日志板块；通过 1440/1000/768/390/320 多端全量响应式校验与交互测试（无横向溢出）；已通过 scripts/deploy-site.sh 自动部署至 gh-pages 分支，GitHub Pages CI 校验已 success 且线上实时核验通过。
 
 ---
 
