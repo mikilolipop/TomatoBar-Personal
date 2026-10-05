@@ -44,9 +44,9 @@ popover 和到时提醒窗。上面的限制来自旧 System Events / screencapt
 
 | 项 | 值 |
 |---|---|
-| ✅ **已安装版本** | **3.9.1（V1.3.1，build 2）+ 本机主分类点击补丁**，`/Applications/TomatoBar Personal.app` 已替换并从该路径运行，安装副本实测箭头展开；本机开发签名，arm64 + x86_64；公开 V1.3.2（3.9.2 / build 3）已包含同一补丁，本轮只同步 GitHub，未重装本机版本标签 |
-| HEAD | 顶部提交 = V1.3.2 发布确认交接；发布标签 `v3.9.2` 锚点为 `8d4836e`，主分类修复核心为 `273f8e0` |
-| 工作区 | 实施跳过休息、任务关联与标签预设、Popover折叠面板、Bluebird专注工作流；/tmp 开发构建已启动运行 |
+| ✅ **已安装版本** | **3.10.0（V1.4.0，build 4）**，`/Applications/TomatoBar Personal.app` 已替换并从该路径运行，唯一进程运行中；本机开发签名，arm64 + x86_64；已清理历史多余解压副本，彻底消除盲盒启动 |
+| HEAD | 顶部提交 = 支持跳过休息、任务标签、Popover折叠与Bluebird专注流（`7996039`） |
+| 工作区 | 已升级版本至 3.10.0 (build 4)，已正式安装至 /Applications 并通过单实例启动核验 |
 | 测试 | **242 项领域 + 46 项真实桥接 + 8 项合成启动事件**全绿；Release 干净构建 + 严格签名通过 |
 | **CI** | `v3.9.2` 标签 run `36807963164` 与发布源码分支 run `36807962859` 均 success（`8d4836e`）；后续纯文档交接提交的状态以其独立 run 为准 |
 | 远程 | `origin` = `mikilolipop/TomatoBar-Personal`（**public**，2026-09-29 GitHub API 实测；默认分支 `feature/personal-focus`）；`upstream` = `ivoronin/TomatoBar` |
