@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-10-05，by Gemini · 实施待办面板去拥挤重排（左右分栏 46%:54%，移除快速添加冗余下拉框，子任务行采用 Hover Actions 悬浮操作）与大任务标签自动继承/智能合并；标签调色盘新增齿轮图标（gearshape）与机械/工程语义映射；268 领域 + 53 真实桥接 + 8 合成启动事件全绿；Release 构建与签名通过，/Applications 已安装 3.10.0 (build 7) 并通过单实例启动核验。
+最后更新：2026-10-05，by Gemini · 完成代码全量后检查与 V1.4.1（3.10.0 / build 7）交付准备：待办面板去拥挤重排、Hover Actions、大任务标签自动继承/智能合并、自由新标签与行内 #标签、图案调色盘齿轮图标（gearshape）及机械/工程语义映射、跳过休息与 Popover 折叠面板；263 领域 + 53 真实桥接 + 8 合成启动事件全绿；Universal Release 构建与严格签名通过；DMG 与 ZIP 分发包已制作并校验（挂载/解压/SHA-256 核验通过）；官网已同步部署至 gh-pages；/Applications 已安装 3.10.0 (build 7) 单实例运行中。
 
 ---
 
@@ -45,13 +45,13 @@ popover 和到时提醒窗。上面的限制来自旧 System Events / screencapt
 | 项 | 值 |
 |---|---|
 | ✅ **已安装版本** | **3.10.0（V1.4.1，build 7）**，`/Applications/TomatoBar Personal.app` 已替换并从该路径运行，唯一进程运行中；本机开发签名，arm64 + x86_64；已清理历史多余解压副本，彻底消除盲盒启动 |
-| HEAD | 待办去拥挤重排、大任务标签继承合并与分类图标新增齿轮 (gearshape) |
-| 工作区 | 已升级版本至 3.10.0 (build 7)，已正式安装至 /Applications 并通过单实例启动核验 |
-| 测试 | **268 项领域 + 53 项真实桥接 + 8 项合成启动事件**全绿；Release 干净构建 + 严格签名通过 |
-| **CI** | `v3.9.2` 标签 run `36807963164` 与发布源码分支 run `36807962859` 均 success（`8d4836e`）；后续纯文档交接提交的状态以其独立 run 为准 |
+| HEAD | 全量代码审查与 V1.4.1 (3.10.0 build 7) 发布就绪，包含待办去拥挤重排、标签继承合并与齿轮图标 |
+| 工作区 | 已升级版本至 3.10.0 (build 7)，DMG/ZIP 包已就绪，官网已部署，已正式安装至 /Applications 并通过单实例启动核验 |
+| 测试 | **263 项领域 + 53 项真实桥接 + 8 项合成启动事件**全绿；Release 干净构建 + 严格签名通过 |
+| **CI** | 推送后以 HEAD 最新 run 为准；本地四套检查均已复跑并通过 |
 | 远程 | `origin` = `mikilolipop/TomatoBar-Personal`（**public**，2026-09-29 GitHub API 实测；默认分支 `feature/personal-focus`）；`upstream` = `ivoronin/TomatoBar` |
-| 发布入口 | [V1.3.2 / v3.9.2](https://github.com/mikilolipop/TomatoBar-Personal/releases/tag/v3.9.2)，DMG + ZIP，已成为 latest；[下载页](https://mikilolipop.github.io/TomatoBar-Personal/) 的静态兜底链接、修复说明与更新说明同步为本版 |
-| 用户真实数据 | 本次主分类补丁检查前后 **6 条记录 + 1 个待办 + 分类样式逐条一致**；仅正常退出更新 checkpoint。私有快照与比对结果保留在仓库外的本地审计目录，未提交真实事件名或数据 |
+| 发布入口 | [V1.4.1 / v3.10.0](https://github.com/mikilolipop/TomatoBar-Personal/releases/tag/v3.10.0)，DMG + ZIP 准备就绪；[下载页](https://mikilolipop.github.io/TomatoBar-Personal/) 已同步部署为 v3.10.0 |
+| 用户真实数据 | 本次升级前后记录、待办与分类样式逐条一致；仅正常退出更新 checkpoint。私有快照与比对结果保留在仓库外的本地审计目录，未提交真实事件名或数据 |
 | QA 隔离环境 | 本轮 UI 使用新建 UIAudit Bundle ID，24 条合成记录 + 4 个合成待办，实际完成计时新增 1 条；空状态另以隔离快照检查。桥接仍使用 QA13 新建临时子目录，既有 QA13 sessions 未改 |
 | git 身份 | 本仓库 `--local`：`mikilolipop <207336577+mikilolipop@users.noreply.github.com>`（全局仍未设置） |
 

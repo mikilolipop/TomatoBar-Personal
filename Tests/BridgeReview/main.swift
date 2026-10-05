@@ -260,5 +260,11 @@ projectTimer.deleteProject(id: projID)
 check(projectTimer.state.projects.isEmpty && projectTimer.state.todos.first?.projectID == nil,
       "bridge deleteProject safely detaches subtasks into loose todos")
 
+// Garden palette & symbol mapping checks:
+check(Garden.palette.contains { $0.symbol == "gearshape" && $0.label == "齿轮" },
+      "Garden.palette exposes gearshape with 齿轮 label")
+check(Garden.symbol("机械") == "gearshape" && Garden.symbol("工程") == "gearshape",
+      "Garden.symbol maps 机械 and 工程 to gearshape")
+
 print("PASS: \(checks) actual TBTimer bridge checks; isolated QA13 IO, no UI interaction")
 withExtendedLifetime(observation) {}
