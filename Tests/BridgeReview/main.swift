@@ -227,5 +227,28 @@ check(currentTimer.state.records.first?.tags == ["研究", "技术"] &&
       currentTimer.state.records.first?.category == "研究",
       "bridge free focus records draft tags and correct category")
 
+// Projects via bridge:
+let projectBridgeDir = scratch.appendingPathComponent("bridge-project")
+let projectBridgeStore = FocusStore(url: projectBridgeDir.appendingPathComponent("sessions.json"))
+var projectBridgeSeed = FocusState()
+try projectBridgeStore.save(projectBridgeSeed)
+let projectTimer = TBTimer(store: projectBridgeStore)
+projectTimer.addProject(name: "考研数学")
+check(projectTimer.state.projects.count == 1 && projectTimer.state.projects.first?.name == "考研数学",
+      "bridge addProject persists project to state")
+let projID = projectTimer.state.projects.first!.id
+projectTimer.addTodo("高数第一章", tags: ["数学"], projectID: projID)
+check(projectTimer.state.todos.count == 1 && projectTimer.state.todos.first?.projectID == projID,
+      "bridge addTodo with projectID assigns task to project")
+let subID = projectTimer.state.todos.first!.id
+projectTimer.selectCurrentTodo(subID)
+projectTimer.startWork()
+projectTimer.stop()
+check(projectTimer.state.records.first?.projectID == projID && projectTimer.state.records.first?.todoID == subID,
+      "bridge session on project subtask writes projectID and todoID to record")
+projectTimer.deleteProject(id: projID)
+check(projectTimer.state.projects.isEmpty && projectTimer.state.todos.first?.projectID == nil,
+      "bridge deleteProject safely detaches subtasks into loose todos")
+
 print("PASS: \(checks) actual TBTimer bridge checks; isolated QA13 IO, no UI interaction")
 withExtendedLifetime(observation) {}

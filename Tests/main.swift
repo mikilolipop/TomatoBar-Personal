@@ -447,6 +447,7 @@ func legacyMatches(_ object: [String: Any]) throws -> Bool {
     var right = try JSONSerialization.jsonObject(with: JSONEncoder().encode(current)) as! [String: Any]
     right.removeValue(forKey: "categoryStyles")
     right.removeValue(forKey: "todos")
+    right.removeValue(forKey: "projects")
     right.removeValue(forKey: "activeTodoID")
     right.removeValue(forKey: "seriesTodoID")
     right.removeValue(forKey: "currentTodoID")
@@ -813,4 +814,67 @@ let (plainTitle, plainTags) = FocusTodo.parseInput("  纯任务名称  ")
 check(plainTitle == "纯任务名称" && plainTags.isEmpty, "parseInput works without tags")
 let (tagOnlyTitle, tagOnlyTags) = FocusTodo.parseInput("#仅标签")
 check(tagOnlyTitle == "#仅标签" && tagOnlyTags == ["仅标签"], "parseInput preserves standalone tag title fallback")
-print("PASS: \(checks) total checks including skip rest, start tags, sticky task and tag parsing")
+
+// FocusProject: CRUD, subtask affiliation, project-level focus seconds aggregation and legacy compatibility.
+var projState = FocusState()
+let projA = projState.addProject(name: "Robomaster校内赛", color: "red", at: base)!
+let projB = projState.addProject(name: "材料力学", color: "blue", at: base)!
+check(projState.projects.count == 2, "projects can be added")
+check(projState.project(for: projA)?.name == "Robomaster校内赛", "project(for:) looks up project by UUID")
+projState.renameProject(id: projA, name: "Robomaster 2026")
+check(projState.project(for: projA)?.name == "Robomaster 2026", "project can be renamed")
+projState.toggleProjectArchived(id: projB)
+check(projState.project(for: projB)?.isArchived == true, "project can be archived")
+
+let subtaskA1 = projState.addTodo(title: "底盘机械设计", tags: ["机械"], projectID: projA, at: base)!
+let subtaskA2 = projState.addTodo(title: "云台代码调试", tags: ["电控"], projectID: projA, at: base)!
+let subtaskLoose = projState.addTodo(title: "英语单词", at: base)!
+
+check(projState.todos.filter { $0.projectID == projA }.count == 2, "subtasks belong to their parent project")
+check(projState.todos.first { $0.id == subtaskLoose }?.projectID == nil, "loose todos have nil projectID")
+
+projState.setTodoProject(todoID: subtaskLoose, projectID: projB)
+check(projState.todos.first { $0.id == subtaskLoose }?.projectID == projB, "todo can be assigned to a project")
+
+// Start focus on subtaskA1, verify record gets both todoID and projectID
+projState.startWork(name: "底盘机械设计", seconds: 120, todoID: subtaskA1, at: base)
+projState.tick(at: base.addingTimeInterval(120))
+projState.stop(at: base.addingTimeInterval(121))
+let recA1 = projState.records.first!
+check(recA1.todoID == subtaskA1 && recA1.projectID == projA, "record inherits both todoID and projectID")
+check(projState.focusSeconds(forTodo: subtaskA1) == 120, "subtask focusSeconds records 120s")
+check(projState.focusSeconds(forProject: projA) == 120, "project focusSeconds includes subtask time")
+
+// Start focus on subtaskA2, verify project aggregation sums up both subtasks
+projState.startWork(name: "云台代码调试", seconds: 60, todoID: subtaskA2, at: base.addingTimeInterval(200))
+projState.tick(at: base.addingTimeInterval(260))
+projState.stop(at: base.addingTimeInterval(261))
+check(projState.focusSeconds(forProject: projA) == 180, "project focusSeconds aggregates all subtasks")
+check(projState.focusSeconds(forProject: projB) == 0, "unrelated project focusSeconds stays 0")
+
+// Deleting a project leaves its subtasks intact with projectID = nil (safe detachment)
+projState.deleteProject(id: projA)
+check(projState.projects.count == 1 && projState.project(for: projA) == nil, "project is deleted")
+check(projState.todos.filter { $0.id == subtaskA1 || $0.id == subtaskA2 }.allSatisfy { $0.projectID == nil },
+      "subtasks of deleted project detach cleanly into loose todos rather than being deleted")
+
+// Serialization roundtrip with projects
+var projRoundTripState = FocusState()
+let roundProjID = projRoundTripState.addProject(name: "毕业论文", at: base)!
+_ = projRoundTripState.addTodo(title: "开题报告", projectID: roundProjID, at: base)
+let roundTripDecoded = try JSONDecoder().decode(FocusState.self, from: JSONEncoder().encode(projRoundTripState))
+check(roundTripDecoded.projects.first?.name == "毕业论文" &&
+      roundTripDecoded.todos.first?.projectID == roundProjID,
+      "projects and subtask affiliations survive serialization roundtrip")
+
+// Legacy sessions.json without projects decodes with empty array
+var legacyWithoutProjects = try JSONSerialization.jsonObject(with: JSONEncoder().encode(projRoundTripState)) as! [String: Any]
+legacyWithoutProjects.removeValue(forKey: "projects")
+var legacyTodosList = legacyWithoutProjects["todos"] as! [[String: Any]]
+for i in legacyTodosList.indices { legacyTodosList[i].removeValue(forKey: "projectID") }
+legacyWithoutProjects["todos"] = legacyTodosList
+let legacyDecodedState = try JSONDecoder().decode(FocusState.self, from: JSONSerialization.data(withJSONObject: legacyWithoutProjects))
+check(legacyDecodedState.projects.isEmpty && legacyDecodedState.todos.first?.projectID == nil,
+      "pre-projects sessions.json decodes with empty projects and nil subtask projectID")
+
+print("PASS: \(checks) total checks including project hierarchy, subtask aggregation and legacy compatibility")

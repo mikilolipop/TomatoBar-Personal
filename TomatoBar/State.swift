@@ -19,9 +19,11 @@ struct FocusRecord: Codable, Identifiable, Equatable {
     var tags: [String]
     /// Optional task link. Older records decode with nil, so existing history stays intact.
     let todoID: UUID?
+    /// Optional parent project link. Older records decode with nil.
+    let projectID: UUID?
 
     init(id: UUID, name: String, startedAt: Date, endedAt: Date, plannedSeconds: TimeInterval,
-         completed: Bool, segments: [FocusSegment], tags: [String] = [], todoID: UUID? = nil) {
+         completed: Bool, segments: [FocusSegment], tags: [String] = [], todoID: UUID? = nil, projectID: UUID? = nil) {
         self.id = id
         self.name = name
         self.startedAt = startedAt
@@ -31,10 +33,11 @@ struct FocusRecord: Codable, Identifiable, Equatable {
         self.segments = segments
         self.tags = Self.normalizedTags(tags)
         self.todoID = todoID
+        self.projectID = projectID
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, startedAt, endedAt, plannedSeconds, completed, segments, tags, todoID
+        case id, name, startedAt, endedAt, plannedSeconds, completed, segments, tags, todoID, projectID
     }
 
     init(from decoder: Decoder) throws {
@@ -48,6 +51,7 @@ struct FocusRecord: Codable, Identifiable, Equatable {
         segments = try values.decode([FocusSegment].self, forKey: .segments)
         tags = Self.normalizedTags(try values.decodeIfPresent([String].self, forKey: .tags) ?? [])
         todoID = try values.decodeIfPresent(UUID.self, forKey: .todoID)
+        projectID = try values.decodeIfPresent(UUID.self, forKey: .projectID)
     }
 
     static func normalizedTags(_ tags: [String]) -> [String] {
@@ -89,6 +93,35 @@ struct FocusRecord: Codable, Identifiable, Equatable {
     }
 }
 
+struct FocusProject: Codable, Identifiable, Equatable {
+    let id: UUID
+    var name: String
+    var color: String?
+    var isArchived: Bool
+    let createdAt: Date
+
+    init(id: UUID = UUID(), name: String, color: String? = nil, isArchived: Bool = false, createdAt: Date) {
+        self.id = id
+        self.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.color = color
+        self.isArchived = isArchived
+        self.createdAt = createdAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, color, isArchived, createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let v = try decoder.container(keyedBy: CodingKeys.self)
+        id = try v.decode(UUID.self, forKey: .id)
+        name = try v.decode(String.self, forKey: .name)
+        color = try v.decodeIfPresent(String.self, forKey: .color)
+        isArchived = try v.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
+        createdAt = try v.decode(Date.self, forKey: .createdAt)
+    }
+}
+
 struct FocusTodo: Codable, Identifiable, Equatable {
     let id: UUID
     var title: String
@@ -98,22 +131,25 @@ struct FocusTodo: Codable, Identifiable, Equatable {
     /// Tags every focus started from this task inherits. The first one becomes the
     /// record's statistics category, exactly like a record's own tags.
     var tags: [String]
+    /// Optional parent project / goal ID.
+    var projectID: UUID?
 
     init(id: UUID = UUID(), title: String, isCompleted: Bool = false,
-         createdAt: Date, completedAt: Date? = nil, tags: [String] = []) {
+         createdAt: Date, completedAt: Date? = nil, tags: [String] = [], projectID: UUID? = nil) {
         self.id = id
         self.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         self.isCompleted = isCompleted
         self.createdAt = createdAt
         self.completedAt = completedAt
         self.tags = FocusRecord.normalizedTags(tags)
+        self.projectID = projectID
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, isCompleted, createdAt, completedAt, tags
+        case id, title, isCompleted, createdAt, completedAt, tags, projectID
     }
 
-    /// Todos written before tags existed decode with an empty list.
+    /// Todos written before tags or projects existed decode with empty list and nil.
     init(from decoder: Decoder) throws {
         let v = try decoder.container(keyedBy: CodingKeys.self)
         id = try v.decode(UUID.self, forKey: .id)
@@ -122,6 +158,7 @@ struct FocusTodo: Codable, Identifiable, Equatable {
         createdAt = try v.decode(Date.self, forKey: .createdAt)
         completedAt = try v.decodeIfPresent(Date.self, forKey: .completedAt)
         tags = FocusRecord.normalizedTags(try v.decodeIfPresent([String].self, forKey: .tags) ?? [])
+        projectID = try v.decodeIfPresent(UUID.self, forKey: .projectID)
     }
 
     /// Parses inline #tag expressions from quick user input (e.g. "阅读章节 #学习").
@@ -158,6 +195,8 @@ struct FocusState: Codable {
     /// Lightweight task list shared by the main window and the menu-bar popover.
     /// Array order is the user's manual order; completion never auto-deletes an item.
     var todos: [FocusTodo] = []
+    /// Project / Goal containers grouping subtasks (Bluebird-style).
+    var projects: [FocusProject] = []
     /// The task associated with the currently running focus, if any.
     var activeTodoID: UUID?
     /// The task context for the current Pomodoro set. Unlike `activeTodoID`, this survives
@@ -182,7 +221,7 @@ struct FocusState: Codable {
 
     private enum CodingKeys: String, CodingKey {
         case phase, paused, name, startedAt, segmentStart, deadline, remaining, planned,
-             segments, rounds, records, todos, activeTodoID, seriesTodoID, currentTodoID,
+             segments, rounds, records, todos, projects, activeTodoID, seriesTodoID, currentTodoID,
              draftTags, activeTags, checkpoint, categoryStyles
     }
 
@@ -207,6 +246,7 @@ struct FocusState: Codable {
         rounds = try v.decode(Int.self, forKey: .rounds)
         records = try v.decode([FocusRecord].self, forKey: .records)
         todos = try v.decodeIfPresent([FocusTodo].self, forKey: .todos) ?? []
+        projects = try v.decodeIfPresent([FocusProject].self, forKey: .projects) ?? []
         activeTodoID = try v.decodeIfPresent(UUID.self, forKey: .activeTodoID)
         seriesTodoID = try v.decodeIfPresent(UUID.self, forKey: .seriesTodoID)
         // Compatibility for states written before seriesTodoID existed. A live work can
@@ -269,10 +309,10 @@ struct FocusState: Codable {
     }
 
     @discardableResult
-    mutating func addTodo(title: String, tags: [String] = [], at now: Date) -> UUID? {
+    mutating func addTodo(title: String, tags: [String] = [], projectID: UUID? = nil, at now: Date) -> UUID? {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        let todo = FocusTodo(title: trimmed, createdAt: now, tags: tags)
+        let todo = FocusTodo(title: trimmed, createdAt: now, tags: tags, projectID: projectID)
         todos.append(todo)
         return todo.id
     }
@@ -331,6 +371,57 @@ struct FocusState: Codable {
             return
         }
         todos.insert(item, at: target)
+    }
+
+    @discardableResult
+    mutating func addProject(name: String, color: String? = nil, at now: Date) -> UUID? {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let project = FocusProject(name: trimmed, color: color, createdAt: now)
+        projects.append(project)
+        return project.id
+    }
+
+    mutating func renameProject(id: UUID, name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let index = projects.firstIndex(where: { $0.id == id }) else { return }
+        projects[index].name = trimmed
+    }
+
+    mutating func deleteProject(id: UUID) {
+        projects.removeAll { $0.id == id }
+        // Keep tasks safe by detaching them into loose tasks rather than deleting
+        for index in todos.indices where todos[index].projectID == id {
+            todos[index].projectID = nil
+        }
+    }
+
+    mutating func toggleProjectArchived(id: UUID) {
+        guard let index = projects.firstIndex(where: { $0.id == id }) else { return }
+        projects[index].isArchived.toggle()
+    }
+
+    mutating func setTodoProject(todoID: UUID, projectID: UUID?) {
+        guard let index = todos.firstIndex(where: { $0.id == todoID }) else { return }
+        if let projectID = projectID {
+            guard projects.contains(where: { $0.id == projectID }) else { return }
+        }
+        todos[index].projectID = projectID
+    }
+
+    func project(for id: UUID?) -> FocusProject? {
+        guard let id = id else { return nil }
+        return projects.first { $0.id == id }
+    }
+
+    func focusSeconds(forProject id: UUID) -> TimeInterval {
+        let projectTodoIDs = Set(todos.filter { $0.projectID == id }.map(\.id))
+        return records.reduce(0) { sum, record in
+            if record.projectID == id || (record.todoID != nil && projectTodoIDs.contains(record.todoID!)) {
+                return sum + record.seconds
+            }
+            return sum
+        }
     }
 
     /// `categoryStyles` defaults to nil so callers that only rename or retag leave the
@@ -576,9 +667,10 @@ struct FocusState: Codable {
 
     private mutating func addRecord(completed: Bool, at now: Date) {
         guard let start = startedAt else { return }
+        let projectID = activeTodoID.flatMap { id in todos.first { $0.id == id }?.projectID }
         records.insert(FocusRecord(id: UUID(), name: name, startedAt: start, endedAt: now,
                                    plannedSeconds: planned, completed: completed, segments: segments,
-                                   tags: activeTags, todoID: activeTodoID), at: 0)
+                                   tags: activeTags, todoID: activeTodoID, projectID: projectID), at: 0)
         startedAt = nil
         segments = []
         activeTodoID = nil

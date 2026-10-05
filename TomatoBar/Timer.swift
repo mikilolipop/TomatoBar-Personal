@@ -125,7 +125,11 @@ final class TBTimer: ObservableObject {
         change { state, _ in
             state.selectCurrentTodo(id)
             if let id = id, let todo = state.todos.first(where: { $0.id == id }) {
-                self.eventName = todo.title
+                if let pid = todo.projectID, let proj = state.project(for: pid) {
+                    self.eventName = "[\(proj.name)] · \(todo.title)"
+                } else {
+                    self.eventName = todo.title
+                }
             }
         }
     }
@@ -135,9 +139,56 @@ final class TBTimer: ObservableObject {
         selectCurrentTodo(todo.id)
     }
 
-    func addTodo(_ title: String, tags: [String] = []) {
+    func addTodo(_ title: String, tags: [String] = [], projectID: UUID? = nil) {
         guard storageError == nil else { return }
-        change { state, date in _ = state.addTodo(title: title, tags: tags, at: date) }
+        change { state, date in _ = state.addTodo(title: title, tags: tags, projectID: projectID, at: date) }
+    }
+
+    func addProject(name: String, color: String? = nil) {
+        guard storageError == nil else { return }
+        change { state, date in _ = state.addProject(name: name, color: color, at: date) }
+    }
+
+    func renameProject(id: UUID, name: String) {
+        guard storageError == nil else { return }
+        change { state, _ in
+            state.renameProject(id: id, name: name)
+            let activeID = self.preparedTodoID ?? state.currentTodoID
+            if let tid = activeID, let todo = state.todos.first(where: { $0.id == tid }), todo.projectID == id {
+                self.eventName = "[\(name.trimmingCharacters(in: .whitespacesAndNewlines))] · \(todo.title)"
+            }
+        }
+    }
+
+    func deleteProject(id: UUID) {
+        guard storageError == nil else { return }
+        change { state, _ in
+            state.deleteProject(id: id)
+            let activeID = self.preparedTodoID ?? state.currentTodoID
+            if let tid = activeID, let todo = state.todos.first(where: { $0.id == tid }), todo.projectID == nil {
+                self.eventName = todo.title
+            }
+        }
+    }
+
+    func toggleProjectArchived(id: UUID) {
+        guard storageError == nil else { return }
+        change { state, _ in state.toggleProjectArchived(id: id) }
+    }
+
+    func setTodoProject(todoID: UUID, projectID: UUID?) {
+        guard storageError == nil else { return }
+        change { state, _ in
+            state.setTodoProject(todoID: todoID, projectID: projectID)
+            let activeID = self.preparedTodoID ?? state.currentTodoID
+            if activeID == todoID, let todo = state.todos.first(where: { $0.id == todoID }) {
+                if let pid = todo.projectID, let proj = state.project(for: pid) {
+                    self.eventName = "[\(proj.name)] · \(todo.title)"
+                } else {
+                    self.eventName = todo.title
+                }
+            }
+        }
     }
 
     func setTodoTags(id: UUID, tags: [String]) {
@@ -155,7 +206,11 @@ final class TBTimer: ObservableObject {
         change { state, _ in state.renameTodo(id: id, title: title) }
         if (preparedTodoID == id || state.seriesTodoID == id || state.currentTodoID == id),
            let todo = state.todos.first(where: { $0.id == id }) {
-            eventName = todo.title
+            if let pid = todo.projectID, let proj = state.project(for: pid) {
+                eventName = "[\(proj.name)] · \(todo.title)"
+            } else {
+                eventName = todo.title
+            }
         }
     }
 

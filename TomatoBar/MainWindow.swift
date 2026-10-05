@@ -21,6 +21,16 @@ struct MainWindowView: View {
     @State private var newTodoTitle = ""
     @State private var editingTodoID: UUID?
     @State private var editingTodoTitle = ""
+    @State private var showingCustomTagAlert = false
+    @State private var customTagTargetTodoID: UUID?
+    @State private var customTagInput = ""
+    @State private var showingNewProjectSheet = false
+    @State private var editingProject: FocusProject?
+    @State private var collapsedProjectIDs: Set<UUID> = []
+    @State private var quickAddTargetProjectID: UUID?
+    @State private var inlineSubtaskTitles: [UUID: String] = [:]
+    @State private var isLooseTodosCollapsed = false
+    @State private var isArchivedCollapsed = true
     private var summary: FocusSummary { FocusSummary(records: history.records, period: period, date: date) }
     private var filtered: FocusSummary { FocusSummary(records: history.records, period: period, date: date, category: selectedCategory) }
     private var visibleRecords: [FocusRecord] {
@@ -119,6 +129,39 @@ struct MainWindowView: View {
             }
             .sheet(isPresented: $settings) { MainSettings(timer: timer) { settings = false } }
             .sheet(isPresented: $expandedTimer) { ExpandedTimer(timer: timer) { expandedTimer = false } }
+            .sheet(isPresented: $showingNewProjectSheet) {
+                NewProjectSheet(onSave: { name in
+                    timer.addProject(name: name)
+                    showingNewProjectSheet = false
+                }, onCancel: {
+                    showingNewProjectSheet = false
+                })
+            }
+            .sheet(item: $editingProject) { project in
+                RenameProjectSheet(project: project, onSave: { name in
+                    timer.renameProject(id: project.id, name: name)
+                    editingProject = nil
+                }, onCancel: {
+                    editingProject = nil
+                })
+            }
+            .alert("自定义新标签", isPresented: $showingCustomTagAlert) {
+                TextField("输入新标签名称", text: $customTagInput)
+                Button("确定") {
+                    let tag = customTagInput.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+                    if !tag.isEmpty, let id = customTagTargetTodoID {
+                        timer.setTodoTags(id: id, tags: [tag])
+                    }
+                    customTagInput = ""
+                    customTagTargetTodoID = nil
+                }
+                Button("取消", role: .cancel) {
+                    customTagInput = ""
+                    customTagTargetTodoID = nil
+                }
+            } message: {
+                Text("输入新标签后将赋给当前待办，并在已有标签列表中保存。")
+            }
             // Row-level delete needs its own confirmation because the editor sheet is not
             // open on that path. The wording comes from RecordEditor.confirmationMessage so
             // both routes warn identically.
@@ -290,12 +333,58 @@ struct MainWindowView: View {
                 Text("\(timer.state.pendingTodos.count) 项未完成")
                     .font(.caption).foregroundColor(Garden.muted)
                 Spacer()
-                if !timer.state.todos.isEmpty {
-                    Text("拖动排序").font(.caption2).foregroundColor(Garden.muted)
+                Button {
+                    showingNewProjectSheet = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "folder.badge.plus")
+                            .font(.system(size: 11))
+                        Text("新建大任务")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundColor(Garden.red)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: Garden.cornerSmall)
+                            .fill(Garden.red.opacity(0.08))
+                    )
                 }
+                .buttonStyle(.plain)
+                .help("创建长周期大任务/项目，并在其下拆解子任务")
             }
 
             HStack(spacing: 8) {
+                if !timer.state.projects.isEmpty {
+                    Menu {
+                        Button("独立待办 (无大任务)") { quickAddTargetProjectID = nil }
+                        Divider()
+                        ForEach(timer.state.projects.filter { !$0.isArchived }) { proj in
+                            Button(proj.name) { quickAddTargetProjectID = proj.id }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: quickAddTargetProjectID == nil ? "tray" : "folder")
+                                .font(.system(size: 11))
+                            Text(quickAddTargetProjectID.flatMap { timer.state.project(for: $0)?.name } ?? "独立待办")
+                                .font(.system(size: 11, weight: .medium))
+                                .lineLimit(1)
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 8))
+                        }
+                        .padding(.horizontal, 8)
+                        .frame(height: 34)
+                        .background(Garden.surface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Garden.cornerSmall)
+                                .stroke(Garden.line.opacity(0.82), lineWidth: 1)
+                        )
+                    }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .frame(maxWidth: 130)
+                }
+
                 TextField("添加待办，例如：阅读章节 #学习", text: $newTodoTitle)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
@@ -322,21 +411,252 @@ struct MainWindowView: View {
                 .accessibilityLabel("添加待办")
             }
 
-            if timer.state.todos.isEmpty {
+            if timer.state.todos.isEmpty && timer.state.projects.isEmpty {
                 VStack(spacing: 8) {
                     GardenArt(name: "PixelSprout", activity: timer.windowActivity)
                         .frame(width: 46, height: 35)
                     Text("把下一件想做的事写在这里")
                         .font(.system(size: 14, weight: .medium))
-                    Text("点一下任务，就会带到下一段专注。")
+                    Text("支持拆解大任务与子任务，点一下就会带到下一段专注。")
                         .font(.caption).foregroundColor(Garden.muted)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 4) {
-                        ForEach(timer.state.todos) { todo in
-                            todoRow(todo)
+                    LazyVStack(alignment: .leading, spacing: 10) {
+                        let activeProjects = timer.state.projects.filter { !$0.isArchived }
+                        let looseTodos = timer.state.todos.filter { $0.projectID == nil }
+                        let archivedProjects = timer.state.projects.filter { $0.isArchived }
+
+                        ForEach(activeProjects) { project in
+                            projectCard(project)
+                        }
+
+                        if !looseTodos.isEmpty || !activeProjects.isEmpty {
+                            looseTodosSection(looseTodos: looseTodos, hasProjects: !activeProjects.isEmpty)
+                        }
+
+                        if !archivedProjects.isEmpty {
+                            archivedProjectsSection(archivedProjects: archivedProjects)
+                        }
+                    }
+                    .padding(.trailing, 6)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func projectCard(_ project: FocusProject) -> some View {
+        let isCollapsed = collapsedProjectIDs.contains(project.id)
+        let subtasks = timer.state.todos.filter { $0.projectID == project.id }
+        let completedCount = subtasks.filter(\.isCompleted).count
+        let totalCount = subtasks.count
+        let projSecs = timer.state.focusSeconds(forProject: project.id)
+
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        if isCollapsed {
+                            collapsedProjectIDs.remove(project.id)
+                        } else {
+                            collapsedProjectIDs.insert(project.id)
+                        }
+                    }
+                } label: {
+                    Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Garden.muted)
+                        .frame(width: 18, height: 18)
+                }
+                .buttonStyle(.plain)
+
+                Image(systemName: "folder.fill")
+                    .font(.system(size: 13))
+                    .foregroundColor(Garden.red.opacity(0.85))
+
+                Text(project.name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Garden.ink)
+                    .lineLimit(1)
+
+                if totalCount > 0 {
+                    Text("\(completedCount)/\(totalCount)")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundColor(Garden.muted)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Garden.line.opacity(0.4))
+                        .cornerRadius(3)
+                }
+
+                if projSecs > 0 {
+                    Text("🎯 \(focusDuration(projSecs))")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundColor(Garden.red)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Garden.red.opacity(0.08))
+                        .cornerRadius(3)
+                }
+
+                Spacer()
+
+                Menu {
+                    Button("为此大任务添加子任务...") {
+                        collapsedProjectIDs.remove(project.id)
+                        inlineSubtaskTitles[project.id] = ""
+                    }
+                    Divider()
+                    Button("重命名大任务") {
+                        editingProject = project
+                    }
+                    Button(project.isArchived ? "取消归档" : "归档大任务") {
+                        timer.toggleProjectArchived(id: project.id)
+                    }
+                    Divider()
+                    Button("删除大任务 (子任务保留为独立待办)", role: .destructive) {
+                        timer.deleteProject(id: project.id)
+                    }
+                } label: {
+                    GardenActionIcon(name: "ellipsis", pointSize: 12, color: Garden.muted)
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .frame(width: 20, height: 20)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(Garden.surface.opacity(0.55))
+            .cornerRadius(Garden.cornerSmall)
+
+            if !isCollapsed {
+                VStack(alignment: .leading, spacing: 3) {
+                    if subtasks.isEmpty {
+                        Text("暂无子任务，在下方添加拆解步骤")
+                            .font(.caption)
+                            .foregroundColor(Garden.muted)
+                            .padding(.leading, 28)
+                            .padding(.vertical, 4)
+                    } else {
+                        ForEach(subtasks) { subtask in
+                            todoRow(subtask, isSubtask: true)
+                                .onDrag {
+                                    NSItemProvider(object: subtask.id.uuidString as NSString)
+                                }
+                                .onDrop(of: [UTType.text], isTargeted: nil) { providers in
+                                    guard let provider = providers.first else { return false }
+                                    provider.loadObject(ofClass: NSString.self) { object, _ in
+                                        guard let raw = object as? NSString,
+                                              let sourceID = UUID(uuidString: raw as String),
+                                              sourceID != subtask.id else { return }
+                                        DispatchQueue.main.async {
+                                            timer.moveTodo(id: sourceID, before: subtask.id)
+                                        }
+                                    }
+                                    return true
+                                }
+                        }
+                    }
+
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(Garden.muted)
+                            .frame(width: 14)
+                        TextField("为此大任务添加子任务...", text: Binding(
+                            get: { inlineSubtaskTitles[project.id] ?? "" },
+                            set: { inlineSubtaskTitles[project.id] = $0 }
+                        ))
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12))
+                        .onSubmit {
+                            commitInlineSubtask(for: project.id)
+                        }
+                        if !(inlineSubtaskTitles[project.id] ?? "").isEmpty {
+                            Button {
+                                commitInlineSubtask(for: project.id)
+                            } label: {
+                                GardenActionIcon(name: "return", pointSize: 10, color: Garden.red)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.leading, 26)
+                    .padding(.trailing, 8)
+                    .padding(.vertical, 4)
+                }
+                .padding(.top, 3)
+            }
+        }
+        .padding(4)
+        .background(
+            RoundedRectangle(cornerRadius: Garden.cornerMedium)
+                .fill(Garden.surface.opacity(0.24))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Garden.cornerMedium)
+                .stroke(Garden.line.opacity(0.40), lineWidth: 1)
+        )
+    }
+
+    private func commitInlineSubtask(for projectID: UUID) {
+        guard let text = inlineSubtaskTitles[projectID], !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let (title, tags) = FocusTodo.parseInput(text)
+        guard !title.isEmpty else { return }
+        timer.addTodo(title, tags: tags, projectID: projectID)
+        inlineSubtaskTitles[projectID] = ""
+    }
+
+    @ViewBuilder
+    private func looseTodosSection(looseTodos: [FocusTodo], hasProjects: Bool) -> some View {
+        if hasProjects {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            isLooseTodosCollapsed.toggle()
+                        }
+                    } label: {
+                        Image(systemName: isLooseTodosCollapsed ? "chevron.right" : "chevron.down")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(Garden.muted)
+                            .frame(width: 18, height: 18)
+                    }
+                    .buttonStyle(.plain)
+
+                    Image(systemName: "tray.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(Garden.muted)
+
+                    Text("独立待办 / 收集箱")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(Garden.ink)
+
+                    Text("\(looseTodos.count)")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundColor(Garden.muted)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Garden.line.opacity(0.4))
+                        .cornerRadius(3)
+
+                    Spacer()
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+
+                if !isLooseTodosCollapsed {
+                    if looseTodos.isEmpty {
+                        Text("无独立待办")
+                            .font(.caption)
+                            .foregroundColor(Garden.muted)
+                            .padding(.leading, 28)
+                            .padding(.vertical, 4)
+                    } else {
+                        ForEach(looseTodos) { todo in
+                            todoRow(todo, isSubtask: false)
                                 .onDrag {
                                     NSItemProvider(object: todo.id.uuidString as NSString)
                                 }
@@ -354,16 +674,99 @@ struct MainWindowView: View {
                                 }
                         }
                     }
-                    .padding(.trailing, 6)
                 }
+            }
+            .padding(4)
+            .background(
+                RoundedRectangle(cornerRadius: Garden.cornerMedium)
+                    .fill(Garden.surface.opacity(0.15))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Garden.cornerMedium)
+                    .stroke(Garden.line.opacity(0.30), lineWidth: 1)
+            )
+        } else {
+            ForEach(looseTodos) { todo in
+                todoRow(todo, isSubtask: false)
+                    .onDrag {
+                        NSItemProvider(object: todo.id.uuidString as NSString)
+                    }
+                    .onDrop(of: [UTType.text], isTargeted: nil) { providers in
+                        guard let provider = providers.first else { return false }
+                        provider.loadObject(ofClass: NSString.self) { object, _ in
+                            guard let raw = object as? NSString,
+                                  let sourceID = UUID(uuidString: raw as String),
+                                  sourceID != todo.id else { return }
+                            DispatchQueue.main.async {
+                                timer.moveTodo(id: sourceID, before: todo.id)
+                            }
+                        }
+                        return true
+                    }
             }
         }
     }
 
     @ViewBuilder
-    private func todoRow(_ todo: FocusTodo) -> some View {
+    private func archivedProjectsSection(archivedProjects: [FocusProject]) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    isArchivedCollapsed.toggle()
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: isArchivedCollapsed ? "chevron.right" : "chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text("已归档大任务 (\(archivedProjects.count))")
+                        .font(.caption.weight(.medium))
+                    Spacer()
+                }
+                .foregroundColor(Garden.muted)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+            }
+            .buttonStyle(.plain)
+
+            if !isArchivedCollapsed {
+                ForEach(archivedProjects) { project in
+                    HStack {
+                        Image(systemName: "archivebox")
+                            .font(.system(size: 11))
+                        Text(project.name)
+                            .font(.caption)
+                            .strikethrough()
+                        Spacer()
+                        Button("取消归档") {
+                            timer.toggleProjectArchived(id: project.id)
+                        }
+                        .font(.caption2)
+                        .buttonStyle(.plain)
+                        .foregroundColor(Garden.red)
+
+                        Button("删除", role: .destructive) {
+                            timer.deleteProject(id: project.id)
+                        }
+                        .font(.caption2)
+                        .buttonStyle(.plain)
+                        .foregroundColor(Garden.muted)
+                    }
+                    .foregroundColor(Garden.muted)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                }
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    @ViewBuilder
+    private func todoRow(_ todo: FocusTodo, isSubtask: Bool = false) -> some View {
         let isCurrent = (timer.state.currentTodoID == todo.id || timer.preparedTodoID == todo.id)
         HStack(spacing: 8) {
+            if isSubtask {
+                Spacer().frame(width: 14)
+            }
             Button { timer.toggleTodo(id: todo.id) } label: {
                 GardenActionIcon(name: todo.isCompleted ? "checkmark.circle.fill" : "circle", pointSize: 15,
                                  color: todo.isCompleted ? Garden.red : Garden.muted)
@@ -436,6 +839,12 @@ struct MainWindowView: View {
                             Button("清除标签") { timer.setTodoTags(id: todo.id, tags: []) }
                             Divider()
                         }
+                        Button("+ 自定义新标签...") {
+                            customTagTargetTodoID = todo.id
+                            customTagInput = ""
+                            showingCustomTagAlert = true
+                        }
+                        Divider()
                         if !timer.state.knownTags.isEmpty {
                             Text("已有标签")
                             ForEach(timer.state.knownTags, id: \.self) { tag in
@@ -446,6 +855,23 @@ struct MainWindowView: View {
                         Text("常用建议")
                         ForEach(Garden.suggestedCategories, id: \.self) { tag in
                             Button(tag) { timer.setTodoTags(id: todo.id, tags: [tag]) }
+                        }
+                    }
+                    Menu("移至大任务") {
+                        if todo.projectID != nil {
+                            Button("移出大任务 (设为独立待办)") {
+                                timer.setTodoProject(todoID: todo.id, projectID: nil)
+                            }
+                            Divider()
+                        }
+                        ForEach(timer.state.projects.filter { !$0.isArchived && $0.id != todo.projectID }) { proj in
+                            Button(proj.name) {
+                                timer.setTodoProject(todoID: todo.id, projectID: proj.id)
+                            }
+                        }
+                        Divider()
+                        Button("+ 新建大任务...") {
+                            showingNewProjectSheet = true
                         }
                     }
                     Button("重命名") {
@@ -468,7 +894,7 @@ struct MainWindowView: View {
             }
         }
         .padding(.horizontal, 9)
-        .frame(height: 34)
+        .frame(height: 32)
         .background(
             RoundedRectangle(cornerRadius: Garden.cornerSmall)
                 .fill(isCurrent ? Garden.red.opacity(0.10) : Color.clear)
@@ -480,7 +906,7 @@ struct MainWindowView: View {
     private func addTodo() {
         let (title, tags) = FocusTodo.parseInput(newTodoTitle)
         guard !title.isEmpty else { return }
-        timer.addTodo(title, tags: tags)
+        timer.addTodo(title, tags: tags, projectID: quickAddTargetProjectID)
         newTodoTitle = ""
     }
 
@@ -613,6 +1039,15 @@ struct TimerCard: View {
                                 .font(.system(size: 13))
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack(spacing: 6) {
+                                    if let proj = current.projectID.flatMap({ timer.state.project(for: $0) }) {
+                                        Text(proj.name)
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .foregroundColor(Garden.ink)
+                                            .padding(.horizontal, 4)
+                                            .padding(.vertical, 1)
+                                            .background(Garden.surface.opacity(0.9))
+                                            .cornerRadius(3)
+                                    }
                                     Text("当前任务")
                                         .font(.system(size: 10, weight: .semibold))
                                         .foregroundColor(Garden.red)
@@ -635,8 +1070,30 @@ struct TimerCard: View {
                                 Divider()
                                 if timer.state.pendingTodos.count > 1 {
                                     Text("切换到其他待办：")
-                                    ForEach(timer.state.pendingTodos.filter { $0.id != current.id }) { todo in
-                                        Button(todo.title) { timer.selectCurrentTodo(todo.id) }
+                                    let activeProjects = timer.state.projects.filter { !$0.isArchived }
+                                    let looseTodos = timer.state.pendingTodos.filter { $0.id != current.id && $0.projectID == nil }
+                                    ForEach(activeProjects) { proj in
+                                        let sub = timer.state.pendingTodos.filter { $0.id != current.id && $0.projectID == proj.id }
+                                        if !sub.isEmpty {
+                                            Section(proj.name) {
+                                                ForEach(sub) { todo in
+                                                    Button(todo.title) { timer.selectCurrentTodo(todo.id) }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if !looseTodos.isEmpty {
+                                        if !activeProjects.isEmpty {
+                                            Section("独立待办") {
+                                                ForEach(looseTodos) { todo in
+                                                    Button(todo.title) { timer.selectCurrentTodo(todo.id) }
+                                                }
+                                            }
+                                        } else {
+                                            ForEach(looseTodos) { todo in
+                                                Button(todo.title) { timer.selectCurrentTodo(todo.id) }
+                                            }
+                                        }
                                     }
                                 }
                             } label: {
@@ -664,8 +1121,30 @@ struct TimerCard: View {
                             if !timer.state.pendingTodos.isEmpty {
                                 Menu {
                                     Text("选择已有待办专注：")
-                                    ForEach(timer.state.pendingTodos) { todo in
-                                        Button(todo.title) { timer.selectCurrentTodo(todo.id) }
+                                    let activeProjects = timer.state.projects.filter { !$0.isArchived }
+                                    let looseTodos = timer.state.pendingTodos.filter { $0.projectID == nil }
+                                    ForEach(activeProjects) { proj in
+                                        let sub = timer.state.pendingTodos.filter { $0.projectID == proj.id }
+                                        if !sub.isEmpty {
+                                            Section(proj.name) {
+                                                ForEach(sub) { todo in
+                                                    Button(todo.title) { timer.selectCurrentTodo(todo.id) }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if !looseTodos.isEmpty {
+                                        if !activeProjects.isEmpty {
+                                            Section("独立待办") {
+                                                ForEach(looseTodos) { todo in
+                                                    Button(todo.title) { timer.selectCurrentTodo(todo.id) }
+                                                }
+                                            }
+                                        } else {
+                                            ForEach(looseTodos) { todo in
+                                                Button(todo.title) { timer.selectCurrentTodo(todo.id) }
+                                            }
+                                        }
                                     }
                                 } label: {
                                     HStack(spacing: 3) {
@@ -786,7 +1265,11 @@ struct ExpandedTimer: View {
                 if let current = timer.state.currentTodo {
                     HStack(spacing: 8) {
                         Text("🎯")
-                        Text(current.title).font(.title3).fontWeight(.medium)
+                        if let proj = current.projectID.flatMap({ timer.state.project(for: $0) }) {
+                            Text("[\(proj.name)] · \(current.title)").font(.title3).fontWeight(.medium)
+                        } else {
+                            Text(current.title).font(.title3).fontWeight(.medium)
+                        }
                         if !current.tags.isEmpty {
                             Text(current.tags.map { "#\($0)" }.joined(separator: " "))
                                 .font(.subheadline)
@@ -893,5 +1376,140 @@ struct MainSettings: View {
                     .onTapGesture { registerEasterEggTap() }
             }
         }.padding(28).frame(width: 460).background(Garden.paper).foregroundColor(Garden.ink).accentColor(Garden.red)
+    }
+}
+
+struct NewProjectSheet: View {
+    let onSave: (String) -> Void
+    let onCancel: () -> Void
+    @State private var name: String = ""
+    @SwiftUI.FocusState private var isFocused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("新建大任务 / 项目")
+                    .font(.system(size: 16, weight: .semibold))
+                Spacer()
+                Button("取消", action: onCancel)
+                    .keyboardShortcut(.cancelAction)
+                    .buttonStyle(.plain)
+                    .foregroundColor(Garden.muted)
+            }
+            Text("大任务用于规划长周期目标（如期末复习、比赛项目、课程作业），其下可拆解多项具体子任务，专注时长将自动汇总归属。")
+                .font(.caption)
+                .foregroundColor(Garden.muted)
+                .lineSpacing(2)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("大任务名称")
+                    .font(.caption)
+                    .foregroundColor(Garden.muted)
+                TextField("例如：Robomaster 校内赛、材料力学大作业", text: $name)
+                    .textFieldStyle(.plain)
+                    .padding(.horizontal, 10)
+                    .frame(height: 34)
+                    .background(Garden.surface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Garden.cornerSmall)
+                            .stroke(Garden.line, lineWidth: 1)
+                    )
+                    .focused($isFocused)
+                    .onSubmit { commit() }
+            }
+
+            HStack {
+                Spacer()
+                Button("取消", action: onCancel)
+                    .keyboardShortcut(.cancelAction)
+                Button("创建大任务") { commit() }
+                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(GardenPrimaryButtonStyle())
+                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(24)
+        .frame(width: 420)
+        .background(Garden.paper)
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isFocused = true
+            }
+        }
+    }
+
+    private func commit() {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        onSave(trimmed)
+    }
+}
+
+struct RenameProjectSheet: View {
+    let project: FocusProject
+    let onSave: (String) -> Void
+    let onCancel: () -> Void
+    @State private var name: String = ""
+    @SwiftUI.FocusState private var isFocused: Bool
+
+    init(project: FocusProject, onSave: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
+        self.project = project
+        self.onSave = onSave
+        self.onCancel = onCancel
+        _name = State(initialValue: project.name)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("重命名大任务")
+                    .font(.system(size: 16, weight: .semibold))
+                Spacer()
+                Button("取消", action: onCancel)
+                    .keyboardShortcut(.cancelAction)
+                    .buttonStyle(.plain)
+                    .foregroundColor(Garden.muted)
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("大任务名称")
+                    .font(.caption)
+                    .foregroundColor(Garden.muted)
+                TextField("大任务名称", text: $name)
+                    .textFieldStyle(.plain)
+                    .padding(.horizontal, 10)
+                    .frame(height: 34)
+                    .background(Garden.surface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Garden.cornerSmall)
+                            .stroke(Garden.line, lineWidth: 1)
+                    )
+                    .focused($isFocused)
+                    .onSubmit { commit() }
+            }
+
+            HStack {
+                Spacer()
+                Button("取消", action: onCancel)
+                    .keyboardShortcut(.cancelAction)
+                Button("保存") { commit() }
+                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(GardenPrimaryButtonStyle())
+                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(24)
+        .frame(width: 380)
+        .background(Garden.paper)
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isFocused = true
+            }
+        }
+    }
+
+    private func commit() {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        onSave(trimmed)
     }
 }

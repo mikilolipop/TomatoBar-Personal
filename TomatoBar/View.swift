@@ -109,6 +109,10 @@ struct TBPopoverView: View {
     @State private var selectedTag: String?
     @State private var showCancelConfirm = false
     @State private var quickTodoTitle = ""
+    @State private var showingCustomTagAlert = false
+    @State private var customTagTargetTodoID: UUID?
+    @State private var isCustomTagForDraft = false
+    @State private var customTagInput = ""
     // Opening the cancel dialog freezes the clock: otherwise the timer could hit zero
     // behind the modal, addRecord fires, and 「放弃这段」 silently no-ops (phase is no
     // longer .work) leaving exactly the record the user just tried to discard.
@@ -281,6 +285,32 @@ struct TBPopoverView: View {
                 .keyboardShortcut(.cancelAction)
             Button("放弃这段", role: .destructive) { timer.cancel() }
         } message: { Text(cancelFocusMessage(timer.state)) }
+        .alert("自定义新标签", isPresented: $showingCustomTagAlert) {
+            TextField("输入新标签名称", text: $customTagInput)
+            Button("确定") {
+                let tag = customTagInput.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+                if !tag.isEmpty {
+                    if isCustomTagForDraft {
+                        let current = timer.state.draftTags
+                        if !current.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) {
+                            timer.setDraftTags(current + [tag])
+                        }
+                    } else if let id = customTagTargetTodoID {
+                        timer.setTodoTags(id: id, tags: [tag])
+                    }
+                }
+                customTagInput = ""
+                customTagTargetTodoID = nil
+                isCustomTagForDraft = false
+            }
+            Button("取消", role: .cancel) {
+                customTagInput = ""
+                customTagTargetTodoID = nil
+                isCustomTagForDraft = false
+            }
+        } message: {
+            Text("输入新标签后将立即应用，并加入已有标签列表。")
+        }
         // P16: the other window's edit or delete can empty out the tag this filter
         // points at. Re-check it whenever the shared record list changes, not only
         // after this view's own save.
@@ -296,6 +326,15 @@ struct TBPopoverView: View {
                         .font(.system(size: 15, weight: .semibold))
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
+                            if let proj = current.projectID.flatMap({ timer.state.project(for: $0) }) {
+                                Text(proj.name)
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(Garden.ink)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 1)
+                                    .background(Garden.surface.opacity(0.9))
+                                    .cornerRadius(3)
+                            }
                             Text("当前任务")
                                 .font(.system(size: 10, weight: .semibold))
                                 .foregroundColor(Garden.red)
@@ -325,8 +364,30 @@ struct TBPopoverView: View {
                         Divider()
                         if timer.state.pendingTodos.count > 1 {
                             Text("切换到其他待办：")
-                            ForEach(timer.state.pendingTodos.filter { $0.id != current.id }) { todo in
-                                Button(todo.title) { timer.selectCurrentTodo(todo.id) }
+                            let activeProjects = timer.state.projects.filter { !$0.isArchived }
+                            let looseTodos = timer.state.pendingTodos.filter { $0.id != current.id && $0.projectID == nil }
+                            ForEach(activeProjects) { proj in
+                                let sub = timer.state.pendingTodos.filter { $0.id != current.id && $0.projectID == proj.id }
+                                if !sub.isEmpty {
+                                    Section(proj.name) {
+                                        ForEach(sub) { todo in
+                                            Button(todo.title) { timer.selectCurrentTodo(todo.id) }
+                                        }
+                                    }
+                                }
+                            }
+                            if !looseTodos.isEmpty {
+                                if !activeProjects.isEmpty {
+                                    Section("独立待办") {
+                                        ForEach(looseTodos) { todo in
+                                            Button(todo.title) { timer.selectCurrentTodo(todo.id) }
+                                        }
+                                    }
+                                } else {
+                                    ForEach(looseTodos) { todo in
+                                        Button(todo.title) { timer.selectCurrentTodo(todo.id) }
+                                    }
+                                }
                             }
                             Divider()
                         }
@@ -335,6 +396,13 @@ struct TBPopoverView: View {
                                 Button("清除标签") { timer.setTodoTags(id: current.id, tags: []) }
                                 Divider()
                             }
+                            Button("+ 自定义新标签...") {
+                                isCustomTagForDraft = false
+                                customTagTargetTodoID = current.id
+                                customTagInput = ""
+                                showingCustomTagAlert = true
+                            }
+                            Divider()
                             if !timer.state.knownTags.isEmpty {
                                 Text("已有标签")
                                 ForEach(timer.state.knownTags, id: \.self) { tag in
@@ -396,11 +464,29 @@ struct TBPopoverView: View {
                         if !timer.state.pendingTodos.isEmpty {
                             Menu {
                                 Text("选择已有待办专注：")
-                                ForEach(timer.state.pendingTodos) { todo in
-                                    Button {
-                                        timer.selectCurrentTodo(todo.id)
-                                    } label: {
-                                        Text(todo.title)
+                                let activeProjects = timer.state.projects.filter { !$0.isArchived }
+                                let looseTodos = timer.state.pendingTodos.filter { $0.projectID == nil }
+                                ForEach(activeProjects) { proj in
+                                    let sub = timer.state.pendingTodos.filter { $0.projectID == proj.id }
+                                    if !sub.isEmpty {
+                                        Section(proj.name) {
+                                            ForEach(sub) { todo in
+                                                Button(todo.title) { timer.selectCurrentTodo(todo.id) }
+                                            }
+                                        }
+                                    }
+                                }
+                                if !looseTodos.isEmpty {
+                                    if !activeProjects.isEmpty {
+                                        Section("独立待办") {
+                                            ForEach(looseTodos) { todo in
+                                                Button(todo.title) { timer.selectCurrentTodo(todo.id) }
+                                            }
+                                        }
+                                    } else {
+                                        ForEach(looseTodos) { todo in
+                                            Button(todo.title) { timer.selectCurrentTodo(todo.id) }
+                                        }
                                     }
                                 }
                             } label: {
@@ -434,6 +520,13 @@ struct TBPopoverView: View {
                                 Button("清除标签") { timer.setDraftTags([]) }
                                 Divider()
                             }
+                            Button("+ 自定义新标签...") {
+                                isCustomTagForDraft = true
+                                customTagTargetTodoID = nil
+                                customTagInput = ""
+                                showingCustomTagAlert = true
+                            }
+                            Divider()
                             if !timer.state.knownTags.isEmpty {
                                 Text("已有标签")
                                 ForEach(timer.state.knownTags, id: \.self) { tag in
@@ -526,6 +619,15 @@ struct TBPopoverView: View {
                                     Text("🎯")
                                         .font(.system(size: 10))
                                 }
+                                if let proj = todo.projectID.flatMap({ timer.state.project(for: $0) }) {
+                                    Text(proj.name)
+                                        .font(.system(size: 9, weight: .semibold))
+                                        .foregroundColor(Garden.muted)
+                                        .padding(.horizontal, 3)
+                                        .padding(.vertical, 1)
+                                        .background(Garden.surface.opacity(0.8))
+                                        .cornerRadius(3)
+                                }
                                 Text(todo.title)
                                     .font(.system(size: 12, weight: isCurrent ? .semibold : .regular))
                                     .foregroundColor(Garden.ink)
@@ -549,6 +651,13 @@ struct TBPopoverView: View {
                                     Button("清除标签") { timer.setTodoTags(id: todo.id, tags: []) }
                                     Divider()
                                 }
+                                Button("+ 自定义新标签...") {
+                                    isCustomTagForDraft = false
+                                    customTagTargetTodoID = todo.id
+                                    customTagInput = ""
+                                    showingCustomTagAlert = true
+                                }
+                                Divider()
                                 if !timer.state.knownTags.isEmpty {
                                     Text("已有标签")
                                     ForEach(timer.state.knownTags, id: \.self) { tag in
