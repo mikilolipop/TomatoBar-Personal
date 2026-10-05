@@ -5,439 +5,63 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="site/ published by scripts/deploy-site.sh">
 <title>TomatoBar Personal · 给眼前的事，一段安静的专注时间</title>
-<meta name="description" content="专为 macOS 打造的安静番茄钟。长周期大任务与子任务层级管理、智能标签继承合并、Hover Actions 悬浮交互，按日、周、月回看时间去向。记录留存本机，MIT 开源。">
+<meta name="description" content="安静的 macOS 菜单栏番茄钟。大任务与子任务层级管理、智能标签、无声计时、随时暂停，按日、周、月回看时间去向。记录留在本机，MIT 开源。">
 <meta property="og:title" content="TomatoBar Personal · 一段安静的专注时间">
-<meta property="og:description" content="无声计时，随时暂停。大任务拆解层级专注，让时间在安静中沉淀足迹。">
+<meta property="og:description" content="无声计时，随时暂停。大任务拆解层级专注，回看时间去了哪里。">
 <meta property="og:image" content="https://mikilolipop.github.io/TomatoBar-Personal/hero-day.png">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://mikilolipop.github.io/TomatoBar-Personal/">
 <link rel="icon" type="image/png" href="icon.png">
-<link rel="stylesheet" href="styles.css">
-<script src="script.js" defer></script>
+<link rel="stylesheet" href="styles.css?v=3.10.0">
+<script src="script.js?v=3.10.0" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#main">跳到正文</a>
-
 <header class="site-header container">
-  <a class="brand" href="#" aria-label="TomatoBar Personal 首页">
-    <img class="pixel-art" src="assets/pixel-tomato.png" alt="" width="40" height="40">
-    <span>TomatoBar Personal</span>
-  </a>
-  <nav aria-label="主导航">
-    <a class="nav-section" href="#features">理念</a>
-    <a class="nav-section" href="#highlights">V1.4.1 重塑</a>
-    <a class="nav-section" href="#playground">标签体验</a>
-    <a class="nav-section" href="#changelog">更新日志</a>
-    <a class="nav-section" href="#install">安装指南</a>
-    <a class="nav-external" href="https://github.com/mikilolipop/TomatoBar-Personal" target="_blank" rel="noopener">GitHub</a>
-    <a class="nav-download" href="#download">下载</a>
-  </nav>
+  <a class="brand" href="#" aria-label="TomatoBar Personal 首页"><img class="pixel-art" src="assets/pixel-tomato.png" alt="" width="40" height="40"><span>TomatoBar Personal</span></a>
+  <nav aria-label="主导航"><a class="nav-section" href="#features">功能</a><a class="nav-section" href="#install">安装</a><a href="https://github.com/mikilolipop/TomatoBar-Personal">GitHub</a><a class="nav-download" href="#download">下载</a></nav>
 </header>
-
 <main id="main">
-  <!-- Hero Section -->
   <section class="hero container" aria-labelledby="hero-title">
     <div class="hero-copy">
-      <div class="hero-badge">
-        <span class="badge-pill">V1.4.1 发布</span>
-        <span class="badge-text">长周期任务层级与智能标签体系重塑</span>
-      </div>
-      <h1 id="hero-title">
-        <span>给眼前的事，</span>
-        <span>一段安静的</span>
-        <span class="accent">专注时间。</span>
-      </h1>
-      <p class="hero-description">
-        无声计时，随时暂停。<br>
-        为大任务拆解步骤，让时间在安静中沉淀足迹。
-      </p>
-      <div class="actions" id="download">
-        <a class="button button-primary" id="btn-dmg" data-download="dmg" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.10.0/TomatoBarPersonal-3.10.0.dmg">
-          下载 macOS 版
-          <img class="ui-icon" src="assets/download.svg" alt="" width="20" height="20">
-        </a>
-        <a class="button button-secondary" href="#install">
-          安装指南
-          <img class="ui-icon" src="assets/arrow-right.svg" alt="" width="18" height="18">
-        </a>
-      </div>
-      <p class="compatibility">
-        macOS 12.3+ · Apple Silicon / Intel<br>
-        <span data-release-version>v3.10.0</span> · MIT 开源 · <span data-download-size="dmg">4.6 MB</span>
-      </p>
-      <p class="download-alternatives">
-        <a id="btn-zip" data-download="zip" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.10.0/TomatoBarPersonal-3.10.0.zip">下载 ZIP (<span data-download-size="zip">4.1 MB</span>)</a>
-        <span aria-hidden="true">·</span>
-        <a href="#changelog">更新亮点</a>
-        <span aria-hidden="true">·</span>
-        <a href="https://github.com/mikilolipop/TomatoBar-Personal/releases/latest" target="_blank" rel="noopener">GitHub Releases</a>
-      </p>
+      <p class="eyebrow">专为 macOS 而生 · V1.4.1</p>
+      <h1 id="hero-title"><span>给眼前的事，</span><span>一段安静的</span><span class="accent">专注时间。</span></h1>
+      <p class="hero-description">无声计时，随时暂停。<br>大任务层级拆解，回看时间去了哪里。</p>
+      <div class="actions" id="download"><a class="button button-primary" id="btn-dmg" data-download="dmg" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.10.0/TomatoBarPersonal-3.10.0.dmg">下载 macOS 版<img class="ui-icon" src="assets/download.svg" alt="" width="20" height="20"></a><a class="button button-secondary" href="#install">安装指南<img class="ui-icon" src="assets/arrow-right.svg" alt="" width="18" height="18"></a></div>
+      <p class="compatibility">macOS 12.3+ · Apple Silicon / Intel<br><span data-release-version>v3.10.0</span> · MIT 开源 · <span data-download-size="dmg">4.6 MB</span></p>
+      <p class="download-alternatives"><a id="btn-zip" data-download="zip" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.10.0/TomatoBarPersonal-3.10.0.zip">下载 ZIP</a><span aria-hidden="true">·</span><a href="https://github.com/mikilolipop/TomatoBar-Personal/releases/latest">查看更新</a></p>
     </div>
     <figure class="hero-preview">
-      <button class="screenshot-button" type="button" data-preview aria-label="查看 TomatoBar Personal 主窗口大图">
-        <img class="app-screenshot" src="hero-day.png" alt="TomatoBar Personal 完整主窗口：专注足迹、分类、待办与记录（示例数据）" width="2360" height="1584" fetchpriority="high">
-      </button>
-      <figcaption>
-        原生 macOS 界面 · 示例数据
-        <span aria-hidden="true"> / </span>
-        <button class="text-link" type="button" data-preview>查看大图</button>
-      </figcaption>
+      <button class="screenshot-button" type="button" data-preview aria-label="查看 TomatoBar Personal 主窗口大图"><img class="app-screenshot" src="hero-day.png" alt="TomatoBar Personal 完整主窗口：大任务层级管理、分类、待办与记录（示例数据）" width="1920" height="1410" fetchpriority="high"></button>
+      <figcaption>原生 macOS 界面 · 示例数据<span aria-hidden="true"> / </span><button class="text-link" type="button" data-preview>查看大图</button></figcaption>
     </figure>
   </section>
-
-  <!-- 3-Step Journey Section -->
   <section class="journey container" id="features" aria-labelledby="journey-title">
-    <div class="section-header">
-      <p class="eyebrow">专注心流</p>
-      <h2 id="journey-title">从开始，到看见积累。</h2>
-    </div>
+    <h2 id="journey-title">从开始，到看见积累。</h2>
     <div class="journey-grid">
-      <article class="journey-item">
-        <span class="step-number" aria-hidden="true">01</span>
-        <div>
-          <h3>拆解与命名</h3>
-          <p>给这段专注一个清晰的名字。设定大任务归属与细分标签，让当下的每一步投入，日后都有迹可循。</p>
-        </div>
-      </article>
-      <article class="journey-item">
-        <span class="step-number" aria-hidden="true">02</span>
-        <div>
-          <h3>静默沉浸</h3>
-          <p>在菜单栏静静计时，随时暂停或继续。到点以无声窗口提醒，跳过休息无缝衔接，陪你保持自己的节奏。</p>
-        </div>
-      </article>
-      <article class="journey-item">
-        <span class="step-number" aria-hidden="true">03</span>
-        <div>
-          <h3>回看足迹</h3>
-          <p>按日、周、月多维回看专注记录。宏观沉淀目标总时长，微观看见时间去了哪里，见证每一分积累。</p>
-        </div>
-      </article>
+      <article class="journey-item"><span class="step-number" aria-hidden="true">01</span><div><h3>写下这一刻</h3><p>给这段专注一个清晰的名字。设定大任务归属与细分标签，让当下的投入，日后也有迹可循。</p></div></article>
+      <article class="journey-item"><span class="step-number" aria-hidden="true">02</span><div><h3>安静投入</h3><p>在菜单栏静静计时，随时暂停或继续。到点以无声窗口提醒，跳过休息无缝衔接，陪你保持自己的节奏。</p></div></article>
+      <article class="journey-item"><span class="step-number" aria-hidden="true">03</span><div><h3>回看足迹</h3><p>按日、周、月回顾专注记录。看见时间去了哪里，微观投入自动沉淀至大任务积累。</p></div></article>
     </div>
   </section>
-
-  <!-- V1.4.1 Flagship Features Section -->
-  <section class="highlights container" id="highlights" aria-labelledby="highlights-title">
-    <div class="section-header">
-      <p class="eyebrow">V1.4.1 重磅升级</p>
-      <h2 id="highlights-title">专注，始于从容的秩序。</h2>
-      <p class="section-lead">针对长周期学习与工程研发场景，TomatoBar 进化出更符合直觉的层级专注流与极致克制的交互美学。</p>
-    </div>
-
-    <div class="highlights-grid">
-      <!-- Feature 1: Task Hierarchy -->
-      <article class="highlight-card">
-        <div class="card-badge">核心架构</div>
-        <h3>长期大任务与层级体系</h3>
-        <p class="card-subtitle">Bluebird 风格持续专注流</p>
-        <p class="card-description">
-          支持建立长期大任务（如“机械原理期末备考”、“Robomaster 比赛研发”）。在大任务下自由拆解子任务，微观专注精准记在子任务，宏观总时长自动汇总聚合。
-        </p>
-        <div class="mock-project-card" aria-hidden="true">
-          <div class="mock-project-header">
-            <div class="mock-project-info">
-              <span class="mock-project-icon">🎯</span>
-              <span class="mock-project-title">机械系统设计大作业</span>
-            </div>
-            <span class="mock-project-time">4小时15分</span>
-          </div>
-          <div class="mock-subtasks">
-            <div class="mock-subtask completed">
-              <span class="mock-check">✓</span>
-              <span class="mock-task-name">齿轮传动比参数验算</span>
-              <span class="mock-tag-pill tag-inherited">#专业课</span>
-            </div>
-            <div class="mock-subtask active">
-              <span class="mock-play">▶</span>
-              <span class="mock-task-name">减速箱装配与动力学建模</span>
-              <span class="mock-tag-pill tag-inherited">#专业课</span>
-              <span class="mock-tag-pill tag-custom">#建模 ⚙️</span>
-            </div>
-          </div>
-        </div>
-      </article>
-
-      <!-- Feature 2: Smart Tag Inheritance -->
-      <article class="highlight-card">
-        <div class="card-badge">智能流转</div>
-        <h3>母任务主标与细分合并</h3>
-        <p class="card-subtitle">统计宏观归集，微观精细沉淀</p>
-        <p class="card-description">
-          大任务卡片设置主分类（如 <code>#专业课</code>），新建子任务免设默认继承；若输入细分标签（如 <code>#仿真</code>），系统自动智能拼合为双层标签，宏观统计与微观细分兼得。
-        </p>
-        <div class="mock-tag-flow" aria-hidden="true">
-          <div class="tag-flow-box">
-            <span class="flow-label">大任务主分类</span>
-            <span class="mock-tag-pill tag-inherited">#专业课</span>
-          </div>
-          <span class="flow-operator">+</span>
-          <div class="tag-flow-box">
-            <span class="flow-label">子任务细分</span>
-            <span class="mock-tag-pill tag-custom">#仿真 ⚙️</span>
-          </div>
-          <span class="flow-operator">➔</span>
-          <div class="tag-flow-box result">
-            <span class="flow-label">智能合并沉淀</span>
-            <div class="tag-pills-row">
-              <span class="mock-tag-pill tag-inherited">#专业课</span>
-              <span class="mock-tag-pill tag-custom">#仿真 ⚙️</span>
-            </div>
-          </div>
-        </div>
-      </article>
-
-      <!-- Feature 3: Hover Actions & Layout Refactor -->
-      <article class="highlight-card">
-        <div class="card-badge">交互美学</div>
-        <h3>待办面板黄金重排 & Hover Actions</h3>
-        <p class="card-subtitle">从容舒展，彻底告别名称截断</p>
-        <p class="card-description">
-          下半区分栏比例由局促重塑为宽裕的黄金比例，可用横向宽度扩展至 540px+；采用悬浮显现操作（Hover Actions），平时专注纯净，鼠标悬停时平滑浮现操作。
-        </p>
-        <div class="mock-hover-preview" aria-hidden="true">
-          <div class="mock-todo-item normal">
-            <span class="mock-circle"></span>
-            <span class="mock-todo-text">准备周三学术讨论会 Slides</span>
-            <span class="mock-tag-pill tag-soft">#科研</span>
-          </div>
-          <div class="mock-todo-item hovered">
-            <span class="mock-circle"></span>
-            <span class="mock-todo-text">撰写技术交接文档与单元测试</span>
-            <span class="mock-tag-pill tag-soft">#工程</span>
-            <div class="mock-actions-reveal">
-              <span class="action-btn-mock play">▶ 专注</span>
-              <span class="action-btn-mock more">···</span>
-            </div>
-          </div>
-        </div>
-      </article>
-
-      <!-- Feature 4: Gear Icon & Custom Tags -->
-      <article class="highlight-card">
-        <div class="card-badge">个性自由</div>
-        <h3>调色盘齿轮图标 & 自定义新标签</h3>
-        <p class="card-subtitle">工科工程场景原生适配</p>
-        <p class="card-description">
-          调色盘正式加入 ⚙️ 齿轮图标（<code>gearshape</code>），含「机械」或「工程」自动语义映射；支持自由创建任意新标签，行内 <code>#标签</code> 敲下回车极速解析。
-        </p>
-        <div class="mock-palette-grid" aria-hidden="true">
-          <div class="palette-chip active">
-            <span class="chip-icon">⚙️</span>
-            <span class="chip-text">机械工程</span>
-          </div>
-          <div class="palette-chip">
-            <span class="chip-icon">📐</span>
-            <span class="chip-text">结构力学</span>
-          </div>
-          <div class="palette-chip">
-            <span class="chip-icon">💻</span>
-            <span class="chip-text">嵌入式算法</span>
-          </div>
-          <div class="palette-chip">
-            <span class="chip-icon">📖</span>
-            <span class="chip-text">文献阅读</span>
-          </div>
-          <div class="palette-chip">
-            <span class="chip-icon">☕</span>
-            <span class="chip-text">思考复盘</span>
-          </div>
-        </div>
-      </article>
-    </div>
-  </section>
-
-  <!-- Interactive Playground Section -->
-  <section class="playground container" id="playground" aria-labelledby="playground-title">
-    <div class="playground-card">
-      <div class="playground-header">
-        <p class="eyebrow">微交互体验</p>
-        <h2 id="playground-title">行内 #标签，敲下即归类。</h2>
-        <p class="playground-description">
-          在输入任务或专注事件时，直接输入 <code>#标签</code> 即可自动提取分类。在下方输入框试试输入，体验实时解析：
-        </p>
-      </div>
-
-      <div class="playground-samples">
-        <span class="samples-label">快速体验预设：</span>
-        <button class="preset-tag-btn" type="button" data-preset="复习理论力学动力学部分 #专业课 #期末">复习理论力学动力学部分 #专业课 #期末</button>
-        <button class="preset-tag-btn" type="button" data-preset="设计行星减速机结构 #机械工程">设计行星减速机结构 #机械工程</button>
-        <button class="preset-tag-btn" type="button" data-preset="精读自动驾驶路径规划论文 #科研">精读自动驾驶路径规划论文 #科研</button>
-      </div>
-
-      <div class="playground-interactive">
-        <div class="input-wrapper">
-          <label class="sr-only" for="playground-input">体验输入任务名称与标签</label>
-          <input class="playground-input" id="playground-input" type="text" value="复习理论力学动力学部分 #专业课 #期末" placeholder="输入任务名称与 #标签（例如：分析齿轮振动 #机械工程 ⚙️）" maxlength="100">
-        </div>
-
-        <div class="playground-output-box" aria-live="polite">
-          <div class="output-row">
-            <span class="output-label">识别到的任务标题</span>
-            <span class="output-title" id="playground-title-preview">复习理论力学动力学部分</span>
-          </div>
-          <div class="output-row">
-            <span class="output-label">自动提取的分类标签</span>
-            <div class="output-tags" id="playground-tags-preview">
-              <span class="tag-badge">#专业课</span>
-              <span class="tag-badge">#期末</span>
-            </div>
-          </div>
-          <p class="output-note">
-            💡 在 TomatoBar Personal 中，输入回车后即可一键生成待办并自动分配对应彩色图标与图表统计。
-          </p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Privacy & Open Source Section -->
   <section class="privacy container" aria-labelledby="privacy-title">
-    <div class="privacy-heading">
-      <p class="eyebrow">专注属于你，记录也是。</p>
-      <h2 id="privacy-title">你的记录，<br>留在你的 Mac。</h2>
-    </div>
-    <div class="privacy-copy">
-      <p>专注记录安全保存在本机，绝不上云。<br class="desktop-break">应用零网络请求、零数据遥测，你的时间，无需交给别处。</p>
-      <p>TomatoBar Personal 是 MIT 开源项目。<br class="desktop-break">源码与构建过程完全公开，你可以随时核验或自主构建。</p>
-      <a class="text-link source-link" href="https://github.com/mikilolipop/TomatoBar-Personal" target="_blank" rel="noopener">
-        在 GitHub 上查看源码
-        <img class="ui-icon" src="assets/arrow-right.svg" alt="" width="18" height="18">
-      </a>
-    </div>
+    <div class="privacy-heading"><p class="eyebrow">专注属于你，记录也是。</p><h2 id="privacy-title">你的记录，<br>留在你的 Mac。</h2></div>
+    <div class="privacy-copy"><p>专注记录保存在本机。应用无网络请求，无遥测，<br class="desktop-break">你的时间，无需交给别处。</p><p>TomatoBar Personal 是 MIT 开源项目。<br class="desktop-break">源码与构建方式公开，你可以随时查看。</p><a class="text-link source-link" href="https://github.com/mikilolipop/TomatoBar-Personal">在 GitHub 上查看源码<img class="ui-icon" src="assets/arrow-right.svg" alt="" width="18" height="18"></a></div>
   </section>
-
-  <!-- Changelog Section -->
-  <section class="changelog container" id="changelog" aria-labelledby="changelog-title">
-    <div class="section-header">
-      <p class="eyebrow">版本演进足迹</p>
-      <h2 id="changelog-title">每一次迭代，皆为心流打磨。</h2>
-    </div>
-
-    <div class="changelog-cards">
-      <!-- V1.4.1 -->
-      <article class="changelog-card current">
-        <div class="changelog-meta">
-          <span class="release-tag">V1.4.1（3.10.0 build 7）</span>
-          <span class="release-date">2026-10-05 · 最新正式版</span>
-          <span class="release-badge-current">Current</span>
-        </div>
-        <div class="changelog-body">
-          <ul class="changelog-list">
-            <li><strong>待办面板黄金重排</strong>：下半区比例扩展为从容黄金比例，消除长任务截断；采用 Linear 风格 Hover Actions 悬浮操作。</li>
-            <li><strong>长期大任务层级体系</strong>：支持建立长期项目（Project）并自由拆解子任务，微观专注精准记在子任务，宏观总时长自动汇聚累加。</li>
-            <li><strong>大任务主标与智能合并继承</strong>：子任务自动继承母项目主标签；输入细分标签时自动智能拼合，统计归集与微观细分各归其位。</li>
-            <li><strong>调色盘新增 ⚙️ 齿轮图标</strong>：分类调色盘正式加入 <code>gearshape</code>，工科与机械工程语义自动映射。</li>
-            <li><strong>自由自定义新标签</strong>：支持任意新标签输入与行内 <code>#标签</code> 快速语法解析。</li>
-            <li><strong>跳过休息（Skip Rest）</strong>：专注完成提醒窗与 Popover 支持一键跳过休息并保留长休息节奏。</li>
-            <li><strong>菜单栏 Popover 折叠面板</strong>：支持记录列表折叠与状态持久化记忆。</li>
-            <li><strong>工程级质量验证</strong>：263 项领域测试 + 53 项真实桥接探针 + 8 项合成启动事件全绿；严格 Universal 签名。</li>
-          </ul>
-        </div>
-      </article>
-
-      <!-- V1.3.2 -->
-      <article class="changelog-card">
-        <div class="changelog-meta">
-          <span class="release-tag">V1.3.2（3.9.2 build 3）</span>
-          <span class="release-date">2026-10-01</span>
-        </div>
-        <div class="changelog-body">
-          <ul class="changelog-list">
-            <li><strong>多标签统计修复</strong>：主分类筛选逻辑修复，历史足迹图表多标签归集准确度全面提升。</li>
-            <li><strong>Universal 双架构分发</strong>：原生兼容 Apple Silicon（M1/M2/M3/M4）与 Intel 芯片 Mac。</li>
-          </ul>
-        </div>
-      </article>
-    </div>
-  </section>
-
-  <!-- Installation Section -->
-  <section class="installation container" id="install" aria-label="安装指南">
-    <details id="install-details">
-      <summary>
-        <span>首次安装？从这里开始。</span>
-        <span class="summary-hint">展开安装指南</span>
-      </summary>
-      <ol class="installation-steps">
-        <li>
-          <h3>下载安装包</h3>
-          <p>选择 DMG 或 ZIP。两个安装包均原生支持 Apple Silicon 与 Intel 架构芯片。</p>
-          <a class="text-link" data-download="zip" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.10.0/TomatoBarPersonal-3.10.0.zip">下载 ZIP · <span data-download-size="zip">4.1 MB</span></a>
-        </li>
-        <li>
-          <h3>移入 Applications</h3>
-          <p>打开 DMG 镜像将应用拖入 Applications 文件夹；或将 ZIP 解压后移入 Applications。</p>
-        </li>
-        <li>
-          <h3>首次打开防拦截</h3>
-          <p>公开安装包采用 ad-hoc 签名，未付费做 Apple 公证。如 macOS 提示无法打开，请执行下方命令：</p>
-        </li>
-      </ol>
-      <div class="first-open">
-        <h3>如果 macOS 提示「无法打开，因为无法验证开发者」</h3>
-        <p>确认安装包来自本页官方 GitHub 发布链接并已移入 Applications 目录，在 Mac 终端中粘贴执行：</p>
-        <div class="command-row">
-          <code id="install-command">xattr -dr com.apple.quarantine "/Applications/TomatoBar Personal.app"</code>
-          <button class="copy-button" id="copy-command" type="button">复制命令</button>
-        </div>
-        <p class="copy-feedback" id="copy-feedback" role="status" aria-live="polite"></p>
-      </div>
-    </details>
-  </section>
-
-  <!-- Thanks Section -->
-  <section class="thanks container" id="thanks" aria-labelledby="thanks-title">
-    <h2 id="thanks-title">感谢最早的支持</h2>
-    <p>谢谢你们在 TomatoBar Personal 起步时给予的信任与灵感。</p>
-    <ul aria-label="第一批支持者">
-      <li>nafi</li>
-      <li>Chiwawa</li>
-      <li>ElF</li>
-    </ul>
-  </section>
-
-  <!-- Closing Download CTA Section -->
   <section class="closing container" aria-labelledby="closing-title">
-    <div class="closing-copy">
-      <h2 id="closing-title">下一段，专注什么？</h2>
-      <p>在安静中，积累每一段有意义的时间。</p>
-    </div>
-    <div class="closing-download">
-      <div class="actions">
-        <a class="button button-primary" data-download="dmg" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.10.0/TomatoBarPersonal-3.10.0.dmg">
-          下载 macOS 版
-          <img class="ui-icon" src="assets/download.svg" alt="" width="20" height="20">
-        </a>
-        <a class="button button-secondary" href="#install">
-          安装指南
-          <img class="ui-icon" src="assets/arrow-right.svg" alt="" width="18" height="18">
-        </a>
-      </div>
-      <p class="compatibility">macOS 12.3+ · Apple Silicon / Intel · <span data-release-version>v3.10.0</span></p>
-    </div>
+    <div class="closing-copy"><h2 id="closing-title">下一段，专注什么？</h2><p>在安静中，积累每一段有意义的时间。</p></div>
+    <div class="closing-download"><div class="actions"><a class="button button-primary" data-download="dmg" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.10.0/TomatoBarPersonal-3.10.0.dmg">下载 macOS 版<img class="ui-icon" src="assets/download.svg" alt="" width="20" height="20"></a><a class="button button-secondary" href="#install">安装指南<img class="ui-icon" src="assets/arrow-right.svg" alt="" width="18" height="18"></a></div><p class="compatibility">macOS 12.3+ · Apple Silicon / Intel · <span data-release-version>v3.10.0</span></p></div>
     <img class="closing-tomato pixel-art" src="assets/pixel-tomato.png" alt="" width="120" height="120" loading="lazy">
   </section>
+  <section class="installation container" id="install" aria-label="安装指南">
+    <details id="install-details"><summary><span>首次安装？从这里开始。</span><span class="summary-hint">展开安装指南</span></summary>
+      <ol class="installation-steps"><li><h3>下载</h3><p>选择 DMG 或 ZIP。两个安装包均支持 Apple Silicon 与 Intel，无需区分芯片。</p><a class="text-link" data-download="zip" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.10.0/TomatoBarPersonal-3.10.0.zip">下载 ZIP · <span data-download-size="zip">4.1 MB</span></a></li><li><h3>移入 Applications</h3><p>打开 DMG，把应用拖进 Applications 文件夹；使用 ZIP 时，解压后将应用移入该文件夹。</p></li><li><h3>首次打开</h3><p>公开安装包采用 ad-hoc 签名，未做付费公证。如果 macOS 拦截首次打开，请参照下面的说明。</p></li></ol>
+      <div class="first-open"><h3>如果 macOS 提示无法打开</h3><p>确认安装包来自本页的 GitHub 发布链接，并已放入 Applications。在终端执行以下命令后重新打开：</p><div class="command-row"><code id="install-command">xattr -dr com.apple.quarantine "/Applications/TomatoBar Personal.app"</code><button class="copy-button" id="copy-command" type="button">复制命令</button></div><p class="copy-feedback" id="copy-feedback" role="status" aria-live="polite"></p></div>
+    </details>
+  </section>
+  <section class="thanks container" id="thanks" aria-labelledby="thanks-title"><h2 id="thanks-title">感谢最早的支持</h2><p>谢谢你们在 TomatoBar Personal 起步时给予的信任。</p><ul aria-label="第一批客户"><li>nafi</li><li>Chiwawa</li><li>ElF</li></ul></section>
 </main>
-
-<footer class="site-footer container">
-  <nav aria-label="页脚导航">
-    <a href="https://github.com/mikilolipop/TomatoBar-Personal" target="_blank" rel="noopener">GitHub</a>
-    <a href="https://github.com/mikilolipop/TomatoBar-Personal/releases" target="_blank" rel="noopener">发布记录</a>
-    <a href="#changelog">更新说明</a>
-    <a href="https://github.com/mikilolipop/TomatoBar-Personal/blob/feature/personal-focus/LICENSE" target="_blank" rel="noopener">MIT 开源</a>
-  </nav>
-  <p>基于 <a href="https://github.com/ivoronin/TomatoBar" target="_blank" rel="noopener">ivoronin/TomatoBar</a>（MIT）的个人定制 fork。</p>
-  <p class="footer-signoff">一点专注，一点积累。</p>
-</footer>
-
-<!-- Screenshot Preview Dialog -->
-<dialog class="preview-dialog" id="preview-dialog" aria-labelledby="preview-title">
-  <div class="preview-toolbar">
-    <h2 id="preview-title">TomatoBar Personal · 完整界面</h2>
-    <button class="close-preview" id="close-preview" type="button" autofocus>关闭</button>
-  </div>
-  <img src="hero-day.png" alt="TomatoBar Personal 主窗口完整截图，展示日视图、分类、待办与记录（示例数据）" width="2360" height="1584">
-  <p>截图为示例数据。<a href="hero-day.png" target="_blank" rel="noopener">打开原图</a></p>
-</dialog>
+<footer class="site-footer container"><nav aria-label="页脚导航"><a href="https://github.com/mikilolipop/TomatoBar-Personal">GitHub</a><a href="https://github.com/mikilolipop/TomatoBar-Personal/releases">发布记录</a><a href="https://github.com/mikilolipop/TomatoBar-Personal/releases/latest">更新说明</a><a href="https://github.com/mikilolipop/TomatoBar-Personal/blob/feature/personal-focus/LICENSE">MIT 开源</a></nav><p>基于 <a href="https://github.com/ivoronin/TomatoBar">ivoronin/TomatoBar</a>（MIT）的个人定制 fork。</p><p class="footer-signoff">一点专注，一点积累。</p></footer>
+<dialog class="preview-dialog" id="preview-dialog" aria-labelledby="preview-title"><div class="preview-toolbar"><h2 id="preview-title">TomatoBar Personal · 完整界面</h2><button class="close-preview" id="close-preview" type="button" autofocus>关闭</button></div><img src="hero-day.png" alt="TomatoBar Personal 主窗口完整截图，展示日视图、大任务层级、分类、待办与记录（示例数据）" width="1920" height="1410"><p>截图为示例数据。<a href="hero-day.png" target="_blank" rel="noopener">打开原图</a></p></dialog>
 </body>
 </html>
