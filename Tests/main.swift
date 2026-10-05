@@ -815,38 +815,53 @@ check(plainTitle == "纯任务名称" && plainTags.isEmpty, "parseInput works wi
 let (tagOnlyTitle, tagOnlyTags) = FocusTodo.parseInput("#仅标签")
 check(tagOnlyTitle == "#仅标签" && tagOnlyTags == ["仅标签"], "parseInput preserves standalone tag title fallback")
 
-// FocusProject: CRUD, subtask affiliation, project-level focus seconds aggregation and legacy compatibility.
+// FocusProject: CRUD, subtask affiliation, tag inheritance, project-level focus seconds aggregation and legacy compatibility.
 var projState = FocusState()
-let projA = projState.addProject(name: "Robomaster校内赛", color: "red", at: base)!
-let projB = projState.addProject(name: "材料力学", color: "blue", at: base)!
+let projA = projState.addProject(name: "Robomaster校内赛", tags: ["竞赛"], color: "red", at: base)!
+let projB = projState.addProject(name: "材料力学", tags: ["专业课"], color: "blue", at: base)!
 check(projState.projects.count == 2, "projects can be added")
 check(projState.project(for: projA)?.name == "Robomaster校内赛", "project(for:) looks up project by UUID")
-projState.renameProject(id: projA, name: "Robomaster 2026")
-check(projState.project(for: projA)?.name == "Robomaster 2026", "project can be renamed")
+check(projState.project(for: projA)?.tags == ["竞赛"], "project stores its primary tag")
+check(projState.knownTags.contains("竞赛") && projState.knownTags.contains("专业课"), "knownTags includes project tags")
+
+projState.updateProject(id: projA, name: "Robomaster 2026", tags: ["竞赛", "科创"])
+check(projState.project(for: projA)?.name == "Robomaster 2026" && projState.project(for: projA)?.tags == ["竞赛", "科创"],
+      "project can be updated with new name and tags")
 projState.toggleProjectArchived(id: projB)
 check(projState.project(for: projB)?.isArchived == true, "project can be archived")
 
+// Subtask tag inheritance & merging:
+// 1. Subtask with child tag merges with parent project tags: ["竞赛", "科创", "机械"]
 let subtaskA1 = projState.addTodo(title: "底盘机械设计", tags: ["机械"], projectID: projA, at: base)!
-let subtaskA2 = projState.addTodo(title: "云台代码调试", tags: ["电控"], projectID: projA, at: base)!
+check(projState.todos.first { $0.id == subtaskA1 }?.tags == ["竞赛", "科创", "机械"],
+      "subtask with own tags merges parent project tags as prefix")
+
+// 2. Subtask without tags automatically inherits parent project tags
+let subtaskA2 = projState.addTodo(title: "采购螺丝", projectID: projA, at: base)!
+check(projState.todos.first { $0.id == subtaskA2 }?.tags == ["竞赛", "科创"],
+      "subtask without tags automatically inherits parent project tags")
+
 let subtaskLoose = projState.addTodo(title: "英语单词", at: base)!
+check(projState.todos.first { $0.id == subtaskLoose }?.tags.isEmpty == true, "loose todo starts without tags")
 
-check(projState.todos.filter { $0.projectID == projA }.count == 2, "subtasks belong to their parent project")
-check(projState.todos.first { $0.id == subtaskLoose }?.projectID == nil, "loose todos have nil projectID")
-
+// 3. Assigning untagged loose todo to project inherits project's tags
 projState.setTodoProject(todoID: subtaskLoose, projectID: projB)
-check(projState.todos.first { $0.id == subtaskLoose }?.projectID == projB, "todo can be assigned to a project")
+check(projState.todos.first { $0.id == subtaskLoose }?.projectID == projB &&
+      projState.todos.first { $0.id == subtaskLoose }?.tags == ["专业课"],
+      "assigning untagged loose todo to project inherits target project's tags")
 
-// Start focus on subtaskA1, verify record gets both todoID and projectID
+// Focus on subtaskA1: record gets both todoID, projectID, and inherited tags (with parent category first)
 projState.startWork(name: "底盘机械设计", seconds: 120, todoID: subtaskA1, at: base)
 projState.tick(at: base.addingTimeInterval(120))
 projState.stop(at: base.addingTimeInterval(121))
 let recA1 = projState.records.first!
 check(recA1.todoID == subtaskA1 && recA1.projectID == projA, "record inherits both todoID and projectID")
+check(recA1.tags == ["竞赛", "科创", "机械"], "record inherits merged project and subtask tags")
 check(projState.focusSeconds(forTodo: subtaskA1) == 120, "subtask focusSeconds records 120s")
 check(projState.focusSeconds(forProject: projA) == 120, "project focusSeconds includes subtask time")
 
-// Start focus on subtaskA2, verify project aggregation sums up both subtasks
-projState.startWork(name: "云台代码调试", seconds: 60, todoID: subtaskA2, at: base.addingTimeInterval(200))
+// Focus on subtaskA2: project aggregation sums up both subtasks
+projState.startWork(name: "采购螺丝", seconds: 60, todoID: subtaskA2, at: base.addingTimeInterval(200))
 projState.tick(at: base.addingTimeInterval(260))
 projState.stop(at: base.addingTimeInterval(261))
 check(projState.focusSeconds(forProject: projA) == 180, "project focusSeconds aggregates all subtasks")
@@ -858,14 +873,26 @@ check(projState.projects.count == 1 && projState.project(for: projA) == nil, "pr
 check(projState.todos.filter { $0.id == subtaskA1 || $0.id == subtaskA2 }.allSatisfy { $0.projectID == nil },
       "subtasks of deleted project detach cleanly into loose todos rather than being deleted")
 
-// Serialization roundtrip with projects
+// Serialization roundtrip with projects and project tags
 var projRoundTripState = FocusState()
-let roundProjID = projRoundTripState.addProject(name: "毕业论文", at: base)!
+let roundProjID = projRoundTripState.addProject(name: "毕业论文", tags: ["学术"], at: base)!
 _ = projRoundTripState.addTodo(title: "开题报告", projectID: roundProjID, at: base)
 let roundTripDecoded = try JSONDecoder().decode(FocusState.self, from: JSONEncoder().encode(projRoundTripState))
 check(roundTripDecoded.projects.first?.name == "毕业论文" &&
-      roundTripDecoded.todos.first?.projectID == roundProjID,
-      "projects and subtask affiliations survive serialization roundtrip")
+      roundTripDecoded.projects.first?.tags == ["学术"] &&
+      roundTripDecoded.todos.first?.projectID == roundProjID &&
+      roundTripDecoded.todos.first?.tags == ["学术"],
+      "projects and subtask affiliations and tags survive serialization roundtrip")
+
+// Compatibility: Project JSON without 'tags' (build 5 format) decodes safely with empty tags array
+var legacyProjectWithoutTags = try JSONSerialization.jsonObject(with: JSONEncoder().encode(projRoundTripState)) as! [String: Any]
+var legacyProjectsList = legacyProjectWithoutTags["projects"] as! [[String: Any]]
+for i in legacyProjectsList.indices { legacyProjectsList[i].removeValue(forKey: "tags") }
+legacyProjectWithoutTags["projects"] = legacyProjectsList
+let legacyProjDecoded = try JSONDecoder().decode(FocusState.self, from: JSONSerialization.data(withJSONObject: legacyProjectWithoutTags))
+check(legacyProjDecoded.projects.first?.name == "毕业论文" &&
+      legacyProjDecoded.projects.first?.tags.isEmpty == true,
+      "build-5 sessions.json without project tags decodes with empty tags array")
 
 // Legacy sessions.json without projects decodes with empty array
 var legacyWithoutProjects = try JSONSerialization.jsonObject(with: JSONEncoder().encode(projRoundTripState)) as! [String: Any]
@@ -877,4 +904,4 @@ let legacyDecodedState = try JSONDecoder().decode(FocusState.self, from: JSONSer
 check(legacyDecodedState.projects.isEmpty && legacyDecodedState.todos.first?.projectID == nil,
       "pre-projects sessions.json decodes with empty projects and nil subtask projectID")
 
-print("PASS: \(checks) total checks including project hierarchy, subtask aggregation and legacy compatibility")
+print("PASS: \(checks) total checks including project hierarchy, tag inheritance, subtask aggregation and legacy compatibility")

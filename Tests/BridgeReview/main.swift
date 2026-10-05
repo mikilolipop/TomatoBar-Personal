@@ -233,19 +233,29 @@ let projectBridgeStore = FocusStore(url: projectBridgeDir.appendingPathComponent
 var projectBridgeSeed = FocusState()
 try projectBridgeStore.save(projectBridgeSeed)
 let projectTimer = TBTimer(store: projectBridgeStore)
-projectTimer.addProject(name: "考研数学")
-check(projectTimer.state.projects.count == 1 && projectTimer.state.projects.first?.name == "考研数学",
-      "bridge addProject persists project to state")
+projectTimer.addProject(name: "考研数学", tags: ["考研"])
+check(projectTimer.state.projects.count == 1 &&
+      projectTimer.state.projects.first?.name == "考研数学" &&
+      projectTimer.state.projects.first?.tags == ["考研"],
+      "bridge addProject persists project and tags to state")
 let projID = projectTimer.state.projects.first!.id
+projectTimer.updateProject(id: projID, name: "考研数学一", tags: ["考研", "数一"])
+check(projectTimer.state.projects.first?.name == "考研数学一" &&
+      projectTimer.state.projects.first?.tags == ["考研", "数一"],
+      "bridge updateProject updates project name and tags")
 projectTimer.addTodo("高数第一章", tags: ["数学"], projectID: projID)
-check(projectTimer.state.todos.count == 1 && projectTimer.state.todos.first?.projectID == projID,
-      "bridge addTodo with projectID assigns task to project")
+check(projectTimer.state.todos.count == 1 &&
+      projectTimer.state.todos.first?.projectID == projID &&
+      projectTimer.state.todos.first?.tags == ["考研", "数一", "数学"],
+      "bridge addTodo with projectID inherits and merges parent project tags")
 let subID = projectTimer.state.todos.first!.id
 projectTimer.selectCurrentTodo(subID)
 projectTimer.startWork()
 projectTimer.stop()
-check(projectTimer.state.records.first?.projectID == projID && projectTimer.state.records.first?.todoID == subID,
-      "bridge session on project subtask writes projectID and todoID to record")
+check(projectTimer.state.records.first?.projectID == projID &&
+      projectTimer.state.records.first?.todoID == subID &&
+      projectTimer.state.records.first?.tags == ["考研", "数一", "数学"],
+      "bridge session on project subtask writes projectID, todoID and inherited tags to record")
 projectTimer.deleteProject(id: projID)
 check(projectTimer.state.projects.isEmpty && projectTimer.state.todos.first?.projectID == nil,
       "bridge deleteProject safely detaches subtasks into loose todos")

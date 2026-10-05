@@ -2,7 +2,7 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-10-05，by Gemini/Claude · 实施大任务/项目与子任务层级（Bluebird风格）、自定义新标签、双向时长聚合归属、跳过休息与Popover记录折叠；258 领域 + 50 真实桥接 + 8 合成启动事件全绿；Release 构建与签名通过，/Applications 已安装 3.10.0 (build 5) 并通过单实例启动核验。
+最后更新：2026-10-05，by Gemini · 实施待办面板去拥挤重排（左右分栏 46%:54%，移除快速添加冗余下拉框，子任务行采用 Hover Actions 悬浮操作）与大任务标签自动继承/智能合并（FocusProject 增加 tags，子任务默认自动继承母项目标签，独立标签自动前置合并）；268 领域 + 53 真实桥接 + 8 合成启动事件全绿；Release 构建与签名通过，/Applications 已安装 3.10.0 (build 6) 并通过单实例启动核验。
 
 ---
 
@@ -44,10 +44,10 @@ popover 和到时提醒窗。上面的限制来自旧 System Events / screencapt
 
 | 项 | 值 |
 |---|---|
-| ✅ **已安装版本** | **3.10.0（V1.4.0，build 5）**，`/Applications/TomatoBar Personal.app` 已替换并从该路径运行，唯一进程运行中；本机开发签名，arm64 + x86_64；已清理历史多余解压副本，彻底消除盲盒启动 |
-| HEAD | 实施大任务/项目与子任务层级、自定义新标签与时长双向聚合 |
-| 工作区 | 已升级版本至 3.10.0 (build 5)，已正式安装至 /Applications 并通过单实例启动核验 |
-| 测试 | **258 项领域 + 50 项真实桥接 + 8 项合成启动事件**全绿；Release 干净构建 + 严格签名通过 |
+| ✅ **已安装版本** | **3.10.0（V1.4.1，build 6）**，`/Applications/TomatoBar Personal.app` 已替换并从该路径运行，唯一进程运行中；本机开发签名，arm64 + x86_64；已清理历史多余解压副本，彻底消除盲盒启动 |
+| HEAD | 待办面板去拥挤重排（46% 均衡分栏、全局添加栏精简、Hover Actions）与大任务标签自动继承与智能合并 |
+| 工作区 | 已升级版本至 3.10.0 (build 6)，已正式安装至 /Applications 并通过单实例启动核验 |
+| 测试 | **268 项领域 + 53 项真实桥接 + 8 项合成启动事件**全绿；Release 干净构建 + 严格签名通过 |
 | **CI** | `v3.9.2` 标签 run `36807963164` 与发布源码分支 run `36807962859` 均 success（`8d4836e`）；后续纯文档交接提交的状态以其独立 run 为准 |
 | 远程 | `origin` = `mikilolipop/TomatoBar-Personal`（**public**，2026-09-29 GitHub API 实测；默认分支 `feature/personal-focus`）；`upstream` = `ivoronin/TomatoBar` |
 | 发布入口 | [V1.3.2 / v3.9.2](https://github.com/mikilolipop/TomatoBar-Personal/releases/tag/v3.9.2)，DMG + ZIP，已成为 latest；[下载页](https://mikilolipop.github.io/TomatoBar-Personal/) 的静态兜底链接、修复说明与更新说明同步为本版 |

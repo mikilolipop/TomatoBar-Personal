@@ -96,26 +96,29 @@ struct FocusRecord: Codable, Identifiable, Equatable {
 struct FocusProject: Codable, Identifiable, Equatable {
     let id: UUID
     var name: String
+    var tags: [String]
     var color: String?
     var isArchived: Bool
     let createdAt: Date
 
-    init(id: UUID = UUID(), name: String, color: String? = nil, isArchived: Bool = false, createdAt: Date) {
+    init(id: UUID = UUID(), name: String, tags: [String] = [], color: String? = nil, isArchived: Bool = false, createdAt: Date) {
         self.id = id
         self.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.tags = FocusRecord.normalizedTags(tags)
         self.color = color
         self.isArchived = isArchived
         self.createdAt = createdAt
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, color, isArchived, createdAt
+        case id, name, tags, color, isArchived, createdAt
     }
 
     init(from decoder: Decoder) throws {
         let v = try decoder.container(keyedBy: CodingKeys.self)
         id = try v.decode(UUID.self, forKey: .id)
         name = try v.decode(String.self, forKey: .name)
+        tags = FocusRecord.normalizedTags(try v.decodeIfPresent([String].self, forKey: .tags) ?? [])
         color = try v.decodeIfPresent(String.self, forKey: .color)
         isArchived = try v.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
         createdAt = try v.decode(Date.self, forKey: .createdAt)
@@ -268,7 +271,7 @@ struct FocusState: Codable {
     /// Every tag the user has ever typed: records, task tags and the free-focus draft.
     /// Offered by the start-time tag picker so a tag is reusable before any record has it.
     var knownTags: [String] {
-        FocusRecord.normalizedTags(records.flatMap(\.tags) + todos.flatMap(\.tags) + draftTags)
+        FocusRecord.normalizedTags(records.flatMap(\.tags) + todos.flatMap(\.tags) + projects.flatMap(\.tags) + draftTags)
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
@@ -312,7 +315,15 @@ struct FocusState: Codable {
     mutating func addTodo(title: String, tags: [String] = [], projectID: UUID? = nil, at now: Date) -> UUID? {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        let todo = FocusTodo(title: trimmed, createdAt: now, tags: tags, projectID: projectID)
+        var resolvedTags = tags
+        if let pid = projectID, let proj = project(for: pid) {
+            if resolvedTags.isEmpty {
+                resolvedTags = proj.tags
+            } else {
+                resolvedTags = FocusRecord.normalizedTags(proj.tags + resolvedTags)
+            }
+        }
+        let todo = FocusTodo(title: trimmed, createdAt: now, tags: resolvedTags, projectID: projectID)
         todos.append(todo)
         return todo.id
     }
@@ -374,18 +385,28 @@ struct FocusState: Codable {
     }
 
     @discardableResult
-    mutating func addProject(name: String, color: String? = nil, at now: Date) -> UUID? {
+    mutating func addProject(name: String, tags: [String] = [], color: String? = nil, at now: Date) -> UUID? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        let project = FocusProject(name: trimmed, color: color, createdAt: now)
+        let project = FocusProject(name: trimmed, tags: tags, color: color, createdAt: now)
         projects.append(project)
         return project.id
     }
 
     mutating func renameProject(id: UUID, name: String) {
+        updateProject(id: id, name: name)
+    }
+
+    mutating func updateProject(id: UUID, name: String, tags: [String]? = nil, color: String? = nil) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let index = projects.firstIndex(where: { $0.id == id }) else { return }
         projects[index].name = trimmed
+        if let tags = tags {
+            projects[index].tags = FocusRecord.normalizedTags(tags)
+        }
+        if let color = color {
+            projects[index].color = color
+        }
     }
 
     mutating func deleteProject(id: UUID) {
@@ -404,9 +425,14 @@ struct FocusState: Codable {
     mutating func setTodoProject(todoID: UUID, projectID: UUID?) {
         guard let index = todos.firstIndex(where: { $0.id == todoID }) else { return }
         if let projectID = projectID {
-            guard projects.contains(where: { $0.id == projectID }) else { return }
+            guard let proj = project(for: projectID) else { return }
+            todos[index].projectID = projectID
+            if todos[index].tags.isEmpty && !proj.tags.isEmpty {
+                todos[index].tags = proj.tags
+            }
+        } else {
+            todos[index].projectID = nil
         }
-        todos[index].projectID = projectID
     }
 
     func project(for id: UUID?) -> FocusProject? {
@@ -546,7 +572,11 @@ struct FocusState: Codable {
         let resolvedTodoID = todoID ?? (phase == .restFinished ? (seriesTodoID ?? currentTodoID) : currentTodoID)
         activeTodoID = resolvedTodoID
         seriesTodoID = resolvedTodoID
-        let todoTags = resolvedTodoID.flatMap { id in todos.first { $0.id == id }?.tags } ?? []
+        let todo = resolvedTodoID.flatMap { id in todos.first { $0.id == id } }
+        var todoTags = todo?.tags ?? []
+        if todoTags.isEmpty, let pid = todo?.projectID, let proj = project(for: pid) {
+            todoTags = proj.tags
+        }
         let known = allTags
         activeTags = FocusRecord.normalizedTags(tags ?? todoTags).map { tag in
             known.first { $0.caseInsensitiveCompare(tag) == .orderedSame } ?? tag

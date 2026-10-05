@@ -144,20 +144,24 @@ final class TBTimer: ObservableObject {
         change { state, date in _ = state.addTodo(title: title, tags: tags, projectID: projectID, at: date) }
     }
 
-    func addProject(name: String, color: String? = nil) {
+    func addProject(name: String, tags: [String] = [], color: String? = nil) {
         guard storageError == nil else { return }
-        change { state, date in _ = state.addProject(name: name, color: color, at: date) }
+        change { state, date in _ = state.addProject(name: name, tags: tags, color: color, at: date) }
     }
 
-    func renameProject(id: UUID, name: String) {
+    func updateProject(id: UUID, name: String, tags: [String]? = nil, color: String? = nil) {
         guard storageError == nil else { return }
         change { state, _ in
-            state.renameProject(id: id, name: name)
+            state.updateProject(id: id, name: name, tags: tags, color: color)
             let activeID = self.preparedTodoID ?? state.currentTodoID
             if let tid = activeID, let todo = state.todos.first(where: { $0.id == tid }), todo.projectID == id {
                 self.eventName = "[\(name.trimmingCharacters(in: .whitespacesAndNewlines))] · \(todo.title)"
             }
         }
+    }
+
+    func renameProject(id: UUID, name: String) {
+        updateProject(id: id, name: name)
     }
 
     func deleteProject(id: UUID) {
