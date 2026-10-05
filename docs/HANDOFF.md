@@ -48,9 +48,9 @@ popover 和到时提醒窗。上面的限制来自旧 System Events / screencapt
 | HEAD | 全量代码审查与 V1.4.1 (3.10.0 build 7) 发布就绪，包含待办去拥挤重排、标签继承合并与齿轮图标 |
 | 工作区 | 已升级版本至 3.10.0 (build 7)，DMG/ZIP 包已就绪，官网已部署，已正式安装至 /Applications 并通过单实例启动核验 |
 | 测试 | **263 项领域 + 53 项真实桥接 + 8 项合成启动事件**全绿；Release 干净构建 + 严格签名通过 |
-| **CI** | 推送后以 HEAD 最新 run 为准；本地四套检查均已复跑并通过 |
+| **CI** | `v3.10.0` 标签 run `37311287450` 与分支 run `37311281237` 均已 **success**（`643845a`） |
 | 远程 | `origin` = `mikilolipop/TomatoBar-Personal`（**public**，2026-09-29 GitHub API 实测；默认分支 `feature/personal-focus`）；`upstream` = `ivoronin/TomatoBar` |
-| 发布入口 | [V1.4.1 / v3.10.0](https://github.com/mikilolipop/TomatoBar-Personal/releases/tag/v3.10.0)，DMG + ZIP 准备就绪；[下载页](https://mikilolipop.github.io/TomatoBar-Personal/) 已同步部署为 v3.10.0 |
+| 发布入口 | [V1.4.1 / v3.10.0](https://github.com/mikilolipop/TomatoBar-Personal/releases/tag/v3.10.0)，已正式发布为 latest，DMG 与 ZIP 双附件已上传并经 CDN 302 下载核验；[官网下载页](https://mikilolipop.github.io/TomatoBar-Personal/) 已自动识别为最新版 |
 | 用户真实数据 | 本次升级前后记录、待办与分类样式逐条一致；仅正常退出更新 checkpoint。私有快照与比对结果保留在仓库外的本地审计目录，未提交真实事件名或数据 |
 | QA 隔离环境 | 本轮 UI 使用新建 UIAudit Bundle ID，24 条合成记录 + 4 个合成待办，实际完成计时新增 1 条；空状态另以隔离快照检查。桥接仍使用 QA13 新建临时子目录，既有 QA13 sessions 未改 |
 | git 身份 | 本仓库 `--local`：`mikilolipop <207336577+mikilolipop@users.noreply.github.com>`（全局仍未设置） |
