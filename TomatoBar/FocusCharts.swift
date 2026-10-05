@@ -77,7 +77,8 @@ enum Garden {
         SymbolChoice(symbol: "paintbrush", label: "画笔"), SymbolChoice(symbol: "figure.walk", label: "步行"),
         SymbolChoice(symbol: "music.note", label: "音乐"), SymbolChoice(symbol: "globe", label: "地球"),
         SymbolChoice(symbol: "camera", label: "相机"), SymbolChoice(symbol: "cup.and.saucer", label: "杯子"),
-        SymbolChoice(symbol: "gamecontroller", label: "游戏"), SymbolChoice(symbol: "star", label: "星星")
+        SymbolChoice(symbol: "gamecontroller", label: "游戏"), SymbolChoice(symbol: "star", label: "星星"),
+        SymbolChoice(symbol: "gearshape", label: "齿轮")
     ]
     static func symbol(_ name: String) -> String {
         if name == "未分类" { return "square.grid.2x2" }
@@ -88,6 +89,7 @@ enum Garden {
         case "编程": return "laptopcomputer"
         case "数学": return "function"
         case "写作": return "pencil"
+        case "机械", "工程": return "gearshape"
         default: return symbolFallbacks[Int(hashOf(name) % UInt64(symbolFallbacks.count))]
         }
     }
