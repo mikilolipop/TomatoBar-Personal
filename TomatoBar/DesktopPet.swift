@@ -89,53 +89,121 @@ enum PetKind: String, CaseIterable, Identifiable {
 
 
     func stripAnimation(for phase: FocusPhase, paused: Bool) -> PetStripAnimation? {
-        guard self == .tomy else { return nil }
+        switch self {
+        case .tomy:
+            if paused {
+                return PetStripAnimation(
+                    assetName: "pet_tomy_paused_v2",
+                    frameCount: 4,
+                    durations: [0.70, 0.70, 0.12, 0.70],
+                    loopMode: .loop
+                )
+            }
 
-        if paused {
-            return PetStripAnimation(
-                assetName: "pet_tomy_paused_v2",
-                frameCount: 4,
-                durations: [0.70, 0.70, 0.12, 0.70],
-                loopMode: .loop
-            )
-        }
+            switch phase {
+            case .work:
+                return PetStripAnimation(
+                    assetName: "pet_tomy_work_v2",
+                    frameCount: 10,
+                    durations: [0.11, 0.10, 0.12, 0.11, 0.06, 0.08, 0.12, 0.11, 0.12, 0.13],
+                    loopMode: .loop
+                )
+            case .idle:
+                return PetStripAnimation(
+                    assetName: "pet_tomy_idle_v2",
+                    frameCount: 8,
+                    durations: [0.42, 0.42, 0.42, 0.07, 0.10, 0.07, 0.52, 0.52],
+                    loopMode: .loop
+                )
+            case .rest:
+                return PetStripAnimation(
+                    assetName: "pet_tomy_rest_v2",
+                    frameCount: 8,
+                    durations: Array(repeating: 0.22, count: 8),
+                    loopMode: .loop
+                )
+            case .workFinished:
+                return PetStripAnimation(
+                    assetName: "pet_tomy_work_finished_v2",
+                    frameCount: 8,
+                    durations: [0.13, 0.11, 0.11, 0.18, 0.18, 0.14, 0.18, 0.70],
+                    loopMode: .onceHold
+                )
+            case .restFinished:
+                return PetStripAnimation(
+                    assetName: "pet_tomy_rest_finished_v2",
+                    frameCount: 8,
+                    durations: [0.26, 0.22, 0.16, 0.15, 0.14, 0.12, 0.12, 0.65],
+                    loopMode: .onceHold
+                )
+            }
 
-        switch phase {
-        case .work:
-            return PetStripAnimation(
-                assetName: "pet_tomy_work_v2",
-                frameCount: 10,
-                durations: [0.11, 0.10, 0.12, 0.11, 0.06, 0.08, 0.12, 0.11, 0.12, 0.13],
-                loopMode: .loop
-            )
-        case .idle:
-            return PetStripAnimation(
-                assetName: "pet_tomy_idle_v2",
-                frameCount: 8,
-                durations: [0.42, 0.42, 0.42, 0.07, 0.10, 0.07, 0.52, 0.52],
-                loopMode: .loop
-            )
-        case .rest:
-            return PetStripAnimation(
-                assetName: "pet_tomy_rest_v2",
-                frameCount: 8,
-                durations: Array(repeating: 0.22, count: 8),
-                loopMode: .loop
-            )
-        case .workFinished:
-            return PetStripAnimation(
-                assetName: "pet_tomy_work_finished_v2",
-                frameCount: 8,
-                durations: [0.13, 0.11, 0.11, 0.18, 0.18, 0.14, 0.18, 0.70],
-                loopMode: .onceHold
-            )
-        case .restFinished:
-            return PetStripAnimation(
-                assetName: "pet_tomy_rest_finished_v2",
-                frameCount: 8,
-                durations: [0.26, 0.22, 0.16, 0.15, 0.14, 0.12, 0.12, 0.65],
-                loopMode: .onceHold
-            )
+        case .sprout:
+            // Sprout V3 keeps phase semantics visible even while paused:
+            // work-paused still holds the reading pose, while rest-paused
+            // stays beside the flowerpot instead of collapsing into one
+            // generic paused sprite.
+            if paused {
+                switch phase {
+                case .work:
+                    return PetStripAnimation(
+                        assetName: "pet_sprout_work_paused_v3",
+                        frameCount: 4,
+                        durations: [0.70, 0.70, 0.15, 0.70],
+                        loopMode: .loop
+                    )
+                case .rest:
+                    return PetStripAnimation(
+                        assetName: "pet_sprout_rest_paused_v3",
+                        frameCount: 4,
+                        durations: [0.60, 0.60, 0.60, 0.60],
+                        loopMode: .loop
+                    )
+                default:
+                    break
+                }
+            }
+
+            switch phase {
+            case .work:
+                return PetStripAnimation(
+                    assetName: "pet_sprout_work_v3",
+                    frameCount: 10,
+                    durations: [0.16, 0.14, 0.12, 0.16, 0.10, 0.12, 0.15, 0.14, 0.13, 0.16],
+                    loopMode: .loop
+                )
+            case .idle:
+                return PetStripAnimation(
+                    assetName: "pet_sprout_idle_v3",
+                    frameCount: 8,
+                    durations: [0.45, 0.45, 0.45, 0.08, 0.10, 0.08, 0.55, 0.55],
+                    loopMode: .loop
+                )
+            case .rest:
+                return PetStripAnimation(
+                    assetName: "pet_sprout_rest_v3",
+                    frameCount: 8,
+                    durations: Array(repeating: 0.32, count: 8),
+                    loopMode: .loop
+                )
+            case .workFinished:
+                return PetStripAnimation(
+                    assetName: "pet_sprout_work_finished_v3",
+                    frameCount: 8,
+                    durations: [0.16, 0.14, 0.13, 0.14, 0.16, 0.16, 0.20, 0.75],
+                    loopMode: .onceHold
+                )
+            case .restFinished:
+                return PetStripAnimation(
+                    assetName: "pet_sprout_rest_finished_v3",
+                    frameCount: 8,
+                    durations: [0.28, 0.24, 0.20, 0.18, 0.16, 0.15, 0.16, 0.70],
+                    loopMode: .onceHold
+                )
+            }
+
+        case .chip, .clay:
+            return nil
         }
     }
 
@@ -483,7 +551,7 @@ struct DesktopPetView: View {
 
     private var microYOffset: CGFloat {
         guard animations else { return 0 }
-        if petKind == .tomy { return 0 }
+        if petKind == .tomy || petKind == .sprout { return 0 }
         if timer.state.needsAttention {
             return (frameIndex % 2 == 1) ? -6 : 0
         }
@@ -492,7 +560,7 @@ struct DesktopPetView: View {
 
     private var microScale: CGFloat {
         guard animations else { return 1.0 }
-        if petKind == .tomy { return 1.0 }
+        if petKind == .tomy || petKind == .sprout { return 1.0 }
         if timer.state.needsAttention {
             return (frameIndex % 2 == 1) ? 1.06 : 1.0
         }

@@ -310,11 +310,40 @@ check(tomyPausedWork != nil && tomyPausedWork?.assetName == "pet_tomy_paused_v2"
 check(tomyPausedRest == tomyPausedWork,
       "Tomy paused animation is consistent across phases")
 
-// Non-Tomy pets should not return strip animations
+// Desktop Pet V3 Sprout deterministic animation assertions:
+let sproutWork = PetKind.sprout.stripAnimation(for: .work, paused: false)
+check(sproutWork != nil && sproutWork?.assetName == "pet_sprout_work_v3" && sproutWork?.frameCount == 10 && sproutWork?.durations.count == 10 && sproutWork?.loopMode == .loop,
+      "Sprout work animation has 10 frames, 10 durations, loops")
+
+let sproutIdle = PetKind.sprout.stripAnimation(for: .idle, paused: false)
+check(sproutIdle != nil && sproutIdle?.assetName == "pet_sprout_idle_v3" && sproutIdle?.frameCount == 8 && sproutIdle?.durations.count == 8 && sproutIdle?.loopMode == .loop,
+      "Sprout idle animation has 8 frames, 8 durations, loops")
+
+let sproutRest = PetKind.sprout.stripAnimation(for: .rest, paused: false)
+check(sproutRest != nil && sproutRest?.assetName == "pet_sprout_rest_v3" && sproutRest?.frameCount == 8 && sproutRest?.durations.count == 8 && sproutRest?.loopMode == .loop,
+      "Sprout rest animation has 8 frames, 8 durations, loops")
+
+let sproutWorkFinished = PetKind.sprout.stripAnimation(for: .workFinished, paused: false)
+check(sproutWorkFinished != nil && sproutWorkFinished?.assetName == "pet_sprout_work_finished_v3" && sproutWorkFinished?.frameCount == 8 && sproutWorkFinished?.durations.count == 8 && sproutWorkFinished?.loopMode == .onceHold,
+      "Sprout workFinished animation has 8 frames, 8 durations, onceHold")
+
+let sproutRestFinished = PetKind.sprout.stripAnimation(for: .restFinished, paused: false)
+check(sproutRestFinished != nil && sproutRestFinished?.assetName == "pet_sprout_rest_finished_v3" && sproutRestFinished?.frameCount == 8 && sproutRestFinished?.durations.count == 8 && sproutRestFinished?.loopMode == .onceHold,
+      "Sprout restFinished animation has 8 frames, 8 durations, onceHold")
+
+// Phase-aware paused states: work and rest must use dedicated silhouettes
+let sproutPausedWork = PetKind.sprout.stripAnimation(for: .work, paused: true)
+let sproutPausedRest = PetKind.sprout.stripAnimation(for: .rest, paused: true)
+check(sproutPausedWork != nil && sproutPausedWork?.assetName == "pet_sprout_work_paused_v3" && sproutPausedWork?.frameCount == 4 && sproutPausedWork?.durations.count == 4 && sproutPausedWork?.loopMode == .loop,
+      "Sprout work paused animation uses pet_sprout_work_paused_v3, 4 frames, loops")
+check(sproutPausedRest != nil && sproutPausedRest?.assetName == "pet_sprout_rest_paused_v3" && sproutPausedRest?.frameCount == 4 && sproutPausedRest?.durations.count == 4 && sproutPausedRest?.loopMode == .loop,
+      "Sprout rest paused animation uses pet_sprout_rest_paused_v3, 4 frames, loops")
+check(sproutPausedWork?.assetName != sproutPausedRest?.assetName,
+      "Sprout paused animation is phase-aware (work paused != rest paused)")
+
+// Chip and Clay legacy pets continue to return nil for strip animations
 check(PetKind.chip.stripAnimation(for: .work, paused: false) == nil,
       "Chip uses frame sequence rather than sprite strip")
-check(PetKind.sprout.stripAnimation(for: .work, paused: false) == nil,
-      "Sprout uses frame sequence rather than sprite strip")
 check(PetKind.clay.stripAnimation(for: .work, paused: false) == nil,
       "Clay uses frame sequence rather than sprite strip")
 

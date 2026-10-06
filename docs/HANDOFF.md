@@ -2,11 +2,11 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-10-06，by Antigravity · Desktop Pet V7 确定性逐帧动画正式集成与优化：
-- 集成 Tomy V7 专属确定性精灵表（Canonical Tomy + Fixed-Frame Local Animation）：Work（10帧双手交替打字）、Idle（8帧自然眨眼）、Paused（4帧低频等待）、WorkFinished（8帧单次举手庆祝）、Rest（8帧品茶热气）、RestFinished（8帧单次回归就绪姿态）；
-- 核心渲染与状态机制：采用 `PetSpriteStripView` 像素级 source rect / offset 裁剪，Nearest-Neighbor (`.interpolation(.none)`) 渲染，消除 1px 接缝与边缘溢出；One-shot 状态到达末帧后自动停止 Timer 保持定格，彻底清除历史倒放打字逻辑；
-- CPU 与生命周期优化：桌宠隐藏时立即注销 Timer 达成 0% 挂起 CPU；悬浮提示卡片精简为单层胶囊（角色名 + 阶段状态），自适应内容宽度；
-- 质量闸门：263 项领域测试 + 63 项真实桥接测试（含 10 项 V7 动画专属断言）+ 8 项合成启动检查 100% 全绿，Release 双架构构建及严格签名通过，真实应用截帧视觉核验通过。
+最后更新：2026-10-06，by Antigravity · Desktop Pet 植小芽 Sprout V3 确定性动画集成与 Runtime QA：
+- 集成 Sprout V3 确定性精灵表：彻底解决 110px 尺度下各状态混淆问题，明确三大独立剪影 Master —— IDLE（盆栽小芽轻微眨眼摇晃，8帧）、WORK（出盆抱书翻阅学习，10帧）、REST（侧靠空盆横卧熟睡冒泡，8帧）；
+- Phase-aware Pause 架构：重构暂停状态映射，Work Paused（4帧抱书发呆+暂停符）与 Rest Paused（4帧卧睡发呆+暂停符）区分不同剪影与业务上下文；
+- 状态机与生命周期：WorkFinished（8帧成长开花）与 RestFinished（8帧苏醒伸展）采用 `.onceHold` 播放一次停留在末帧并注销 Timer；禁用全局弹跳变形（`microYOffset = 0`, `microScale = 1.0`）；
+- 质量闸门：263 项领域测试 + 70 项真实桥接测试（含 Sprout V3 7状态专属断言）+ 8 项合成启动检查 100% 全绿；Release 严格签名与 macOS 真实运行视觉验证通过；Tomy V7 零回归；V2 资源完整保留作为回退。
 
 ---
 
