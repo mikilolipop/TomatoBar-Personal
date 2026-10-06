@@ -21,6 +21,7 @@
 		D12000000000000000000011 /* MainWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12000000000000000000001 /* MainWindow.swift */; };
 		D12000000000000000000012 /* FocusCharts.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12000000000000000000002 /* FocusCharts.swift */; };
 		D13000000000000000000010 /* LaunchContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = D13000000000000000000000 /* LaunchContext.swift */; };
+		D12000000000000000000013 /* DesktopPet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12000000000000000000003 /* DesktopPet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -46,6 +47,7 @@
 		D12000000000000000000001 /* MainWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindow.swift; sourceTree = "<group>"; };
 		D12000000000000000000002 /* FocusCharts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusCharts.swift; sourceTree = "<group>"; };
 		D13000000000000000000000 /* LaunchContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchContext.swift; sourceTree = "<group>"; };
+		D12000000000000000000003 /* DesktopPet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -82,6 +84,7 @@
 			isa = PBXGroup;
 			children = (
 				8A21B78B27EE31A20009E5DB /* App.swift */,
+				D12000000000000000000003 /* DesktopPet.swift */,
 				D13000000000000000000000 /* LaunchContext.swift */,
 				D12000000000000000000002 /* FocusCharts.swift */,
 				D12000000000000000000001 /* MainWindow.swift */,
@@ -213,6 +216,7 @@
 				8A9F701927EE3DAF0012A1EC /* Timer.swift in Sources */,
 				8A21B78C27EE31A20009E5DB /* App.swift in Sources */,
 				D13000000000000000000010 /* LaunchContext.swift in Sources */,
+				D12000000000000000000013 /* DesktopPet.swift in Sources */,
 				D12000000000000000000012 /* FocusCharts.swift in Sources */,
 				D12000000000000000000011 /* MainWindow.swift in Sources */,
 				D12000000000000000000010 /* Analytics.swift in Sources */,

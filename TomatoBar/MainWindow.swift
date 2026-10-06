@@ -1188,6 +1188,8 @@ struct MainSettings: View {
     @ObservedObject var timer: TBTimer
     let close: () -> Void
     @AppStorage("gentleAnimations") private var animations = true
+    @AppStorage("showDesktopPet") private var showDesktopPet = true
+    @AppStorage("desktopPetKind") private var desktopPetKind = PetKind.tomy.rawValue
     @State private var easterEggTapCount = 0
     @State private var lastEasterEggTap = Date.distantPast
     @State private var easterEggNotice: String?
@@ -1213,6 +1215,27 @@ struct MainSettings: View {
             GardenNumberInputRow(title: "每组", value: $timer.workIntervalsInSet, range: 1...10, unit: "个番茄")
             Divider()
             Toggle("轻微像素动画", isOn: $animations)
+            Toggle("桌面伴侣（Codex 桌宠）", isOn: $showDesktopPet)
+            if showDesktopPet {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 10) {
+                        ForEach(PetKind.allCases) { kind in
+                            PetSelectionCard(
+                                kind: kind,
+                                isSelected: desktopPetKind == kind.rawValue,
+                                onSelect: { desktopPetKind = kind.rawValue }
+                            )
+                        }
+                    }
+                    if let selectedKind = PetKind(rawValue: desktopPetKind) {
+                        Text(selectedKind.tagline)
+                            .font(.caption)
+                            .foregroundColor(Garden.muted)
+                            .padding(.leading, 2)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
             Toggle("菜单栏显示倒计时", isOn: $timer.showTimerInMenuBar).onChange(of: timer.showTimerInMenuBar) { _ in timer.updateStatus() }
             LaunchAtLogin.Toggle("登录时启动")
             KeyboardShortcuts.Recorder("开始 / 暂停 / 继续", name: .startStopTimer)
@@ -1229,6 +1252,36 @@ struct MainSettings: View {
                     .onTapGesture { registerEasterEggTap() }
             }
         }.padding(28).frame(width: 460).background(Garden.paper).foregroundColor(Garden.ink).accentColor(Garden.red)
+    }
+}
+
+private struct PetSelectionCard: View {
+    let kind: PetKind
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            VStack(spacing: 4) {
+                Image(kind.imageName(for: .idle))
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 44, height: 44)
+                Text(kind.shortName)
+                    .font(.system(size: 11, weight: isSelected ? .bold : .regular))
+                    .foregroundColor(isSelected ? Garden.red : Garden.ink)
+            }
+            .frame(width: 82, height: 76)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? Garden.red.opacity(0.12) : Color.black.opacity(0.03))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(isSelected ? Garden.red : Garden.line.opacity(0.5), lineWidth: isSelected ? 1.5 : 0.8)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 

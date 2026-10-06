@@ -3,8 +3,24 @@ import Combine
 
 // Compile the real UI/bridge sources, but do not construct TBApp or launch windows.
 // All IO is confined to a new child of QA13, never the live or existing QA sessions file.
-let qaRoot = FileManager.default.homeDirectoryForCurrentUser
+let defaultQaRoot = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent("Library/Containers/com.dilyar.TomatoBarPersonal.QA13/Data/Library/Application Support/TomatoBarPersonal")
+let qaRoot: URL = {
+    if let custom = ProcessInfo.processInfo.environment["TOMATOBAR_QA_ROOT"] {
+        return URL(fileURLWithPath: custom)
+    }
+    do {
+        try FileManager.default.createDirectory(at: defaultQaRoot, withIntermediateDirectories: true)
+        let probe = defaultQaRoot.appendingPathComponent(".write_test_\(UUID().uuidString)")
+        try Data("probe".utf8).write(to: probe)
+        try FileManager.default.removeItem(at: probe)
+        return defaultQaRoot
+    } catch {
+        let tempRoot = FileManager.default.temporaryDirectory.appendingPathComponent("TomatoBarPersonalQA13")
+        try? FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        return tempRoot
+    }
+}()
 let scratch = qaRoot.appendingPathComponent("review-\(UUID().uuidString)")
 try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
 defer { try? FileManager.default.removeItem(at: scratch) }
@@ -265,6 +281,42 @@ check(Garden.palette.contains { $0.symbol == "gearshape" && $0.label == "齿轮"
       "Garden.palette exposes gearshape with 齿轮 label")
 check(Garden.symbol("机械") == "gearshape" && Garden.symbol("工程") == "gearshape",
       "Garden.symbol maps 机械 and 工程 to gearshape")
+
+// Desktop Pet V7 Tomy deterministic animation assertions:
+let tomyWork = PetKind.tomy.stripAnimation(for: .work, paused: false)
+check(tomyWork != nil && tomyWork?.assetName == "pet_tomy_work_v2" && tomyWork?.frameCount == 10 && tomyWork?.durations.count == 10 && tomyWork?.loopMode == .loop,
+      "Tomy work animation has 10 frames, 10 durations, loops")
+
+let tomyIdle = PetKind.tomy.stripAnimation(for: .idle, paused: false)
+check(tomyIdle != nil && tomyIdle?.assetName == "pet_tomy_idle_v2" && tomyIdle?.frameCount == 8 && tomyIdle?.durations.count == 8 && tomyIdle?.loopMode == .loop,
+      "Tomy idle animation has 8 frames, 8 durations, loops")
+
+let tomyRest = PetKind.tomy.stripAnimation(for: .rest, paused: false)
+check(tomyRest != nil && tomyRest?.assetName == "pet_tomy_rest_v2" && tomyRest?.frameCount == 8 && tomyRest?.durations.count == 8 && tomyRest?.loopMode == .loop,
+      "Tomy rest animation has 8 frames, 8 durations, loops")
+
+let tomyWorkFinished = PetKind.tomy.stripAnimation(for: .workFinished, paused: false)
+check(tomyWorkFinished != nil && tomyWorkFinished?.assetName == "pet_tomy_work_finished_v2" && tomyWorkFinished?.frameCount == 8 && tomyWorkFinished?.durations.count == 8 && tomyWorkFinished?.loopMode == .onceHold,
+      "Tomy workFinished animation has 8 frames, 8 durations, onceHold (not loop)")
+
+let tomyRestFinished = PetKind.tomy.stripAnimation(for: .restFinished, paused: false)
+check(tomyRestFinished != nil && tomyRestFinished?.assetName == "pet_tomy_rest_finished_v2" && tomyRestFinished?.frameCount == 8 && tomyRestFinished?.durations.count == 8 && tomyRestFinished?.loopMode == .onceHold,
+      "Tomy restFinished animation has 8 frames, 8 durations, onceHold (not loop)")
+
+let tomyPausedWork = PetKind.tomy.stripAnimation(for: .work, paused: true)
+let tomyPausedRest = PetKind.tomy.stripAnimation(for: .rest, paused: true)
+check(tomyPausedWork != nil && tomyPausedWork?.assetName == "pet_tomy_paused_v2" && tomyPausedWork?.frameCount == 4 && tomyPausedWork?.durations.count == 4 && tomyPausedWork?.loopMode == .loop,
+      "Tomy paused state has dedicated 4-frame animation strip and loops")
+check(tomyPausedRest == tomyPausedWork,
+      "Tomy paused animation is consistent across phases")
+
+// Non-Tomy pets should not return strip animations
+check(PetKind.chip.stripAnimation(for: .work, paused: false) == nil,
+      "Chip uses frame sequence rather than sprite strip")
+check(PetKind.sprout.stripAnimation(for: .work, paused: false) == nil,
+      "Sprout uses frame sequence rather than sprite strip")
+check(PetKind.clay.stripAnimation(for: .work, paused: false) == nil,
+      "Clay uses frame sequence rather than sprite strip")
 
 print("PASS: \(checks) actual TBTimer bridge checks; isolated QA13 IO, no UI interaction")
 withExtendedLifetime(observation) {}

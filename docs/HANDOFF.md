@@ -2,7 +2,11 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-10-06，by Gemini · 完成公开官网配图数据源的彻底物理隔离与全自动化构建方案：建立 `demo/sessions.json` 与 `scripts/seed-showcase.swift` 专有公开演示数据源（严禁夹杂任何私人真实备考、课业或赛事任务）；开发 `scripts/capture-window.swift` 与 `scripts/generate-showcase-screenshot.sh` 脚本，通过无沙盒独立宿主直接载入演示数据完成 1920x1410 视网膜高清截图；配图完美展示 V1.4.1 的大任务层级树、子任务累积 🎯 5小时40分、SF 像素图标与主界面；通过 scripts/deploy-site.sh 重新发布 gh-pages 并增加静态资源防缓存标识，全量 263 项领域测试全绿。
+最后更新：2026-10-06，by Antigravity · Desktop Pet V7 确定性逐帧动画正式集成与优化：
+- 集成 Tomy V7 专属确定性精灵表（Canonical Tomy + Fixed-Frame Local Animation）：Work（10帧双手交替打字）、Idle（8帧自然眨眼）、Paused（4帧低频等待）、WorkFinished（8帧单次举手庆祝）、Rest（8帧品茶热气）、RestFinished（8帧单次回归就绪姿态）；
+- 核心渲染与状态机制：采用 `PetSpriteStripView` 像素级 source rect / offset 裁剪，Nearest-Neighbor (`.interpolation(.none)`) 渲染，消除 1px 接缝与边缘溢出；One-shot 状态到达末帧后自动停止 Timer 保持定格，彻底清除历史倒放打字逻辑；
+- CPU 与生命周期优化：桌宠隐藏时立即注销 Timer 达成 0% 挂起 CPU；悬浮提示卡片精简为单层胶囊（角色名 + 阶段状态），自适应内容宽度；
+- 质量闸门：263 项领域测试 + 63 项真实桥接测试（含 10 项 V7 动画专属断言）+ 8 项合成启动检查 100% 全绿，Release 双架构构建及严格签名通过，真实应用截帧视觉核验通过。
 
 ---
 

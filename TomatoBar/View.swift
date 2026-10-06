@@ -105,6 +105,8 @@ struct TBPopoverView: View {
     @ObservedObject var timer: TBTimer
     @State private var tab = 0
     @AppStorage("popoverTabsCollapsed") private var isTabsCollapsed = true
+    @AppStorage("showDesktopPet") private var showDesktopPet = true
+    @AppStorage("desktopPetKind") private var desktopPetKind = PetKind.tomy.rawValue
     @State private var editingRecord: FocusRecord?
     @State private var selectedTag: String?
     @State private var showCancelConfirm = false
@@ -895,6 +897,21 @@ struct TBPopoverView: View {
             KeyboardShortcuts.Recorder("开始 / 暂停 / 继续", name: .startStopTimer)
             Toggle("菜单栏显示倒计时", isOn: $timer.showTimerInMenuBar)
                 .onChange(of: timer.showTimerInMenuBar) { _ in timer.updateStatus() }
+            Toggle("桌面伴侣（Codex 桌宠）", isOn: $showDesktopPet)
+            if showDesktopPet {
+                HStack {
+                    Text("形象选择")
+                        .font(.system(size: 13))
+                    Spacer()
+                    Picker("", selection: $desktopPetKind) {
+                        ForEach(PetKind.allCases) { kind in
+                            Text(kind.displayName).tag(kind.rawValue)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                }
+            }
             LaunchAtLogin.Toggle("登录时启动")
             Text("到时会显示无声提醒窗口，确认后再继续。电脑睡眠或退出应用时自动暂停。")
                 .font(.caption).foregroundColor(Garden.muted)

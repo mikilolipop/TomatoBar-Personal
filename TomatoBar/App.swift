@@ -21,6 +21,7 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var model: TBTimer!
     private let reminder = TBReminder()
     private var launchContext = LaunchContext()
+    private(set) var petController: DesktopPetController?
     static var shared: TBStatusItem?
     private static let mainWindowMinContent = NSSize(width: 960, height: 620)
 
@@ -32,6 +33,8 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
         Self.shared = self
         LaunchAtLogin.migrateIfNeeded()
         model = TBTimer()
+        petController = DesktopPetController(timer: model)
+        petController?.setup()
         popover.behavior = .transient
         popover.contentViewController = NSHostingController(rootView: TBPopoverView(timer: model))
         statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
