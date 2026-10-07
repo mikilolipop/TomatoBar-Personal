@@ -45,19 +45,29 @@
       var packages = {};
       release.assets.forEach(function (asset) {
         var match = /^TomatoBarPersonal-[\d.]+\.(dmg|zip)$/.exec(asset.name);
-        if (!match || typeof asset.browser_download_url !== "string") return;
-        var url = new URL(asset.browser_download_url);
-        if (url.origin !== "https://github.com" || !url.pathname.startsWith("/mikilolipop/TomatoBar-Personal/releases/download/")) return;
-        packages[match[1]] = asset;
-      });
-      // Keep the version and both package types consistent.
-      if (!packages.dmg || !packages.zip) return;
-      ["dmg", "zip"].forEach(function (type) {
-        document.querySelectorAll('[data-download="' + type + '"]').forEach(function (link) { link.href = packages[type].browser_download_url; });
-        if (Number.isFinite(packages[type].size) && packages[type].size > 0) {
-          document.querySelectorAll('[data-download-size="' + type + '"]').forEach(function (label) { label.textContent = (packages[type].size / 1048576).toFixed(1) + " MB"; });
+        if (match && typeof asset.browser_download_url === "string") {
+          var url = new URL(asset.browser_download_url);
+          if (url.origin === "https://github.com" && url.pathname.startsWith("/mikilolipop/TomatoBar-Personal/releases/download/")) {
+            packages[match[1]] = asset;
+          }
+        }
+        var exeMatch = /^(TomatoBar.*\.exe|.*-setup\.exe)$/i.exec(asset.name);
+        if (exeMatch && typeof asset.browser_download_url === "string") {
+          packages.exe = asset;
         }
       });
+      // Keep the version and package types consistent.
+      if (packages.dmg && packages.zip) {
+        ["dmg", "zip"].forEach(function (type) {
+          document.querySelectorAll('[data-download="' + type + '"]').forEach(function (link) { link.href = packages[type].browser_download_url; });
+          if (Number.isFinite(packages[type].size) && packages[type].size > 0) {
+            document.querySelectorAll('[data-download-size="' + type + '"]').forEach(function (label) { label.textContent = (packages[type].size / 1048576).toFixed(1) + " MB"; });
+          }
+        });
+      }
+      if (packages.exe) {
+        document.querySelectorAll('[data-download="exe"]').forEach(function (link) { link.href = packages.exe.browser_download_url; });
+      }
       document.querySelectorAll("[data-release-version]").forEach(function (label) { label.textContent = release.tag_name; });
     })
     .catch(function () { /* The static links remain usable. */ })

@@ -34,6 +34,8 @@ h1 span{display:block;white-space:nowrap}
 .button:hover{text-decoration:none;transform:translateY(-2px)}
 .button-primary{color:#fffaf0;background:var(--red);box-shadow:0 6px 16px #b34d3d1f}
 .button-primary:hover{background:var(--red-dark);box-shadow:0 8px 20px #b34d3d29}
+.button-windows{color:#fffaf0;background:#446355;box-shadow:0 6px 16px #44635526}
+.button-windows:hover{background:#354f44;box-shadow:0 8px 20px #354f4433}
 .button-secondary{color:var(--ink);border-color:var(--line);background:#fffdf7}
 .button-secondary:hover{background:#f7edde}
 .ui-icon{display:inline-block;flex:none;vertical-align:middle}
