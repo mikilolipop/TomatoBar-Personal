@@ -123,33 +123,33 @@ export const HistoryList: React.FC<HistoryListProps> = ({
 
       {/* Edit Modal Dialog */}
       {editingRecord && (
-        <div className="modal-overlay">
-          <div className="modal-card">
-            <h3 className="modal-title">编辑专注记录</h3>
-            <div className="modal-form-group">
+        <div className="garden-modal-overlay">
+          <div className="garden-dialog-card">
+            <h3 className="dialog-title">编辑专注记录</h3>
+            <div className="dialog-field">
               <label>任务名称</label>
               <input
                 type="text"
-                className="modal-input"
+                className="garden-input"
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
               />
             </div>
-            <div className="modal-form-group">
+            <div className="dialog-field">
               <label>标签列表（首个标签将作为统计主分类，使用逗号或空格隔开）</label>
               <input
                 type="text"
-                className="modal-input"
+                className="garden-input"
                 value={editTagsRaw}
                 onChange={(e) => setEditTagsRaw(e.target.value)}
                 placeholder="例如: 开发, 需求, 架构"
               />
             </div>
-            <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setEditingRecord(null)}>
+            <div className="dialog-actions">
+              <button className="garden-btn-secondary" onClick={() => setEditingRecord(null)}>
                 取消
               </button>
-              <button className="btn btn-primary" onClick={handleSaveEdit}>
+              <button className="garden-btn-primary" onClick={handleSaveEdit}>
                 保存修改
               </button>
             </div>

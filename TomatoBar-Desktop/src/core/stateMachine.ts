@@ -9,6 +9,7 @@ import type {
   FocusRecord,
   FocusSegment,
   FocusTodo,
+  FocusProject,
 } from '../types';
 import {
   normalizeTags,
@@ -377,6 +378,42 @@ export class FocusStateMachine {
     return {
       ...state,
       records: state.records.filter((r) => r.id !== recordID),
+      checkpoint: now.toISOString(),
+    };
+  }
+
+  // MARK: - Project Actions
+
+  static addProject(
+    state: FocusState,
+    name: string,
+    tags: string[] = [],
+    now: Date = new Date()
+  ): FocusState {
+    const cleanName = name.trim();
+    if (!cleanName) return state;
+
+    const newProject: FocusProject = {
+      id: generateUUID(),
+      name: cleanName,
+      tags: normalizeTags(tags),
+      color: null,
+      isArchived: false,
+      createdAt: now.toISOString(),
+    };
+
+    return {
+      ...state,
+      projects: [...state.projects, newProject],
+      checkpoint: now.toISOString(),
+    };
+  }
+
+  static deleteProject(state: FocusState, projectID: string, now: Date = new Date()): FocusState {
+    return {
+      ...state,
+      projects: state.projects.filter((p) => p.id !== projectID),
+      todos: state.todos.map((t) => (t.projectID === projectID ? { ...t, projectID: null } : t)),
       checkpoint: now.toISOString(),
     };
   }

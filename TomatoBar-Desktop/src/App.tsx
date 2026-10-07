@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import type { FocusState, PetKind, FocusTodo } from './types';
+import type { FocusState, PetKind, FocusTodo, FocusRecord } from './types';
 import { createDefaultFocusState } from './types';
 import { FocusStateMachine } from './core/stateMachine';
 import { LocalStorageProvider } from './core/storage';
-import { TimerCard } from './components/TimerCard';
-import { TaskInput } from './components/TaskInput';
-import { TodoList } from './components/TodoList';
-import { AnalyticsView } from './components/AnalyticsView';
-import { HistoryList } from './components/HistoryList';
-import { DesktopPet } from './components/DesktopPet';
-import { ReminderModal } from './components/ReminderModal';
+import type { FocusPeriod } from './core/analytics';
+import { GardenOverview } from './components/GardenOverview';
+import { ExpandedTimerModal } from './components/ExpandedTimerModal';
+import { RecordEditorModal } from './components/RecordEditorModal';
 import { SettingsModal } from './components/SettingsModal';
-import { Timer, BarChart3, History, Settings } from 'lucide-react';
+import { ReminderModal } from './components/ReminderModal';
+import { HistoryList } from './components/HistoryList';
+import { ChevronLeft } from 'lucide-react';
 
 const storage = new LocalStorageProvider();
 
@@ -19,10 +18,16 @@ export const App: React.FC = () => {
   const [state, setState] = useState<FocusState>(createDefaultFocusState());
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Nav tab
-  const [activeTab, setActiveTab] = useState<'timer' | 'analytics' | 'history'>('timer');
+  // Nav tab: overview (Garden) or history
+  const [activeTab, setActiveTab] = useState<'overview' | 'history'>('overview');
 
-  // Modal dialogs
+  // Period & Date filters for Garden
+  const [period, setPeriod] = useState<FocusPeriod>('day');
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+
+  // Modal dialog states
+  const [showExpandedTimer, setShowExpandedTimer] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<FocusRecord | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showReminder, setShowReminder] = useState(false);
 
@@ -33,17 +38,12 @@ export const App: React.FC = () => {
   const [petKind, setPetKind] = useState<PetKind>('tomy');
   const [showPet, setShowPet] = useState(true);
 
-  // Draft inputs
-  const [taskName, setTaskName] = useState('');
-  const [taskTags, setTaskTags] = useState<string[]>([]);
-
   // Load state on mount
   useEffect(() => {
     async function init() {
       const loaded = await storage.load();
-      // Recover interrupted state if needed
       if (loaded.phase === 'work' && !loaded.paused) {
-        // Mark as paused on reload to prevent accidental overrun
+        // Interrupted session: pause to avoid overrun
         const pausedState = FocusStateMachine.pause(loaded, new Date());
         setState(pausedState);
       } else {
@@ -51,7 +51,6 @@ export const App: React.FC = () => {
       }
       setIsLoaded(true);
 
-      // Load pet settings
       const savedPet = localStorage.getItem('TomatoBar_petKind') as PetKind;
       if (savedPet) setPetKind(savedPet);
       const savedShowPet = localStorage.getItem('TomatoBar_showPet');
@@ -60,13 +59,13 @@ export const App: React.FC = () => {
     init();
   }, []);
 
-  // Save state whenever it updates (once loaded)
+  // Persist state updates
   useEffect(() => {
     if (!isLoaded) return;
     storage.save(state).catch((e) => console.error('Save failed', e));
   }, [state, isLoaded]);
 
-  // Main 1-second timer tick loop
+  // 1-second interval timer tick
   useEffect(() => {
     if (!isLoaded) return;
 
@@ -87,15 +86,20 @@ export const App: React.FC = () => {
 
   // Actions
   const handleStartWork = () => {
+    const currentTodo = state.todos.find((t) => t.id === state.currentTodoID);
+    const taskName = currentTodo ? currentTodo.title : state.name || '专注时光';
+    const taskTags = currentTodo ? currentTodo.tags : state.draftTags;
+
     const next = FocusStateMachine.startWork(
       state,
-      taskName || state.name,
-      taskTags.length > 0 ? taskTags : state.draftTags,
+      taskName,
+      taskTags,
       workMinutes * 60,
       state.currentTodoID,
       new Date()
     );
     setState(next);
+    setShowExpandedTimer(true);
   };
 
   const handlePause = () => {
@@ -120,8 +124,8 @@ export const App: React.FC = () => {
     setState((prev) => FocusStateMachine.skipRest(prev, new Date()));
   };
 
-  const handleAddTodo = (title: string, tags: string[]) => {
-    setState((prev) => FocusStateMachine.addTodo(prev, title, tags, null, new Date()));
+  const handleAddTodo = (title: string, tags: string[], projectID?: string | null) => {
+    setState((prev) => FocusStateMachine.addTodo(prev, title, tags, projectID ?? null, new Date()));
   };
 
   const handleToggleTodo = (id: string) => {
@@ -133,8 +137,6 @@ export const App: React.FC = () => {
   };
 
   const handleSelectTodoForFocus = (todo: FocusTodo) => {
-    setTaskName(todo.title);
-    setTaskTags(todo.tags);
     setState((prev) => ({
       ...prev,
       currentTodoID: todo.id,
@@ -143,8 +145,16 @@ export const App: React.FC = () => {
     }));
   };
 
-  const handleUpdateRecord = (id: string, updates: any) => {
-    setState((prev) => FocusStateMachine.updateRecord(prev, id, updates, new Date()));
+  const handleAddProject = (name: string, tags: string[]) => {
+    setState((prev) => FocusStateMachine.addProject(prev, name, tags, new Date()));
+  };
+
+  const handleDeleteProject = (id: string) => {
+    setState((prev) => FocusStateMachine.deleteProject(prev, id, new Date()));
+  };
+
+  const handleSaveRecord = (id: string, name: string, tags: string[]) => {
+    setState((prev) => FocusStateMachine.updateRecord(prev, id, { name, tags }, new Date()));
   };
 
   const handleDeleteRecord = (id: string) => {
@@ -174,135 +184,93 @@ export const App: React.FC = () => {
     localStorage.setItem('TomatoBar_showPet', String(show));
   };
 
-  // Known tags for autocomplete
-  const knownTags = Array.from(
-    new Set([
-      ...state.records.flatMap((r) => r.tags),
-      ...state.todos.flatMap((t) => t.tags),
-      ...state.draftTags,
-      ...taskTags,
-    ])
-  ).filter(Boolean);
-
   return (
-    <div className="app-container">
-      {/* Top Brand & Navigation Header */}
-      <header className="app-header">
-        <div className="brand-section">
-          <img src="/icons/icon_128x128@2x.png" alt="TomatoBar Logo" className="brand-logo" />
-          <span className="brand-title">TomatoBar</span>
-          <span className="brand-tag">Windows</span>
-        </div>
-
-        <div className="nav-and-settings">
-          <nav className="nav-tabs">
-            <button
-              className={`nav-tab-btn ${activeTab === 'timer' ? 'active' : ''}`}
-              onClick={() => setActiveTab('timer')}
-            >
-              <Timer size={15} /> 专注时钟
-            </button>
-            <button
-              className={`nav-tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
-              onClick={() => setActiveTab('analytics')}
-            >
-              <BarChart3 size={15} /> 复盘统计
-            </button>
-            <button
-              className={`nav-tab-btn ${activeTab === 'history' ? 'active' : ''}`}
-              onClick={() => setActiveTab('history')}
-            >
-              <History size={15} /> 历史记录
-            </button>
-          </nav>
-
-          <button
-            className="settings-btn"
-            onClick={() => setShowSettings(true)}
-            title="偏好设置 & 数据管理"
-          >
-            <Settings size={17} />
-          </button>
-        </div>
-      </header>
-
-      {/* Main Content Area */}
-      <main className="app-main-content">
-        {activeTab === 'timer' && (
-          <div className="main-view-grid">
-            <div className="timer-column">
-              <TimerCard
-                state={state}
-                onStartWork={handleStartWork}
-                onPause={handlePause}
-                onResume={handleResume}
-                onStopEarly={handleStopEarly}
-                onStartRest={handleStartRest}
-                onSkipRest={handleSkipRest}
-              />
-
-              <TaskInput
-                currentName={taskName}
-                currentTags={taskTags}
-                knownTags={knownTags}
-                onCommit={(name, tags) => {
-                  setTaskName(name);
-                  setTaskTags(tags);
-                  setState((prev) => ({
-                    ...prev,
-                    name: name || prev.name,
-                    draftTags: tags,
-                  }));
-                }}
-                disabled={state.phase === 'work'}
-              />
+    <div className="garden-app-wrapper">
+      {activeTab === 'overview' ? (
+        <GardenOverview
+          state={state}
+          period={period}
+          currentDate={currentDate}
+          onSetPeriod={setPeriod}
+          onSetDate={setCurrentDate}
+          onStartFocus={handleStartWork}
+          onPause={handlePause}
+          onResume={handleResume}
+          onSkipRest={handleSkipRest}
+          onOpenExpandedTimer={() => setShowExpandedTimer(true)}
+          onOpenSettings={() => setShowSettings(true)}
+          onSwitchTab={(tab) => setActiveTab(tab)}
+          onAddTodo={handleAddTodo}
+          onToggleTodo={handleToggleTodo}
+          onDeleteTodo={handleDeleteTodo}
+          onSelectTodoForFocus={handleSelectTodoForFocus}
+          onAddProject={handleAddProject}
+          onDeleteProject={handleDeleteProject}
+          onEditRecord={(record) => setEditingRecord(record)}
+        />
+      ) : (
+        <div className="garden-root">
+          <div className="garden-window-topbar">
+            <div className="mac-traffic-dots">
+              <span className="dot dot-red" />
+              <span className="dot dot-amber" />
+              <span className="dot dot-green" />
+              <span className="window-title-text">TomatoBar · 历史回顾</span>
             </div>
 
-            <div className="todo-column">
-              <TodoList
-                todos={state.todos}
-                activeTodoID={state.activeTodoID}
-                onAddTodo={handleAddTodo}
-                onToggleTodo={handleToggleTodo}
-                onDeleteTodo={handleDeleteTodo}
-                onSelectTodoForFocus={handleSelectTodoForFocus}
-              />
+            <div className="garden-nav-tabs">
+              <span className="brand-logo-text">TomatoBar</span>
+              <button className="nav-link" onClick={() => setActiveTab('overview')}>
+                概览
+              </button>
+              <button className="nav-link active" onClick={() => setActiveTab('history')}>
+                历史
+              </button>
+            </div>
+
+            <div className="garden-top-right">
+              <button className="garden-btn-secondary" onClick={() => setActiveTab('overview')}>
+                <ChevronLeft size={14} /> 返回概览
+              </button>
             </div>
           </div>
-        )}
 
-        {activeTab === 'analytics' && <AnalyticsView records={state.records} />}
+          <div className="garden-divider-line" />
 
-        {activeTab === 'history' && (
-          <HistoryList
-            records={state.records}
-            onUpdateRecord={handleUpdateRecord}
-            onDeleteRecord={handleDeleteRecord}
-          />
-        )}
-      </main>
+          <div style={{ padding: '24px 32px' }}>
+            <HistoryList
+              records={state.records}
+              onUpdateRecord={(id, updates) =>
+                setState((prev) => FocusStateMachine.updateRecord(prev, id, updates, new Date()))
+              }
+              onDeleteRecord={handleDeleteRecord}
+            />
+          </div>
+        </div>
+      )}
 
-      {/* Floating Desktop Pet Widget */}
-      {showPet && (
-        <DesktopPet
-          kind={petKind}
-          phase={state.phase}
-          paused={state.paused}
-          size={100}
-          floating={true}
+      {/* Expanded Timer Modal */}
+      {showExpandedTimer && (
+        <ExpandedTimerModal
+          state={state}
+          petKind={petKind}
+          onStartWork={handleStartWork}
+          onPause={handlePause}
+          onResume={handleResume}
+          onStopEarly={handleStopEarly}
+          onStartRest={handleStartRest}
+          onSkipRest={handleSkipRest}
+          onClose={() => setShowExpandedTimer(false)}
         />
       )}
 
-      {/* Silent Sticky Reminder Modal */}
-      {showReminder && (
-        <ReminderModal
-          phase={state.phase}
-          rounds={state.rounds}
-          taskName={state.name}
-          onStartRest={handleStartRest}
-          onSkipRest={handleSkipRest}
-          onStartWork={handleStartWork}
-          onDismiss={() => setShowReminder(false)}
+      {/* Record Editor Modal */}
+      {editingRecord && (
+        <RecordEditorModal
+          record={editingRecord}
+          onSave={handleSaveRecord}
+          onDelete={handleDeleteRecord}
+          onClose={() => setEditingRecord(null)}
         />
       )}
 
@@ -324,6 +292,19 @@ export const App: React.FC = () => {
           onExportData={handleExportData}
           onImportData={handleImportData}
           onClose={() => setShowSettings(false)}
+        />
+      )}
+
+      {/* Silent Sticky Reminder Modal */}
+      {showReminder && (
+        <ReminderModal
+          phase={state.phase}
+          rounds={state.rounds}
+          taskName={state.name}
+          onStartRest={handleStartRest}
+          onSkipRest={handleSkipRest}
+          onStartWork={handleStartWork}
+          onDismiss={() => setShowReminder(false)}
         />
       )}
     </div>
