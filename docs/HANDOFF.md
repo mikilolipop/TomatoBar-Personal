@@ -2,7 +2,16 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-10-06，by Antigravity · Desktop Pet 植小芽 Sprout V3 确定性动画集成与 Runtime QA：
+最后更新：2026-10-07，by Antigravity · Windows 平台拓展（TomatoBar-Desktop）落地与核心闭环完成：
+- 跨平台工程建立：在仓库内新建 `TomatoBar-Desktop` 跨平台子工程，基于 Tauri 2.0 + React 18 / TypeScript + Vite 构建；
+- 数据层 100% 对齐：TypeScript 领域类型与计时状态机严格对齐 macOS `State.swift`（基于 segment、以 deadline 封顶、checkpoint 防断电恢复、UUID 唯一标示），编写 Vitest 自动化单元测试通过；
+- 完整功能复刻：大倒计时、阶段流转（专注/休息/暂停/提前结束）、待办清单联动（支持 `#tag` 解析与大任务关联）、日色块流时间轴、周分类堆叠柱、月度热力日历、历史记录查看与编辑、完全无声置顶提醒；
+- 像素桌面宠物：完整迁移 Tomy 与 植小芽 Sprout V3 像素精灵表（100px 尺寸），基于 Canvas/CSS 实现确定性动画状态机与拖拽悬浮窗挂件；
+- 存储与扩展预留：抽象 `IStorageProvider` 接口，V1.0 支持本地持久化与双端 `sessions.json` 导出/导入互通，为后续云同步预留标准接口；
+- CI 自动化工作流：编写 `.github/workflows/windows-build.yml`，配置 GitHub Actions `windows-latest` 自动化流水线，推送时自动打包 Windows `.msi` 与 `.exe` 安装包。
+- 质量保证：领域测试 263 项（Swift） + 7 项（TypeScript）全部 100% PASS，Vite 编译无报错。
+
+历史更新：2026-10-06，by Antigravity · Desktop Pet 植小芽 Sprout V3 确定性动画集成与 Runtime QA：
 - 集成 Sprout V3 确定性精灵表：彻底解决 110px 尺度下各状态混淆问题，明确三大独立剪影 Master —— IDLE（盆栽小芽轻微眨眼摇晃，8帧）、WORK（出盆抱书翻阅学习，10帧）、REST（侧靠空盆横卧熟睡冒泡，8帧）；
 - Phase-aware Pause 架构：重构暂停状态映射，Work Paused（4帧抱书发呆+暂停符）与 Rest Paused（4帧卧睡发呆+暂停符）区分不同剪影与业务上下文；
 - 状态机与生命周期：WorkFinished（8帧成长开花）与 RestFinished（8帧苏醒伸展）采用 `.onceHold` 播放一次停留在末帧并注销 Timer；禁用全局弹跳变形（`microYOffset = 0`, `microScale = 1.0`）；

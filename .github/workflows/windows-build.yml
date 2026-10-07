@@ -1,0 +1,69 @@
+name: Windows Desktop Build
+
+on:
+  push:
+    branches:
+      - feature/personal-focus
+    tags:
+      - 'v*'
+  pull_request:
+    paths:
+      - 'TomatoBar-Desktop/**'
+      - '.github/workflows/windows-build.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows:
+    name: Build Windows App (Tauri 2.0)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: 'TomatoBar-Desktop/package-lock.json'
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: 'TomatoBar-Desktop/src-tauri -> target'
+
+      - name: Install Frontend Dependencies
+        working-directory: TomatoBar-Desktop
+        run: npm ci
+
+      - name: Run Domain Unit Tests
+        working-directory: TomatoBar-Desktop
+        run: npm test
+
+      - name: Build Web Frontend
+        working-directory: TomatoBar-Desktop
+        run: npm run build
+
+      - name: Build Windows Tauri Package
+        working-directory: TomatoBar-Desktop
+        run: npm run tauri build
+
+      - name: Archive Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: TomatoBar-Personal-Windows
+          path: |
+            TomatoBar-Desktop/src-tauri/target/release/bundle/nsis/*.exe
+            TomatoBar-Desktop/src-tauri/target/release/bundle/msi/*.msi
+            TomatoBar-Desktop/src-tauri/target/release/*.exe
+          if-no-files-found: warn

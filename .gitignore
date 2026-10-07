@@ -5,3 +5,8 @@ xcuserdata
 # design-qa.md cites them by path; they stay on disk and in the source
 # snapshots under ~/Library/Application Support/TomatoBarBuildBackups/.
 docs/**/*.png
+
+# Cross-platform Desktop
+TomatoBar-Desktop/node_modules/
+TomatoBar-Desktop/dist/
+TomatoBar-Desktop/src-tauri/target/
