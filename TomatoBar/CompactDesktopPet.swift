@@ -1,6 +1,43 @@
 import AppKit
 import SwiftUI
 
+/// Props are separate from the approved character raster. A reading, sleeping or
+/// completed scene can change without redrawing the crown, lighting or face.
+private final class TomySceneProps {
+    static let shared = TomySceneProps()
+    static let crops = [CGRect(x: 30, y: 110, width: 480, height: 340),
+                        CGRect(x: 30, y: 110, width: 480, height: 340),
+                        CGRect(x: 51, y: 190, width: 424, height: 283),
+                        CGRect(x: 37, y: 118, width: 468, height: 269),
+                        CGRect(x: 120, y: 83, width: 269, height: 332),
+                        CGRect(x: 111, y: 93, width: 271, height: 299)]
+    let images: [CGImage]
+    init(image: NSImage? = NSImage(named: "pet_tomy_scenes_v1")) {
+        var proposed = CGRect(x: 0, y: 0, width: 1536, height: 1024)
+        guard let source = image?.cgImage(forProposedRect: &proposed, context: nil, hints: nil),
+              source.width == 1536, source.height == 1024 else { images = []; return }
+        images = Self.crops.enumerated().compactMap { i, crop in
+            source.cropping(to: crop.offsetBy(dx: CGFloat(i % 3 * 512), dy: CGFloat(i / 3 * 512)))
+        }
+    }
+    struct Layer {
+        let index: Int
+        let rect: CGRect
+        let attached: Bool
+    }
+    func layers(_ state: PetMotionState, pageTurn: Bool) -> [Layer] {
+        switch state {
+        case .idle: return []
+        case .work: return [Layer(index: pageTurn ? 1 : 0, rect: CGRect(x: 19, y: 55, width: 58, height: 34), attached: true)]
+        case .workPaused: return [Layer(index: 2, rect: CGRect(x: 26, y: 67, width: 44, height: 25), attached: true)]
+        case .rest, .restPaused: return [Layer(index: 3, rect: CGRect(x: 24, y: 73, width: 68, height: 19), attached: false)]
+        case .workFinished: return [Layer(index: 4, rect: CGRect(x: 34, y: 62, width: 26, height: 32), attached: true)]
+        case .restFinished: return [Layer(index: 3, rect: CGRect(x: 29, y: 77, width: 62, height: 15), attached: false),
+                                    Layer(index: 5, rect: CGRect(x: 73, y: 13, width: 17, height: 19), attached: false)]
+        }
+    }
+}
+
 enum CompactPetLayout {
     static let slot = 96.0
     static let characterHeight = 80.0
@@ -18,7 +55,9 @@ final class CompactTomyAtlas {
                            CGRect(x: 341, y: 364, width: 85, height: 89)]
     let body: CGImage?
     let eyePatches: [[CGImage]]
-    private let alpha: [UInt8]
+    private var hitPose: PetPose?
+    private var hitAlpha: [UInt8] = []
+    private let props: TomySceneProps
 
     private convenience init() {
         let image = NSImage(named: "pet_tomy_compact_v1") ??
@@ -27,12 +66,13 @@ final class CompactTomyAtlas {
         self.init(image: image)
     }
 
-    init(image: NSImage?) {
+    init(image: NSImage?, propsImage: NSImage? = NSImage(named: "pet_tomy_scenes_v1")) {
+        props = TomySceneProps(image: propsImage)
         var proposed = CGRect(x: 0, y: 0, width: 2172, height: 724)
         guard let source = image?.cgImage(forProposedRect: &proposed, context: nil, hints: nil),
               source.width == 2172, source.height == 724,
               let neutral = source.cropping(to: CGRect(x: 0, y: 0, width: 724, height: 724)) else {
-            body = nil; eyePatches = []; alpha = []
+            body = nil; eyePatches = []
             return
         }
         body = neutral
@@ -41,18 +81,6 @@ final class CompactTomyAtlas {
                 source.cropping(to: rect.offsetBy(dx: CGFloat(frame * Self.cell), dy: 0))
             }
         }
-        var pixels = [UInt8](repeating: 0, count: Self.cell * Self.cell * 4)
-        pixels.withUnsafeMutableBytes { bytes in
-            let info = CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
-            if let context = CGContext(data: bytes.baseAddress, width: Self.cell, height: Self.cell,
-                                       bitsPerComponent: 8, bytesPerRow: Self.cell * 4,
-                                       space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: info) {
-                // Bitmap rows already follow CGImage's top-origin pixel order.
-                // The drawing view's flipped coordinates must not flip this mask.
-                context.draw(neutral, in: CGRect(x: 0, y: 0, width: Self.cell, height: Self.cell))
-            }
-        }
-        alpha = (0..<(Self.cell * Self.cell)).map { pixels[$0 * 4 + 3] }
     }
 
     private func metrics(_ size: CGSize) -> (scale: CGFloat, x: CGFloat, y: CGFloat, baseline: CGFloat) {
@@ -89,20 +117,51 @@ final class CompactTomyAtlas {
             }
         }
         context.restoreGState()
+        func drawProps(_ state: PetMotionState, opacity: Double) {
+            guard opacity > 0 else { return }
+            for layer in props.layers(state, pageTurn: pose.pageTurn) where layer.index < props.images.count {
+                context.saveGState()
+                context.interpolationQuality = .none
+                context.setAlpha(CGFloat(opacity))
+                context.scaleBy(x: unit, y: unit)
+                if layer.attached {
+                    context.translateBy(x: 48 + CGFloat(pose.x), y: 96 * 0.94 + CGFloat(pose.y))
+                    context.rotate(by: CGFloat(pose.angle * .pi / 180))
+                    context.scaleBy(x: CGFloat(pose.scaleX), y: CGFloat(pose.scaleY))
+                    context.translateBy(x: -48, y: -96 * 0.94)
+                }
+                drawImage(props.images[layer.index], layer.rect)
+                context.restoreGState()
+            }
+        }
+        if pose.sceneProgress < 1 { drawProps(pose.previousScene, opacity: 1 - pose.sceneProgress) }
+        drawProps(pose.scene, opacity: pose.sceneProgress)
     }
 
     func contains(_ point: CGPoint, size: CGSize, pose: PetPose) -> Bool {
-        guard !alpha.isEmpty, size.width > 0, size.height > 0 else { return false }
-        let m = metrics(size), unit = size.width / CGFloat(CompactPetLayout.slot)
-        let dx = point.x - size.width / 2 - CGFloat(pose.x) * unit
-        let dy = point.y - m.baseline - CGFloat(pose.y) * unit
-        let radians = CGFloat(pose.angle * .pi / 180)
-        let x = (cos(radians) * dx + sin(radians) * dy) / CGFloat(pose.scaleX) + size.width / 2
-        let y = (-sin(radians) * dx + cos(radians) * dy) / CGFloat(pose.scaleY) + m.baseline
-        let sx = Int(floor((x - m.x) / m.scale)), sy = Int(floor((y - m.y) / m.scale))
-        guard (0..<Self.cell).contains(sx), (0..<Self.cell).contains(sy) else { return false }
-        return alpha[sy * Self.cell + sx] > 96
+        guard body != nil, size.width > 0, size.height > 0 else { return false }
+        let side = Int(CompactPetLayout.slot)
+        let x = Int(floor(point.x / size.width * CGFloat(side)))
+        let y = Int(floor(point.y / size.height * CGFloat(side)))
+        guard (0..<side).contains(x), (0..<side).contains(y) else { return false }
+        if hitPose != pose {
+            // Use the actual composited raster: rotating props, crossfade alpha,
+            // eyelids and their occlusion share exactly the visible click shape.
+            var pixels = [UInt8](repeating: 0, count: side * side * 4)
+            pixels.withUnsafeMutableBytes { bytes in
+                let info = CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
+                let context = CGContext(data: bytes.baseAddress, width: side, height: side,
+                    bitsPerComponent: 8, bytesPerRow: side * 4,
+                    space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: info)!
+                context.translateBy(x: 0, y: CGFloat(side)); context.scaleBy(x: 1, y: -1)
+                draw(in: context, size: CGSize(width: side, height: side), pose: pose)
+            }
+            hitAlpha = (0..<(side * side)).map { pixels[$0 * 4 + 3] }
+            hitPose = pose
+        }
+        return hitAlpha[y * side + x] > 96
     }
+
 }
 
 final class CompactTomyDrawingView: NSView {

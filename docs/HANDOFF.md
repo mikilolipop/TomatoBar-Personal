@@ -2,17 +2,17 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-10-09，by Codex · macOS Tomy 原生升级：
+最后更新：2026-10-09，by Codex · macOS Tomy 七场景改版：
 - 用户认可第 1 款番茄与待机样片，并授权接入 macOS；**Windows 本轮不做**，留待后续集中修整。
-- 七种状态共用已选主体，眼部裁片配合微幅姿态动画，0.34 秒过渡，完成动作一次停播；悬停/缩放不重新播放庆祝。
+- 用户否决了仅靠眨眼和微幅姿态区分状态的方案，认为过于一致。现改为抱书阅读/翻页、合书暂停、侧身靠枕休息、睁眼休息暂停、星星庆祝、醒来伸展；固定已选主体不重画，独立道具层组合。0.34 秒过渡，完成后保留达成场景；悬停/缩放不重播庆祝。
 - Tomy 默认可见高度 80 点、窗口 96×96 点，右键三档 64/80/96 点；真实状态/倒计时移至独立悬停气泡，透明鼠标区域随绘制姿态变化。
 - 单击延迟至双击判定结束，双击和拖动不会顺带触发单击；隐藏选择不再被启动强制改回显示。隐藏、关闭动画、减少动态效果与完成状态停止动画 Timer。
-- 增加实际绘制/点击 mask 对照，发现并修正上下翻转；开发脚本修正管道吞掉检查失败的问题，失败时立即停止。
-- **最终检查：263 项领域 + 40 项动画 + 88 项桥接/原生处理器 + 8 项合成启动，全通过；universal Release 严格签名通过。** 已从 `/tmp` 运行开发版，`/Applications` 仍是 3.10.0/build 7 的原安装副本，未发布新版本。
-- 原生角色和真实浮窗内容视觉已检查；跨窗口点击、菜单/拖动、真实 Space/多屏/睡眠/VoiceOver 仍有人工验收项，见 [`desktop-pet-vnext/native-qa-2026-10-09.md`](desktop-pet-vnext/native-qa-2026-10-09.md)。不将合成检查描述为桌面行为完全通过。
+- 绘制/点击 mask 回归覆盖全部状态与两两过渡。道具旋转边缘存在解析采样差异，点击范围现缓存实际合成 alpha；角色、道具、过渡与遮挡共用可见形状。此前的上下翻转与开发脚本吞检查失败问题保持修复。
+- **最终检查：263 项领域 + 43 项动画 + 89 项桥接/原生处理器 + 8 项合成启动，全通过；universal Release 严格签名通过。** 已从 `/tmp` 运行开发版，`/Applications` 仍是 3.10.0/build 7 的原安装副本，未发布新版本。
+- 七场景原生渲染与真实浮窗内容视觉已检查，浏览器页支持七状态切换与对照，见 [`desktop-pet-vnext/scene-qa-2026-10-09.md`](desktop-pet-vnext/scene-qa-2026-10-09.md)；跨窗口点击、菜单/拖动、真实 Space/多屏/睡眠/VoiceOver 仍有人工验收项，见 [`desktop-pet-vnext/native-qa-2026-10-09.md`](desktop-pet-vnext/native-qa-2026-10-09.md)。不将合成检查描述为桌面行为完全通过。
 - 真实数据备份在仓库外通过访达完成。既有记录可见，观察期间新增短记录暂保留并询问来源；没有声称整个会话的数据逐条不变，没有提交真实记录或截图。
 
-历史更新：2026-10-09 · 已选择首轮第 1 款形象并完成独立浏览器待机样片，原记录见 [`desktop-pet-vnext/design-qa.md`](desktop-pet-vnext/design-qa.md)。浏览器页仍保留为独立样片。
+历史更新：2026-10-09 · 已选择首轮第 1 款形象并完成独立浏览器待机样片，原记录见 [`desktop-pet-vnext/design-qa.md`](desktop-pet-vnext/design-qa.md)。浏览器页现升级为独立七场景样片；原待机验收不作为新场景验收证据。
 
 历史更新：2026-10-07，by Antigravity · Windows 平台拓展（TomatoBar-Desktop）落地与核心闭环完成：
 - 跨平台工程建立：在仓库内新建 `TomatoBar-Desktop` 跨平台子工程，基于 Tauri 2.0 + React 18 / TypeScript + Vite 构建；
@@ -72,12 +72,12 @@ popover 和到时提醒窗。上面的限制来自旧 System Events / screencapt
 | ✅ **已安装版本** | **3.10.0（V1.4.1，build 7）**，`/Applications/TomatoBar Personal.app` 仍为原安装副本；本轮运行新版 `/tmp` 开发产物，唯一 TomatoBar Personal 进程；正式包尚未替换 |
 | HEAD | 本轮 macOS Tomy 紧凑桌宠与七状态动画提交；提交完成后以 git log 为准 |
 | 工作区 / 运行 | macOS 桌宠变更完成；当前运行签名 `/tmp` 开发产物，正式安装、发布包及官网本轮未更新 |
-| 测试 | **263 项领域 + 40 项动画 + 88 项桥接/原生处理器 + 8 项合成启动事件**全绿；universal Release + 严格签名通过 |
+| 测试 | **263 项领域 + 43 项动画 + 89 项桥接/原生处理器 + 8 项合成启动事件**全绿；universal Release + 严格签名通过 |
 | **CI** | 上次发布时 `v3.10.0` / `643845a` 检查通过（历史记录）；本轮本机检查全绿，远程检查以新提交 run 为准 |
 | 远程 | `origin` = `mikilolipop/TomatoBar-Personal`（**public**，2026-09-29 GitHub API 实测；默认分支 `feature/personal-focus`）；`upstream` = `ivoronin/TomatoBar` |
 | 发布入口 | [V1.4.1 / v3.10.0](https://github.com/mikilolipop/TomatoBar-Personal/releases/tag/v3.10.0)，已正式发布为 latest，DMG 与 ZIP 双附件已上传并经 CDN 302 下载核验；[官网下载页](https://mikilolipop.github.io/TomatoBar-Personal/) 已自动识别为最新版 |
 | 用户真实数据 | 当前快照已复制到仓库外并核验可读；观察期间新增短记录保留待确认，不声称全会话数据逐条不变。未编辑/删除真实记录，未提交个人事件名或截图 |
-| QA 隔离环境 | 本轮 UI 使用新建 UIAudit Bundle ID，24 条合成记录 + 4 个合成待办，实际完成计时新增 1 条；空状态另以隔离快照检查。桥接仍使用 QA13 新建临时子目录，既有 QA13 sessions 未改 |
+| QA 隔离环境 | 本轮桌宠使用独立进程 Tomy Desktop QA 与临时 FocusStore；此前 UIAudit 记录属于历史 UI 检查。桥接仍使用 QA13 新建临时子目录，既有 QA13 sessions 未改 |
 | git 身份 | 本仓库 `--local`：`mikilolipop <207336577+mikilolipop@users.noreply.github.com>`（全局仍未设置） |
 
 ### 原版 TomatoBar 已退役

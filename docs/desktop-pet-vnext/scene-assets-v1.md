@@ -1,0 +1,11 @@
+# 场景道具素材 v1
+
+2026-10-09，内置 ImageGen，transparent_background=true。选定母稿 `assets/tomy-selected-master.png` 仅作为像素风、色阶、描边与光照的风格参考；未生成或替换角色主体。
+
+工作区产物 `assets/tomy-scene-props-v1.png`：1536×1024 RGBA，3 列 × 2 行、每格 512×512。原始生成文件保留在 Codex generated_images 中。本素材也复制到原生 `pet_tomy_scenes_v1.imageset`。
+
+格子依次为：打开的书、翻页的书、合上的书、靠枕、星星奖章、醒来的太阳。透明角落 alpha=0；主体区域 alpha>96 的范围均在各自格子内。播放器按源码记录的矩形裁切道具，没有手工重画番茄。
+
+## 实际提示词
+
+Create ONE transparent pixel-art PROP ATLAS for a desktop tomato mascot. The attached approved tomato is a STYLE REFERENCE ONLY: match its crisp stepped pixel clusters, warm palette, dark reddish-brown outlines and soft volume lit from upper left. Do NOT draw any tomato or character. Exactly six separate prop sprites, arranged as a regular 3-column by 2-row grid of six equal square cells, no gaps, no cell outlines. Each sprite centered within its cell with generous transparent margin, entirely contained in its cell. Target canvas 1536x1024, each cell 512x512. Row 1 left: a small open teal hardcover book, two warm cream pages, viewed from slightly above/front, shallow V shape, broad width, visible central spine, a few tiny dark ink marks, no readable text. Row 1 middle: the EXACT SAME open teal book, same orientation and cover outline, but one cream page rises from the central spine during a page turn; only the page changes. Row 1 right: the same teal book now closed, laid horizontally, cream page edge and a small coral bookmark sticking out; a clear closed-book silhouette. Row 2 left: a small plump ivory-peach sleeping pillow viewed slightly above/front, low wide rounded rectangle, cozy softly shaded fabric and four subtle corner tufts, no pattern or face. Row 2 middle: a cute small golden five-point STAR AWARD on two short teal ribbon tails, a bright raised gold center and thick stepped brown outline, no face. Row 2 right: a tiny warm golden rising SUN, small circular center and six short thick rays, crisp pixel-art icon with dimensional orange edge, no face and no glow beyond sprite. All are real transparent RGBA cutouts, NO rendered checkerboard, floor, cast shadow backdrop, border, text, numbers, labels, watermark, furniture, hands or character. Pixel clusters and lighting must look at home next to the reference tomato, clear and recognizable at 28 to 60 pixels. This is a production sprite atlas of six props, not a scene illustration.

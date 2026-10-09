@@ -351,7 +351,9 @@ check(PetKind.clay.stripAnimation(for: .work, paused: false) == nil,
 // Compact Tomy uses the approved neutral body and authored eye patches, not the legacy strip.
 let atlasURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
     .appendingPathComponent("TomatoBar/Assets.xcassets/pet_tomy_compact_v1.imageset/pet_tomy_compact_v1.png")
-let compactAtlas = CompactTomyAtlas(image: NSImage(contentsOf: atlasURL))
+let propsURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+    .appendingPathComponent("TomatoBar/Assets.xcassets/pet_tomy_scenes_v1.imageset/pet_tomy_scenes_v1.png")
+let compactAtlas = CompactTomyAtlas(image: NSImage(contentsOf: atlasURL), propsImage: NSImage(contentsOf: propsURL))
 check(compactAtlas.body?.width == 724 && compactAtlas.body?.height == 724, "compact neutral cell loads from real asset")
 check(compactAtlas.eyePatches.count == 3 && compactAtlas.eyePatches.allSatisfy { $0.count == 2 }, "all authored eye poses load")
 check(compactAtlas.contains(CGPoint(x: 48, y: 48), size: CGSize(width: 96, height: 96), pose: PetPose()), "opaque torso accepts pointer")
@@ -361,9 +363,18 @@ check(CompactTomyAtlas(image: nil).body == nil && !CompactTomyAtlas(image: nil).
 // Raster rendering and the inverse mouse mask must agree for rotated/stretched poses.
 // Render outside the 96-point slot to detect clipping rather than hiding it.
 var maskMatches = true, staysInsideSlot = true, coveredSamples = 0
+var sceneSamples: [PetPose] = []
 for state in PetMotionState.allCases {
     for time in [0.9, 1.35, 3.9] {
-        let pose = PetMotionDriver(state: state, now: 0).pose(at: time)
+        sceneSamples.append(PetMotionDriver(state: state, now: 0).pose(at: time))
+    }
+    for next in PetMotionState.allCases where next != state {
+        var driver = PetMotionDriver(state: state, now: 0)
+        driver.configure(state: next, hovered: false, dragging: false, enabled: true, reduced: false, now: 4)
+        for t in [0.0, 0.08, 0.17, 0.26, 0.4] { sceneSamples.append(driver.pose(at: 4 + t)) }
+    }
+}
+for pose in sceneSamples {
         let canvas = 144, inset = 24
         var pixels = [UInt8](repeating: 0, count: canvas * canvas * 4)
         pixels.withUnsafeMutableBytes { bytes in
@@ -390,10 +401,12 @@ for state in PetMotionState.allCases {
                 }
             }
         }
-    }
 }
 check(staysInsideSlot, "all authored states fit in the real 96-point slot without clipping")
-check(maskMatches && coveredSamples > 100, "mouse mask matches raster at opaque/clear samples across all states")
+check(maskMatches && coveredSamples > 100, "mouse mask matches character and props in every state and transition")
+let sleeping = PetMotionDriver(state: .rest, now: 0).pose(at: 3)
+check(compactAtlas.contains(CGPoint(x: 88, y: 84), size: CGSize(width: 96, height: 96), pose: sleeping),
+      "pillow outside the leaning character is part of the clickable scene")
 check(CompactPetLayout.scale(.nan) == 1 && CompactPetLayout.scale(-1) == 1 &&
       CompactPetLayout.scale(0.8) == 0.8 && CompactPetLayout.scale(9) == 1.2, "compact scale is finite and bounded")
 let screenArea = NSRect(x: -1920, y: 40, width: 1920, height: 1040)

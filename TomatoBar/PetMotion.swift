@@ -35,6 +35,10 @@ struct PetPose: Equatable {
     var scaleX = 1.0
     var scaleY = 1.0
     var angle = 0.0
+    var scene = PetMotionState.idle
+    var previousScene = PetMotionState.idle
+    var sceneProgress = 1.0
+    var pageTurn = false
 
     static func blend(_ from: PetPose, _ to: PetPose, progress: Double) -> PetPose {
         let t = min(1, max(0, progress))
@@ -61,6 +65,8 @@ struct PetMotionDriver {
     private var releaseAt: Double?
     private var transitionAt: Double?
     private var transitionFrom = PetPose()
+    private var sceneFrom = PetMotionState.idle
+    private var sceneTransitionAt: Double?
 
     init(state: PetMotionState = .idle, now: Double) {
         self.state = state
@@ -72,7 +78,11 @@ struct PetMotionDriver {
         guard self.state != state || self.hovered != hovered || self.dragging != dragging ||
               self.enabled != enabled || self.reduced != reduced else { return }
         let previous = pose(at: now)
-        if self.state != state { enteredAt = now }
+        if self.state != state {
+            sceneFrom = self.state
+            sceneTransitionAt = enabled && !reduced ? now : nil
+            enteredAt = now
+        }
         if self.dragging && !dragging { releaseAt = now }
         self.state = state
         self.hovered = hovered
@@ -94,45 +104,49 @@ struct PetMotionDriver {
             result.scaleX -= breath * 0.0025
             result.scaleY += breath * 0.005
             result.angle = dynamic ? sin(elapsed * .pi * 2 / 9.7) * 0.7 : 0
-        case .work, .workPaused:
-            result.angle = -2.2
-            result.eyes = dynamic ? Self.blink(at: elapsed, cycle: state == .work ? 10 : 13) : 0
-            if dynamic && state == .work {
-                result.scaleY += breath * 0.003
+        case .work:
+            result.angle = -4
+            result.eyes = dynamic ? Self.blink(at: elapsed, cycle: 10) : 0
+            result.scaleY = 0.96 + breath * 0.004
+            if dynamic {
                 let nod = elapsed.truncatingRemainder(dividingBy: 6.4)
-                if nod > 3.5 && nod < 4.4 {
-                    result.angle -= sin((nod - 3.5) / 0.9 * .pi) * 0.9
-                }
+                if nod > 3.5 && nod < 4.4 { result.angle -= sin((nod - 3.5) / 0.9 * .pi) * 3 }
             }
-        case .rest, .restPaused:
+        case .workPaused:
+            result.scaleY = 0.98
+        case .rest:
             result.eyes = 2
-            result.angle = 5.5
-            result.scaleX = 1.015
-            result.scaleY = 0.97
-            if dynamic && state == .rest {
-                result.scaleY += sin(elapsed * .pi * 2 / 5.8) * 0.006
-            }
+            result.x = -18; result.y = -5
+            result.angle = 24
+            result.scaleX = 0.85
+            result.scaleY = 0.85 + (dynamic ? sin(elapsed * .pi * 2 / 5.8) * 0.012 : 0)
+        case .restPaused:
+            result.x = -11; result.y = -4
+            result.angle = 12
+            result.scaleX = 0.9; result.scaleY = 0.9
         case .workFinished:
             if dynamic && elapsed > 0.25 && elapsed < 1.65 {
                 let t = (elapsed - 0.25) / 1.4
                 let lift = pow(sin(t * .pi), 2)
-                result.y = -4 * lift
+                result.y = -8 * lift
                 result.scaleX += lift * 0.016
                 result.scaleY += lift * 0.018
                 result.angle = sin(t * .pi * 2) * 2.5
             }
         case .restFinished:
+            result.x = -6; result.scaleX = 0.92; result.scaleY = 0.98
             if dynamic && elapsed > 0.15 && elapsed < 1.65 {
                 let stretch = sin((elapsed - 0.15) / 1.5 * .pi)
-                result.scaleX -= stretch * 0.014
-                result.scaleY += stretch * 0.045
+                result.scaleX -= stretch * 0.03
+                result.scaleY += stretch * 0.065
             }
         }
         if hovered && !dragging {
-            if state == .rest || state == .restPaused { result.eyes = 1 }
+            if state == .rest { result.eyes = 1 }
             if dynamic { result.angle += 1.0 }
         }
         if dragging {
+            result.x = 0; result.y = 0
             result.eyes = 0
             result.angle = 0
             result.scaleX = 1
@@ -147,9 +161,16 @@ struct PetMotionDriver {
             }
         }
         if let start = transitionAt {
-            return .blend(transitionFrom, result,
-                          progress: (now - start) / Self.transitionDuration)
+            result = .blend(transitionFrom, result, progress: (now - start) / Self.transitionDuration)
         }
+        result.scene = state
+        result.previousScene = sceneFrom
+        if dynamic, let start = sceneTransitionAt {
+            let t = min(1, max(0, (now - start) / Self.transitionDuration))
+            result.sceneProgress = t * t * (3 - 2 * t)
+        }
+        let page = elapsed.truncatingRemainder(dividingBy: 6.4)
+        result.pageTurn = dynamic && state == .work && page > 3.55 && page < 4.15
         return result
     }
 
@@ -157,7 +178,7 @@ struct PetMotionDriver {
         guard enabled && !reduced && !dragging else { return false }
         if let start = transitionAt, now - start < Self.transitionDuration { return true }
         if let release = releaseAt, now - release < 0.42 { return true }
-        if state == .restPaused { return false }
+        if state == .restPaused || state == .workPaused { return false }
         return !state.finishesOnce || now - enteredAt < Self.completionDuration
     }
 
