@@ -102,7 +102,7 @@ struct PetLabView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Tomy · macOS 桌面验收").font(.system(size: 24, weight: .semibold))
-            Text("读书、合书等待、靠枕休息、星星庆祝。下方都是实际原生渲染。").foregroundStyle(.secondary)
+            Text("坐姿打字、捧杯喝水；暂停停住当前动作。下方都是实际原生渲染。").foregroundStyle(.secondary)
             HStack(spacing: 16) { ForEach(PetMotionState.allCases, id: \.self) { StateSample(state: $0) } }
                 .frame(height: 140).padding(12).background(Color(nsColor: .windowBackgroundColor))
             HStack {

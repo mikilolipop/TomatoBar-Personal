@@ -351,9 +351,30 @@ check(PetKind.clay.stripAnimation(for: .work, paused: false) == nil,
 // Compact Tomy uses the approved neutral body and authored eye patches, not the legacy strip.
 let atlasURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
     .appendingPathComponent("TomatoBar/Assets.xcassets/pet_tomy_compact_v1.imageset/pet_tomy_compact_v1.png")
-let propsURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-    .appendingPathComponent("TomatoBar/Assets.xcassets/pet_tomy_scenes_v1.imageset/pet_tomy_scenes_v1.png")
-let compactAtlas = CompactTomyAtlas(image: NSImage(contentsOf: atlasURL), propsImage: NSImage(contentsOf: propsURL))
+let assetRoot = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("TomatoBar/Assets.xcassets")
+func seatedAsset(_ clip: SeatedPetClip) -> URL {
+    assetRoot.appendingPathComponent("\(clip.assetName).imageset/\(clip.assetName).png")
+}
+let compactAtlas = CompactTomyAtlas(image: NSImage(contentsOf: atlasURL),
+    workImage: NSImage(contentsOf: seatedAsset(.work)), restImage: NSImage(contentsOf: seatedAsset(.rest)))
+struct PreviewClip: Decodable {
+    let cell: Int, columns: Int, frames: Int
+    let offsets: [[Double]], bounds: [Double], timeline: [SeatedPetClip.Step]
+}
+let previewRoot = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("docs/desktop-pet-vnext")
+let previewClips = try JSONDecoder().decode([String: PreviewClip].self,
+    from: Data(contentsOf: previewRoot.appendingPathComponent("assets/tomy-seated-motion-v1.json")))
+for clip in SeatedPetClip.allCases {
+    let reference = previewClips[clip.rawValue]!
+    check(reference.cell == 512 && reference.columns == 3 && reference.frames == 6 &&
+          reference.offsets == clip.offsets && reference.bounds == clip.bounds && reference.timeline == clip.timeline,
+          "native camera and timeline exactly match browser sample: \(clip)")
+    let nativeData = try Data(contentsOf: seatedAsset(clip))
+    let previewData = try Data(contentsOf: previewRoot.appendingPathComponent("assets/tomy-seated-\(clip.rawValue)-v1.png"))
+    check(nativeData == previewData,
+          "native sprite sheet is byte-identical to delivered sample: \(clip)")
+    check(compactAtlas.seatedFrames[clip]?.count == 6, "all six complete authored poses load: \(clip)")
+}
 check(compactAtlas.body?.width == 724 && compactAtlas.body?.height == 724, "compact neutral cell loads from real asset")
 check(compactAtlas.eyePatches.count == 3 && compactAtlas.eyePatches.allSatisfy { $0.count == 2 }, "all authored eye poses load")
 check(compactAtlas.contains(CGPoint(x: 48, y: 48), size: CGSize(width: 96, height: 96), pose: PetPose()), "opaque torso accepts pointer")
@@ -364,6 +385,9 @@ check(CompactTomyAtlas(image: nil).body == nil && !CompactTomyAtlas(image: nil).
 // Render outside the 96-point slot to detect clipping rather than hiding it.
 var maskMatches = true, staysInsideSlot = true, coveredSamples = 0
 var sceneSamples: [PetPose] = []
+for scene in [PetMotionState.work, .rest] {
+    for frame in 0..<6 { sceneSamples.append(PetPose(scene: scene, frame: frame)) }
+}
 for state in PetMotionState.allCases {
     for time in [0.9, 1.35, 3.9] {
         sceneSamples.append(PetMotionDriver(state: state, now: 0).pose(at: time))
@@ -403,10 +427,9 @@ for pose in sceneSamples {
         }
 }
 check(staysInsideSlot, "all authored states fit in the real 96-point slot without clipping")
-check(maskMatches && coveredSamples > 100, "mouse mask matches character and props in every state and transition")
-let sleeping = PetMotionDriver(state: .rest, now: 0).pose(at: 3)
-check(compactAtlas.contains(CGPoint(x: 88, y: 84), size: CGSize(width: 96, height: 96), pose: sleeping),
-      "pillow outside the leaning character is part of the clickable scene")
+check(maskMatches && coveredSamples > 100, "mouse mask matches complete poses in every authored frame, state and transition")
+check(compactAtlas.contains(CGPoint(x: 48, y: 74), size: CGSize(width: 96, height: 96), pose: PetPose(scene: .work)),
+      "laptop in the complete seated pose is clickable")
 check(CompactPetLayout.scale(.nan) == 1 && CompactPetLayout.scale(-1) == 1 &&
       CompactPetLayout.scale(0.8) == 0.8 && CompactPetLayout.scale(9) == 1.2, "compact scale is finite and bounded")
 let screenArea = NSRect(x: -1920, y: 40, width: 1920, height: 1040)

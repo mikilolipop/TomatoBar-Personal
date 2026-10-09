@@ -1,43 +1,6 @@
 import AppKit
 import SwiftUI
 
-/// Props are separate from the approved character raster. A reading, sleeping or
-/// completed scene can change without redrawing the crown, lighting or face.
-private final class TomySceneProps {
-    static let shared = TomySceneProps()
-    static let crops = [CGRect(x: 30, y: 110, width: 480, height: 340),
-                        CGRect(x: 30, y: 110, width: 480, height: 340),
-                        CGRect(x: 51, y: 190, width: 424, height: 283),
-                        CGRect(x: 37, y: 118, width: 468, height: 269),
-                        CGRect(x: 120, y: 83, width: 269, height: 332),
-                        CGRect(x: 111, y: 93, width: 271, height: 299)]
-    let images: [CGImage]
-    init(image: NSImage? = NSImage(named: "pet_tomy_scenes_v1")) {
-        var proposed = CGRect(x: 0, y: 0, width: 1536, height: 1024)
-        guard let source = image?.cgImage(forProposedRect: &proposed, context: nil, hints: nil),
-              source.width == 1536, source.height == 1024 else { images = []; return }
-        images = Self.crops.enumerated().compactMap { i, crop in
-            source.cropping(to: crop.offsetBy(dx: CGFloat(i % 3 * 512), dy: CGFloat(i / 3 * 512)))
-        }
-    }
-    struct Layer {
-        let index: Int
-        let rect: CGRect
-        let attached: Bool
-    }
-    func layers(_ state: PetMotionState, pageTurn: Bool) -> [Layer] {
-        switch state {
-        case .idle: return []
-        case .work: return [Layer(index: pageTurn ? 1 : 0, rect: CGRect(x: 19, y: 55, width: 58, height: 34), attached: true)]
-        case .workPaused: return [Layer(index: 2, rect: CGRect(x: 26, y: 67, width: 44, height: 25), attached: true)]
-        case .rest, .restPaused: return [Layer(index: 3, rect: CGRect(x: 24, y: 73, width: 68, height: 19), attached: false)]
-        case .workFinished: return [Layer(index: 4, rect: CGRect(x: 34, y: 62, width: 26, height: 32), attached: true)]
-        case .restFinished: return [Layer(index: 3, rect: CGRect(x: 29, y: 77, width: 62, height: 15), attached: false),
-                                    Layer(index: 5, rect: CGRect(x: 73, y: 13, width: 17, height: 19), attached: false)]
-        }
-    }
-}
-
 enum CompactPetLayout {
     static let slot = 96.0
     static let characterHeight = 80.0
@@ -46,8 +9,8 @@ enum CompactPetLayout {
     }
 }
 
-/// The atlas contains authored eye poses. Every drawing uses the same body image,
-/// so no pose can accidentally mirror the leaf crown or move the face.
+/// Idle keeps the approved body/eye raster. Work and rest use complete authored
+/// seated poses, including arms, feet and their laptop/mug interaction.
 final class CompactTomyAtlas {
     static let shared = CompactTomyAtlas()
     static let cell = 724
@@ -55,9 +18,9 @@ final class CompactTomyAtlas {
                            CGRect(x: 341, y: 364, width: 85, height: 89)]
     let body: CGImage?
     let eyePatches: [[CGImage]]
+    let seatedFrames: [SeatedPetClip: [CGImage]]
     private var hitPose: PetPose?
     private var hitAlpha: [UInt8] = []
-    private let props: TomySceneProps
 
     private convenience init() {
         let image = NSImage(named: "pet_tomy_compact_v1") ??
@@ -66,14 +29,22 @@ final class CompactTomyAtlas {
         self.init(image: image)
     }
 
-    init(image: NSImage?, propsImage: NSImage? = NSImage(named: "pet_tomy_scenes_v1")) {
-        props = TomySceneProps(image: propsImage)
+    init(image: NSImage?, workImage: NSImage? = NSImage(named: "pet_tomy_seated_work_v1"),
+         restImage: NSImage? = NSImage(named: "pet_tomy_seated_rest_v1")) {
+        func frames(_ image: NSImage?) -> [CGImage] {
+            var proposed = CGRect(x: 0, y: 0, width: 1536, height: 1024)
+            guard let source = image?.cgImage(forProposedRect: &proposed, context: nil, hints: nil),
+                  source.width == 1536, source.height == 1024 else { return [] }
+            return (0..<6).compactMap { i in
+                source.cropping(to: CGRect(x: i % 3 * 512, y: i / 3 * 512, width: 512, height: 512))
+            }
+        }
+        seatedFrames = [.work: frames(workImage), .rest: frames(restImage)]
         var proposed = CGRect(x: 0, y: 0, width: 2172, height: 724)
         guard let source = image?.cgImage(forProposedRect: &proposed, context: nil, hints: nil),
               source.width == 2172, source.height == 724,
               let neutral = source.cropping(to: CGRect(x: 0, y: 0, width: 724, height: 724)) else {
-            body = nil; eyePatches = []
-            return
+            body = nil; eyePatches = []; return
         }
         body = neutral
         eyePatches = (0..<3).map { frame in
@@ -83,23 +54,15 @@ final class CompactTomyAtlas {
         }
     }
 
-    private func metrics(_ size: CGSize) -> (scale: CGFloat, x: CGFloat, y: CGFloat, baseline: CGFloat) {
-        let scale = size.width / CGFloat(CompactPetLayout.slot) * CGFloat(CompactPetLayout.characterHeight) / 597
-        let baseline = size.height * 0.94
-        return (scale, (size.width - 724 * scale) / 2, baseline - 671 * scale, baseline)
-    }
-
     func draw(in context: CGContext, size: CGSize, pose: PetPose) {
-        guard let body = body else { return }
-        let m = metrics(size)
-        let unit = size.width / CGFloat(CompactPetLayout.slot)
+        let unit = size.width / CGFloat(CompactPetLayout.slot), baseline = size.height * 0.94
         context.saveGState()
         context.interpolationQuality = .none
         context.translateBy(x: size.width / 2 + CGFloat(pose.x) * unit,
-                            y: m.baseline + CGFloat(pose.y) * unit)
+                            y: baseline + CGFloat(pose.y) * unit)
         context.rotate(by: CGFloat(pose.angle * .pi / 180))
         context.scaleBy(x: CGFloat(pose.scaleX), y: CGFloat(pose.scaleY))
-        context.translateBy(x: -size.width / 2, y: -m.baseline)
+        context.translateBy(x: -size.width / 2, y: -baseline)
         func drawImage(_ image: CGImage, _ rect: CGRect) {
             context.saveGState()
             context.translateBy(x: rect.minX, y: rect.maxY)
@@ -107,35 +70,39 @@ final class CompactTomyAtlas {
             context.draw(image, in: CGRect(origin: .zero, size: rect.size))
             context.restoreGState()
         }
-        drawImage(body, CGRect(x: m.x, y: m.y, width: 724 * m.scale, height: 724 * m.scale))
-        let frame = min(2, max(0, pose.eyes))
-        if frame > 0, eyePatches.count == 3, eyePatches[frame].count == 2 {
-            for (rect, patch) in zip(Self.eyeRects, eyePatches[frame]) {
-                drawImage(patch, CGRect(x: m.x + rect.minX * m.scale,
-                                       y: m.y + rect.minY * m.scale,
-                                       width: rect.width * m.scale, height: rect.height * m.scale))
-            }
-        }
-        context.restoreGState()
-        func drawProps(_ state: PetMotionState, opacity: Double) {
+        func drawScene(_ state: PetMotionState, frame: Int, eyes: Int, opacity: Double) {
             guard opacity > 0 else { return }
-            for layer in props.layers(state, pageTurn: pose.pageTurn) where layer.index < props.images.count {
-                context.saveGState()
-                context.interpolationQuality = .none
-                context.setAlpha(CGFloat(opacity))
-                context.scaleBy(x: unit, y: unit)
-                if layer.attached {
-                    context.translateBy(x: 48 + CGFloat(pose.x), y: 96 * 0.94 + CGFloat(pose.y))
-                    context.rotate(by: CGFloat(pose.angle * .pi / 180))
-                    context.scaleBy(x: CGFloat(pose.scaleX), y: CGFloat(pose.scaleY))
-                    context.translateBy(x: -48, y: -96 * 0.94)
+            context.saveGState()
+            context.setAlpha(CGFloat(opacity))
+            defer { context.restoreGState() }
+            if let clip = state.clip, let frames = seatedFrames[clip], frames.count == 6 {
+                let index = min(5, max(0, frame)), bounds = clip.bounds, offset = clip.offsets[index]
+                // One fixed camera for every frame, identical to full-pose-player.js.
+                let scale = CGFloat(CompactPetLayout.characterHeight) * unit / CGFloat(bounds[3] - bounds[1])
+                let x = size.width / 2 - CGFloat((bounds[0] + bounds[2]) / 2) * scale
+                let y = baseline - CGFloat(bounds[3]) * scale
+                drawImage(frames[index], CGRect(x: x + CGFloat(offset[0]) * scale,
+                    y: y + CGFloat(offset[1]) * scale, width: 512 * scale, height: 512 * scale))
+                return
+            }
+            guard let body = body else { return }
+            let scale = CGFloat(CompactPetLayout.characterHeight) * unit / 597
+            let x = (size.width - 724 * scale) / 2, y = baseline - 671 * scale
+            drawImage(body, CGRect(x: x, y: y, width: 724 * scale, height: 724 * scale))
+            let eye = min(2, max(0, eyes))
+            if eye > 0, eyePatches.count == 3, eyePatches[eye].count == 2 {
+                for (rect, patch) in zip(Self.eyeRects, eyePatches[eye]) {
+                    drawImage(patch, CGRect(x: x + rect.minX * scale, y: y + rect.minY * scale,
+                        width: rect.width * scale, height: rect.height * scale))
                 }
-                drawImage(props.images[layer.index], layer.rect)
-                context.restoreGState()
             }
         }
-        if pose.sceneProgress < 1 { drawProps(pose.previousScene, opacity: 1 - pose.sceneProgress) }
-        drawProps(pose.scene, opacity: pose.sceneProgress)
+        if pose.sceneProgress < 1 {
+            drawScene(pose.previousScene, frame: pose.previousFrame, eyes: pose.previousEyes,
+                      opacity: 1 - pose.sceneProgress)
+        }
+        drawScene(pose.scene, frame: pose.frame, eyes: pose.eyes, opacity: pose.sceneProgress)
+        context.restoreGState()
     }
 
     func contains(_ point: CGPoint, size: CGSize, pose: PetPose) -> Bool {
@@ -145,8 +112,8 @@ final class CompactTomyAtlas {
         let y = Int(floor(point.y / size.height * CGFloat(side)))
         guard (0..<side).contains(x), (0..<side).contains(y) else { return false }
         if hitPose != pose {
-            // Use the actual composited raster: rotating props, crossfade alpha,
-            // eyelids and their occlusion share exactly the visible click shape.
+            // Cache the actual composited alpha, including authored hands/props,
+            // frame registration and crossfades. Clear pixels pass through.
             var pixels = [UInt8](repeating: 0, count: side * side * 4)
             pixels.withUnsafeMutableBytes { bytes in
                 let info = CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
@@ -161,7 +128,6 @@ final class CompactTomyAtlas {
         }
         return hitAlpha[y * side + x] > 96
     }
-
 }
 
 final class CompactTomyDrawingView: NSView {
