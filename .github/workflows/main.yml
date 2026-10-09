@@ -33,6 +33,9 @@ jobs:
       - name: Domain tests
         run: sh scripts/test.sh
 
+      - name: Desktop pet motion checks (macOS presentation)
+        run: sh scripts/test-pet-motion.sh
+
       # The project signs Automatically with the user's Personal Team, which the
       # runner has no account for. CI therefore builds unsigned and ad-hoc re-signs the
       # host app as a compile gate only; this artifact is not the locally signed release.

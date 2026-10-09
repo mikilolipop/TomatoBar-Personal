@@ -19,6 +19,17 @@
 set -eu
 cd "$(dirname "$0")/.."
 
+# POSIX sh reports the last command of a pipeline; `check | tail` hid failures.
+check_log=$(mktemp -t tomatobar-dev-check)
+trap 'rm -f "$check_log"' EXIT
+run_check() {
+  if ! sh "$1" > "$check_log" 2>&1; then
+    cat "$check_log" >&2
+    return 1
+  fi
+  tail -1 "$check_log"
+}
+
 APP="TomatoBar Personal"
 BUNDLE="com.dilyar.TomatoBarPersonal"
 PROD_APP="/Applications/$APP.app"
@@ -63,7 +74,7 @@ echo "2/5 领域测试闸门..."
 if [ "${SKIP_TESTS:-0}" = "1" ]; then
   echo "  （SKIP_TESTS=1,已跳过）"
 else
-  sh scripts/test.sh | tail -1
+  run_check scripts/test.sh
 fi
 
 echo "3/5 Release 构建 + 严格签名（scripts/build.sh）..."
@@ -79,8 +90,9 @@ echo "4/5 桥接 + 启动上下文回归检查..."
 if [ "${SKIP_TESTS:-0}" = "1" ]; then
   echo "  （SKIP_TESTS=1,已跳过）"
 else
-  sh scripts/test-bridge.sh | tail -1
-  sh scripts/test-launch-context.sh | tail -1
+  run_check scripts/test-pet-motion.sh
+  run_check scripts/test-bridge.sh
+  run_check scripts/test-launch-context.sh
 fi
 
 echo "5/5 启动新版（/tmp 构建产物;容器与正式版共用,数据无损延续）..."

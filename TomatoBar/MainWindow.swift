@@ -1263,10 +1263,14 @@ private struct PetSelectionCard: View {
     var body: some View {
         Button(action: onSelect) {
             VStack(spacing: 4) {
-                Image(kind.imageName(for: .idle))
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 44, height: 44)
+                if kind == .tomy {
+                    CompactTomySprite().frame(width: 44, height: 44)
+                } else {
+                    Image(kind.imageName(for: .idle))
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 44, height: 44)
+                }
                 Text(kind.shortName)
                     .font(.system(size: 11, weight: isSelected ? .bold : .regular))
                     .foregroundColor(isSelected ? Garden.red : Garden.ink)

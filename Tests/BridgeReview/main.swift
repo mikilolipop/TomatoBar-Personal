@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import Combine
 
 // Compile the real UI/bridge sources, but do not construct TBApp or launch windows.
@@ -346,6 +347,101 @@ check(PetKind.chip.stripAnimation(for: .work, paused: false) == nil,
       "Chip uses frame sequence rather than sprite strip")
 check(PetKind.clay.stripAnimation(for: .work, paused: false) == nil,
       "Clay uses frame sequence rather than sprite strip")
+
+// Compact Tomy uses the approved neutral body and authored eye patches, not the legacy strip.
+let atlasURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+    .appendingPathComponent("TomatoBar/Assets.xcassets/pet_tomy_compact_v1.imageset/pet_tomy_compact_v1.png")
+let compactAtlas = CompactTomyAtlas(image: NSImage(contentsOf: atlasURL))
+check(compactAtlas.body?.width == 724 && compactAtlas.body?.height == 724, "compact neutral cell loads from real asset")
+check(compactAtlas.eyePatches.count == 3 && compactAtlas.eyePatches.allSatisfy { $0.count == 2 }, "all authored eye poses load")
+check(compactAtlas.contains(CGPoint(x: 48, y: 48), size: CGSize(width: 96, height: 96), pose: PetPose()), "opaque torso accepts pointer")
+check(!compactAtlas.contains(CGPoint(x: 2, y: 2), size: CGSize(width: 96, height: 96), pose: PetPose()) &&
+      !compactAtlas.contains(CGPoint(x: 10, y: 88), size: CGSize(width: 96, height: 96), pose: PetPose()), "transparent corners do not capture pointer")
+check(CompactTomyAtlas(image: nil).body == nil && !CompactTomyAtlas(image: nil).contains(.zero, size: CGSize(width: 96, height: 96), pose: PetPose()), "missing asset never creates an invisible click blocker")
+// Raster rendering and the inverse mouse mask must agree for rotated/stretched poses.
+// Render outside the 96-point slot to detect clipping rather than hiding it.
+var maskMatches = true, staysInsideSlot = true, coveredSamples = 0
+for state in PetMotionState.allCases {
+    for time in [0.9, 1.35, 3.9] {
+        let pose = PetMotionDriver(state: state, now: 0).pose(at: time)
+        let canvas = 144, inset = 24
+        var pixels = [UInt8](repeating: 0, count: canvas * canvas * 4)
+        pixels.withUnsafeMutableBytes { bytes in
+            let info = CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
+            let context = CGContext(data: bytes.baseAddress, width: canvas, height: canvas,
+                bitsPerComponent: 8, bytesPerRow: canvas * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: info)!
+            context.translateBy(x: 0, y: CGFloat(canvas)); context.scaleBy(x: 1, y: -1)
+            context.translateBy(x: CGFloat(inset), y: CGFloat(inset))
+            compactAtlas.draw(in: context, size: CGSize(width: 96, height: 96), pose: pose)
+        }
+        for y in 0..<canvas {
+            for x in 0..<canvas where pixels[(y * canvas + x) * 4 + 3] > 96 {
+                staysInsideSlot = staysInsideSlot && (inset..<(inset + 96)).contains(x) && (inset..<(inset + 96)).contains(y)
+            }
+        }
+        for y in stride(from: 2, to: 94, by: 4) {
+            for x in stride(from: 2, to: 94, by: 4) {
+                let alpha = pixels[((y + inset) * canvas + x + inset) * 4 + 3]
+                if alpha < 24 || alpha > 200 {
+                    let hit = compactAtlas.contains(CGPoint(x: Double(x) + 0.5, y: Double(y) + 0.5),
+                                                    size: CGSize(width: 96, height: 96), pose: pose)
+                    maskMatches = maskMatches && hit == (alpha > 200)
+                    if hit { coveredSamples += 1 }
+                }
+            }
+        }
+    }
+}
+check(staysInsideSlot, "all authored states fit in the real 96-point slot without clipping")
+check(maskMatches && coveredSamples > 100, "mouse mask matches raster at opaque/clear samples across all states")
+check(CompactPetLayout.scale(.nan) == 1 && CompactPetLayout.scale(-1) == 1 &&
+      CompactPetLayout.scale(0.8) == 0.8 && CompactPetLayout.scale(9) == 1.2, "compact scale is finite and bounded")
+let screenArea = NSRect(x: -1920, y: 40, width: 1920, height: 1040)
+let edge = DesktopPetController.clamped(NSRect(x: -20, y: 1060, width: 115.2, height: 115.2), to: screenArea)
+check(screenArea.contains(edge) && edge.maxX <= -4 && edge.maxY <= 1076, "resize and negative display coordinates stay on screen")
+let farOff = DesktopPetController.clamped(NSRect(x: -4000, y: -3000, width: 96, height: 96), to: NSRect(x: 0, y: 0, width: 1512, height: 950))
+check(farOff.origin == CGPoint(x: 4, y: 4), "removed-screen position clamps to a reachable corner")
+func drainPetEvents(_ seconds: TimeInterval) {
+    let deadline = Date().addingTimeInterval(seconds)
+    while Date() < deadline { RunLoop.main.run(until: min(deadline, Date().addingTimeInterval(0.01))) }
+}
+func petMouse(_ type: NSEvent.EventType, count: Int = 1) -> NSEvent {
+    NSEvent.mouseEvent(with: type, location: CGPoint(x: 48, y: 48), modifierFlags: [], timestamp: 0,
+                       windowNumber: 0, context: nil, eventNumber: 0, clickCount: count, pressure: 1)!
+}
+let petEvents = DesktopPetEventView(frame: NSRect(x: 0, y: 0, width: 96, height: 96))
+var singles = 0, doubles = 0, dragStarts = 0, dragEnds = 0
+petEvents.onSingleClick = { singles += 1 }; petEvents.onDoubleClick = { doubles += 1 }
+petEvents.onDragBegan = { dragStarts += 1 }; petEvents.onDragEnded = { dragEnds += 1 }
+petEvents.mouseDown(with: petMouse(.leftMouseDown))
+petEvents.mouseUp(with: petMouse(.leftMouseUp))
+petEvents.mouseDown(with: petMouse(.leftMouseDown, count: 2))
+petEvents.mouseUp(with: petMouse(.leftMouseUp, count: 2))
+drainPetEvents(NSEvent.doubleClickInterval + 0.05)
+check(singles == 0 && doubles == 1, "double click never starts or pauses a timer first")
+petEvents.mouseDown(with: petMouse(.leftMouseDown)); petEvents.mouseUp(with: petMouse(.leftMouseUp))
+drainPetEvents(NSEvent.doubleClickInterval + 0.05)
+check(singles == 1, "single click fires once after the double-click interval")
+petEvents.mouseDown(with: petMouse(.leftMouseDown)); petEvents.mouseDragged(with: petMouse(.leftMouseDragged))
+petEvents.mouseUp(with: petMouse(.leftMouseUp))
+drainPetEvents(NSEvent.doubleClickInterval + 0.05)
+check(singles == 1 && dragStarts == 1 && dragEnds == 1, "drag cannot also trigger a click")
+petEvents.mouseDown(with: petMouse(.leftMouseDown)); petEvents.mouseUp(with: petMouse(.leftMouseUp))
+petEvents.cancelPendingClick(); drainPetEvents(NSEvent.doubleClickInterval + 0.05)
+check(singles == 1, "hiding or dismantling cancels queued timer actions")
+let petAnimator = DesktopPetAnimator()
+petAnimator.configure(state: .work, hovered: false, dragging: false, enabled: true, reduced: false)
+petAnimator.setPresented(true)
+check(petAnimator.isTicking, "visible animation starts a real frame timer")
+petAnimator.setPresented(false)
+check(!petAnimator.isTicking, "hidden animation releases its frame timer")
+petAnimator.setPresented(true)
+petAnimator.configure(state: .work, hovered: false, dragging: false, enabled: true, reduced: true)
+check(!petAnimator.isTicking, "reduced motion releases the real frame timer")
+petAnimator.configure(state: .workFinished, hovered: false, dragging: false, enabled: true, reduced: false)
+drainPetEvents(2.3)
+check(!petAnimator.isTicking, "completed celebration releases the real frame timer")
+petAnimator.stop()
 
 print("PASS: \(checks) actual TBTimer bridge checks; isolated QA13 IO, no UI interaction")
 withExtendedLifetime(observation) {}

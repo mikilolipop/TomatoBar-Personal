@@ -80,7 +80,7 @@ enum PetKind: String, CaseIterable, Identifiable {
 
     var tagline: String {
         switch self {
-        case .tomy: return "敲击键盘的番茄小极客，滴答沉浸在每一段心流"
+        case .tomy: return "一颗柔软的小番茄，安静陪你进入心流"
         case .sprout: return "静悄悄拔节，破土而出的蓬勃专注力"
         case .chip: return "复古极简键盘猫，代码飞按声是最棒的白噪音"
         case .clay: return "温润小陶团，静心沉淀每一段专注时光"
@@ -285,11 +285,39 @@ final class DesktopPetEventView: NSView {
     var onRightClick: ((NSEvent) -> Void)?
     var onDragEnded: (() -> Void)?
     var onHoverStateChanged: ((Bool) -> Void)?
+    var onDragBegan: (() -> Void)?
+    var acceptsPoint: ((CGPoint, CGSize) -> Bool)?
+    var onPresentationChanged: ((Bool) -> Void)?
 
     private var didDrag = false
     private var trackingArea: NSTrackingArea?
+    private var pendingClick: DispatchWorkItem?
+    private(set) var hovering = false
 
     override var acceptsFirstResponder: Bool { false }
+    override var isFlipped: Bool { true }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window is DesktopPetPanel { DesktopPetController.shared?.register(self) }
+    }
+
+    func accepts(_ point: CGPoint) -> Bool {
+        bounds.contains(point) && (acceptsPoint?(point, bounds.size) ?? true)
+    }
+
+    func setHovered(_ value: Bool) {
+        guard hovering != value else { return }
+        hovering = value
+        onHoverStateChanged?(value)
+    }
+
+    func cancelPendingClick() { pendingClick?.cancel(); pendingClick = nil }
+
+    override func accessibilityPerformPress() -> Bool {
+        onSingleClick?()
+        return true
+    }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -303,22 +331,28 @@ final class DesktopPetEventView: NSView {
 
     override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
-        onHoverStateChanged?(true)
+        setHovered(accepts(convert(event.locationInWindow, from: nil)))
     }
 
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
-        onHoverStateChanged?(false)
+        setHovered(false)
     }
 
     override func mouseDown(with event: NSEvent) {
         didDrag = false
+        if event.clickCount > 1 { cancelPendingClick() }
     }
 
     override func mouseDragged(with event: NSEvent) {
+        guard !didDrag else { return }
+        cancelPendingClick()
         didDrag = true
+        DesktopPetController.shared?.setDragging(true)
+        onDragBegan?()
         window?.performDrag(with: event)
         onDragEnded?()
+        DesktopPetController.shared?.setDragging(false)
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -327,15 +361,22 @@ final class DesktopPetEventView: NSView {
             return
         }
         if event.clickCount == 2 {
+            cancelPendingClick()
             onDoubleClick?()
         } else if event.clickCount == 1 {
-            onSingleClick?()
+            cancelPendingClick()
+            let click = DispatchWorkItem { [weak self] in self?.onSingleClick?() }
+            pendingClick = click
+            DispatchQueue.main.asyncAfter(deadline: .now() + NSEvent.doubleClickInterval, execute: click)
         }
     }
 
     override func rightMouseDown(with event: NSEvent) {
+        cancelPendingClick()
         onRightClick?(event)
     }
+
+    deinit { pendingClick?.cancel() }
 }
 
 struct DesktopPetEventRepresentable: NSViewRepresentable {
@@ -344,14 +385,14 @@ struct DesktopPetEventRepresentable: NSViewRepresentable {
     let onRightClick: (NSEvent) -> Void
     let onDragEnded: () -> Void
     let onHoverStateChanged: (Bool) -> Void
+    var onDragBegan: () -> Void = {}
+    var acceptsPoint: ((CGPoint, CGSize) -> Bool)? = nil
+    var onPresentationChanged: (Bool) -> Void = { _ in }
+    var accessibilityName = "桌面伴侣"
 
     func makeNSView(context: Context) -> DesktopPetEventView {
         let view = DesktopPetEventView()
-        view.onSingleClick = onSingleClick
-        view.onDoubleClick = onDoubleClick
-        view.onRightClick = onRightClick
-        view.onDragEnded = onDragEnded
-        view.onHoverStateChanged = onHoverStateChanged
+        updateNSView(view, context: context)
         return view
     }
 
@@ -361,6 +402,18 @@ struct DesktopPetEventRepresentable: NSViewRepresentable {
         nsView.onRightClick = onRightClick
         nsView.onDragEnded = onDragEnded
         nsView.onHoverStateChanged = onHoverStateChanged
+        nsView.onDragBegan = onDragBegan
+        nsView.acceptsPoint = acceptsPoint
+        nsView.onPresentationChanged = onPresentationChanged
+        nsView.setAccessibilityElement(true)
+        nsView.setAccessibilityRole(.button)
+        nsView.setAccessibilityLabel(accessibilityName)
+        nsView.setAccessibilityHelp("单击开始或暂停，双击打开主面板，拖动移动，右键打开菜单")
+    }
+
+    static func dismantleNSView(_ view: DesktopPetEventView, coordinator: ()) {
+        view.cancelPendingClick()
+        view.onPresentationChanged?(false)
     }
 }
 
@@ -666,7 +719,7 @@ struct DesktopPetView: View {
 
     // MARK: - Native Context Menu
 
-    private func showContextMenu(with event: NSEvent) {
+    func showContextMenu(with event: NSEvent) {
         let menu = NSMenu()
 
         // Character Submenu
@@ -687,12 +740,15 @@ struct DesktopPetView: View {
         // Scale Submenu
         let scaleItem = NSMenuItem(title: "尺寸缩放", action: nil, keyEquivalent: "")
         let scaleMenu = NSMenu()
-        let scales: [(String, Double)] = [("小号 (80%)", 0.8), ("标准 (100%)", 1.0), ("大号 (125%)", 1.25)]
+        let scales: [(String, Double)] = petKind == .tomy
+            ? [("小号 (64 点)", 0.8), ("标准 (80 点)", 1.0), ("大号 (96 点)", 1.2)]
+            : [("小号 (80%)", 0.8), ("标准 (100%)", 1.0), ("大号 (125%)", 1.25)]
+        let currentScale = petKind == .tomy ? CompactPetLayout.scale(petScale) : petScale
         for (title, value) in scales {
             let item = NSMenuItem(title: title, action: #selector(ContextMenuTarget.selectScale(_:)), keyEquivalent: "")
             item.target = ContextMenuTarget.shared
             item.representedObject = value
-            if abs(petScale - value) < 0.05 {
+            if abs(currentScale - value) < 0.05 {
                 item.state = .on
             }
             scaleMenu.addItem(item)
@@ -732,8 +788,9 @@ struct DesktopPetView: View {
         hideItem.target = ContextMenuTarget.shared
         menu.addItem(hideItem)
 
-        if let window = NSApp.windows.first(where: { $0 is DesktopPetPanel }) {
-            let location = event.locationInWindow
+        if let window = DesktopPetController.shared?.panel ?? NSApp.windows.first(where: { $0 is DesktopPetPanel }),
+           let content = window.contentView {
+            let location = content.convert(event.locationInWindow, from: nil)
             menu.popUp(positioning: nil, at: location, in: window.contentView)
         }
     }
@@ -796,144 +853,237 @@ final class DesktopPetPanel: NSPanel {
 
 final class DesktopPetController: NSObject, NSWindowDelegate {
     static var shared: DesktopPetController?
-
     private(set) var panel: DesktopPetPanel?
+    private(set) var tooltipPanel: DesktopPetPanel?
     weak var timer: TBTimer?
-
+    private weak var eventView: DesktopPetEventView?
+    private var pointerTimer: Foundation.Timer?
+    private var globalPointerMonitor: Any?
+    private var localPointerMonitor: Any?
+    private var dragging = false
+    private var menuOpen = false
+    private var sleeping = false
     private let originXKey = "desktopPetOriginX"
     private let originYKey = "desktopPetOriginY"
     private let showKey = "showDesktopPet"
     private let scaleKey = "desktopPetScale"
+    private var compact: Bool { UserDefaults.standard.string(forKey: "desktopPetKind") == PetKind.tomy.rawValue }
+    private var desiredSize: NSSize {
+        let scale = UserDefaults.standard.double(forKey: scaleKey)
+        if compact {
+            let side = CompactPetLayout.slot * CompactPetLayout.scale(scale)
+            return NSSize(width: side, height: side)
+        }
+        let actual = scale.isFinite && scale > 0.5 ? scale : 1
+        return NSSize(width: 220 * actual, height: 250 * actual)
+    }
 
     init(timer: TBTimer) {
         self.timer = timer
         super.init()
         Self.shared = self
-        setupNotifications()
+        NotificationCenter.default.addObserver(self, selector: #selector(screenParametersChanged),
+            name: NSApplication.didChangeScreenParametersNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(defaultsChanged),
+            name: UserDefaults.didChangeNotification, object: nil)
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(willSleep),
+            name: NSWorkspace.willSleepNotification, object: nil)
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(didWake),
+            name: NSWorkspace.didWakeNotification, object: nil)
     }
 
     func setup() {
-        UserDefaults.standard.set(true, forKey: showKey)
+        if UserDefaults.standard.object(forKey: showKey) == nil {
+            UserDefaults.standard.set(true, forKey: showKey)
+        }
         if UserDefaults.standard.object(forKey: "desktopPetKind") == nil {
             UserDefaults.standard.set(PetKind.tomy.rawValue, forKey: "desktopPetKind")
         }
         if UserDefaults.standard.object(forKey: scaleKey) == nil {
             UserDefaults.standard.set(1.0, forKey: scaleKey)
         }
-
         updateVisibility()
     }
 
-    private func setupNotifications() {
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(screenParametersChanged),
-            name: NSApplication.didChangeScreenParametersNotification,
-            object: nil
-        )
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(defaultsChanged),
-            name: UserDefaults.didChangeNotification,
-            object: nil
-        )
+    func register(_ view: DesktopPetEventView) {
+        eventView?.cancelPendingClick()
+        eventView?.onPresentationChanged?(false)
+        eventView = view
+        view.onPresentationChanged?(panel?.isVisible == true && !sleeping)
+        refreshPointer()
     }
 
     @objc private func defaultsChanged() {
-        DispatchQueue.main.async { [weak self] in
-            self?.updateVisibility()
-        }
+        DispatchQueue.main.async { [weak self] in self?.updateVisibility() }
     }
-
-    @objc private func screenParametersChanged() {
-        ensurePanelOnScreen()
+    @objc private func screenParametersChanged() { ensurePanelOnScreen(); positionTooltip() }
+    @objc private func willSleep() {
+        sleeping = true
+        stopPointerMonitoring()
+        eventView?.onPresentationChanged?(false)
+        eventView?.cancelPendingClick()
+        tooltipPanel?.orderOut(nil)
     }
+    @objc private func didWake() { sleeping = false; updateVisibility() }
 
     func updateVisibility() {
-        let isEnabled = UserDefaults.standard.bool(forKey: showKey)
-        if isEnabled {
-            if panel == nil {
-                createPanel()
-            }
+        if UserDefaults.standard.bool(forKey: showKey) && !sleeping {
+            if panel == nil { createPanel() }
+            updatePanelSize()
             panel?.orderFront(nil)
+            eventView?.onPresentationChanged?(true)
+            if pointerTimer == nil {
+                globalPointerMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
+                    self?.refreshPointer()
+                }
+                localPointerMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved]) { [weak self] event in
+                    self?.refreshPointer()
+                    return event
+                }
+                let monitor = Foundation.Timer(timeInterval: 1 / 12, repeats: true) { [weak self] _ in
+                    self?.refreshPointer()
+                }
+                pointerTimer = monitor
+                RunLoop.main.add(monitor, forMode: .common)
+            }
+            refreshPointer()
         } else {
+            stopPointerMonitoring()
+            eventView?.cancelPendingClick()
+            eventView?.setHovered(false)
+            eventView?.onPresentationChanged?(false)
             panel?.orderOut(nil)
+            tooltipPanel?.orderOut(nil)
         }
     }
 
     private func createPanel() {
         guard let timer = timer else { return }
-
-        let scale = UserDefaults.standard.double(forKey: scaleKey)
-        let actualScale = scale > 0.5 ? scale : 1.0
-        // Generous panel dimensions (220x250) completely eliminates clipping of bottom status pill!
-        let panelSize = NSSize(width: 220 * actualScale, height: 250 * actualScale)
-
-        var origin = loadSavedPosition()
-        if origin == .zero {
-            origin = defaultPosition(for: panelSize)
-        }
-
-        let panel = DesktopPetPanel(contentRect: NSRect(origin: origin, size: panelSize))
-        let hosting = NSHostingController(rootView: DesktopPetView(timer: timer))
-        panel.contentViewController = hosting
-        panel.delegate = self
+        let size = desiredSize
+        let saved = loadSavedPosition()
+        let panel = DesktopPetPanel(contentRect: NSRect(origin: saved == .zero ? defaultPosition(for: size) : saved, size: size))
+        panel.title = "Tomy 桌面伴侣"
         self.panel = panel
-
+        panel.contentViewController = NSHostingController(rootView: DesktopPetRootView(timer: timer))
+        panel.delegate = self
         ensurePanelOnScreen()
     }
 
     func updatePanelSize() {
         guard let panel = panel else { return }
-        let scale = UserDefaults.standard.double(forKey: scaleKey)
-        let actualScale = scale > 0.5 ? scale : 1.0
-        let newSize = NSSize(width: 220 * actualScale, height: 250 * actualScale)
-        var frame = panel.frame
-        frame.size = newSize
-        panel.setFrame(frame, display: true)
-        ensurePanelOnScreen()
+        let size = desiredSize
+        if panel.frame.size != size {
+            var frame = panel.frame
+            frame.origin.x += (frame.width - size.width) / 2
+            frame.size = size
+            panel.setFrame(frame, display: true)
+            ensurePanelOnScreen()
+        }
+        if !compact { tooltipPanel?.orderOut(nil) }
+    }
+
+    func setDragging(_ value: Bool) {
+        dragging = value
+        if value {
+            panel?.ignoresMouseEvents = false
+            tooltipPanel?.orderOut(nil)
+        } else {
+            ensurePanelOnScreen()
+            refreshPointer()
+        }
+    }
+
+    private func refreshPointer() {
+        guard let panel = panel, panel.isVisible, !sleeping, !dragging, !menuOpen,
+              let view = eventView else { return }
+        let local = panel.convertPoint(fromScreen: NSEvent.mouseLocation)
+        let hit = view.accepts(view.convert(local, from: nil))
+        // NSView.hitTest alone cannot pass an empty pixel through to another app.
+        panel.ignoresMouseEvents = !hit
+        view.setHovered(hit)
+        if compact && hit { showTooltip() }
+        else { tooltipPanel?.orderOut(nil) }
+    }
+
+    private func showTooltip() {
+        if tooltipPanel == nil, let timer = timer {
+            let bubble = DesktopPetPanel(contentRect: NSRect(x: 0, y: 0, width: 214, height: 34))
+            bubble.ignoresMouseEvents = true
+            bubble.contentViewController = NSHostingController(rootView: CompactPetTooltipView(timer: timer))
+            tooltipPanel = bubble
+        }
+        positionTooltip()
+        if tooltipPanel?.isVisible == false { tooltipPanel?.orderFront(nil) }
+    }
+
+    private func positionTooltip() {
+        guard let panel = panel, let bubble = tooltipPanel, let screen = screen(for: panel.frame) else { return }
+        let visible = screen.visibleFrame
+        let y = panel.frame.maxY + 5 + bubble.frame.height <= visible.maxY
+            ? panel.frame.maxY + 5 : panel.frame.minY - bubble.frame.height - 5
+        let proposed = NSRect(x: panel.frame.midX - bubble.frame.width / 2, y: y,
+                              width: bubble.frame.width, height: bubble.frame.height)
+        bubble.setFrameOrigin(Self.clamped(proposed, to: visible).origin)
+    }
+
+    func showCompactContextMenu(with event: NSEvent) {
+        guard let timer = timer else { return }
+        menuOpen = true
+        defer { menuOpen = false; refreshPointer() }
+        tooltipPanel?.orderOut(nil)
+        DesktopPetView(timer: timer).showContextMenu(with: event)
     }
 
     func saveCurrentPosition() {
         guard let panel = panel else { return }
-        UserDefaults.standard.set(Double(panel.frame.origin.x), forKey: originXKey)
-        UserDefaults.standard.set(Double(panel.frame.origin.y), forKey: originYKey)
+        let x = Double(panel.frame.minX), y = Double(panel.frame.minY)
+        if UserDefaults.standard.double(forKey: originXKey) != x { UserDefaults.standard.set(x, forKey: originXKey) }
+        if UserDefaults.standard.double(forKey: originYKey) != y { UserDefaults.standard.set(y, forKey: originYKey) }
     }
-
     private func loadSavedPosition() -> NSPoint {
-        let x = UserDefaults.standard.double(forKey: originXKey)
-        let y = UserDefaults.standard.double(forKey: originYKey)
-        guard x != 0 || y != 0 else { return .zero }
-        return NSPoint(x: x, y: y)
+        let x = UserDefaults.standard.double(forKey: originXKey), y = UserDefaults.standard.double(forKey: originYKey)
+        return x.isFinite && y.isFinite ? NSPoint(x: x, y: y) : .zero
     }
-
     private func defaultPosition(for size: NSSize) -> NSPoint {
-        if let screen = NSScreen.main {
-            let visible = screen.visibleFrame
-            return NSPoint(
-                x: visible.maxX - size.width - 24,
-                y: visible.minY + 48
-            )
-        }
-        return NSPoint(x: 200, y: 200)
+        guard let screen = NSScreen.main else { return NSPoint(x: 200, y: 200) }
+        return NSPoint(x: screen.visibleFrame.maxX - size.width - 24, y: screen.visibleFrame.minY + 48)
     }
-
+    private func screen(for frame: NSRect) -> NSScreen? {
+        NSScreen.screens.max { a, b in
+            let left = a.visibleFrame.intersection(frame), right = b.visibleFrame.intersection(frame)
+            let la = left.isNull ? 0 : left.width * left.height
+            let ra = right.isNull ? 0 : right.width * right.height
+            return la < ra
+        } ?? NSScreen.main
+    }
+    static func clamped(_ frame: NSRect, to visible: NSRect) -> NSRect {
+        var result = frame
+        result.origin.x = min(max(frame.minX, visible.minX + 4), max(visible.minX + 4, visible.maxX - frame.width - 4))
+        result.origin.y = min(max(frame.minY, visible.minY + 4), max(visible.minY + 4, visible.maxY - frame.height - 4))
+        return result
+    }
     private func ensurePanelOnScreen() {
-        guard let panel = panel else { return }
-        let frame = panel.frame
-
-        let screens = NSScreen.screens
-        let isOnScreen = screens.contains { $0.visibleFrame.intersects(frame) }
-
-        if !isOnScreen, NSScreen.main != nil {
-            let defaultPos = defaultPosition(for: frame.size)
-            panel.setFrameOrigin(defaultPos)
-            saveCurrentPosition()
-        }
+        guard let panel = panel, let screen = screen(for: panel.frame) else { return }
+        let frame = Self.clamped(panel.frame, to: screen.visibleFrame)
+        if frame.origin != panel.frame.origin { panel.setFrameOrigin(frame.origin); saveCurrentPosition() }
     }
+    func windowDidMove(_ notification: Notification) { saveCurrentPosition(); positionTooltip() }
 
-    // NSWindowDelegate
-    func windowDidMove(_ notification: Notification) {
-        saveCurrentPosition()
+    func shutdown() {
+        stopPointerMonitoring()
+        eventView?.cancelPendingClick()
+        eventView?.onPresentationChanged?(false)
+        panel?.orderOut(nil); panel?.contentViewController = nil; panel = nil
+        tooltipPanel?.orderOut(nil); tooltipPanel?.contentViewController = nil; tooltipPanel = nil
+        NotificationCenter.default.removeObserver(self)
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+        if Self.shared === self { Self.shared = nil }
     }
+    private func stopPointerMonitoring() {
+        pointerTimer?.invalidate(); pointerTimer = nil
+        if let monitor = globalPointerMonitor { NSEvent.removeMonitor(monitor) }
+        if let monitor = localPointerMonitor { NSEvent.removeMonitor(monitor) }
+        globalPointerMonitor = nil; localPointerMonitor = nil
+    }
+    deinit { stopPointerMonitoring() }
 }
