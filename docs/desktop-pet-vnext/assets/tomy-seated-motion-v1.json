@@ -1,0 +1,270 @@
+{
+  "work": {
+    "file": "assets/tomy-seated-work-v1.png",
+    "cell": 512,
+    "columns": 3,
+    "frames": 6,
+    "offsets": [
+      [
+        0,
+        0
+      ],
+      [
+        20,
+        0
+      ],
+      [
+        40,
+        0
+      ],
+      [
+        -4,
+        30
+      ],
+      [
+        20,
+        31
+      ],
+      [
+        39,
+        31
+      ]
+    ],
+    "bounds": [
+      61,
+      73,
+      495,
+      495
+    ],
+    "durations": [
+      0.24,
+      0.2,
+      0.2,
+      0.08,
+      0.08,
+      0.14
+    ],
+    "timeline": [
+      {
+        "frame": 0,
+        "duration": 0.22
+      },
+      {
+        "frame": 1,
+        "duration": 0.14
+      },
+      {
+        "frame": 2,
+        "duration": 0.14
+      },
+      {
+        "frame": 1,
+        "duration": 0.14
+      },
+      {
+        "frame": 0,
+        "duration": 0.18
+      },
+      {
+        "frame": 1,
+        "duration": 0.14
+      },
+      {
+        "frame": 2,
+        "duration": 0.14
+      },
+      {
+        "frame": 0,
+        "duration": 0.32
+      },
+      {
+        "frame": 0,
+        "duration": 0.22
+      },
+      {
+        "frame": 1,
+        "duration": 0.14
+      },
+      {
+        "frame": 2,
+        "duration": 0.14
+      },
+      {
+        "frame": 1,
+        "duration": 0.14
+      },
+      {
+        "frame": 0,
+        "duration": 0.18
+      },
+      {
+        "frame": 1,
+        "duration": 0.14
+      },
+      {
+        "frame": 2,
+        "duration": 0.14
+      },
+      {
+        "frame": 0,
+        "duration": 0.32
+      },
+      {
+        "frame": 0,
+        "duration": 0.22
+      },
+      {
+        "frame": 1,
+        "duration": 0.14
+      },
+      {
+        "frame": 2,
+        "duration": 0.14
+      },
+      {
+        "frame": 1,
+        "duration": 0.14
+      },
+      {
+        "frame": 0,
+        "duration": 0.18
+      },
+      {
+        "frame": 1,
+        "duration": 0.14
+      },
+      {
+        "frame": 2,
+        "duration": 0.14
+      },
+      {
+        "frame": 0,
+        "duration": 0.32
+      },
+      {
+        "frame": 0,
+        "duration": 0.22
+      },
+      {
+        "frame": 1,
+        "duration": 0.14
+      },
+      {
+        "frame": 2,
+        "duration": 0.14
+      },
+      {
+        "frame": 1,
+        "duration": 0.14
+      },
+      {
+        "frame": 0,
+        "duration": 0.18
+      },
+      {
+        "frame": 1,
+        "duration": 0.14
+      },
+      {
+        "frame": 2,
+        "duration": 0.14
+      },
+      {
+        "frame": 0,
+        "duration": 0.32
+      },
+      {
+        "frame": 3,
+        "duration": 0.07
+      },
+      {
+        "frame": 4,
+        "duration": 0.08
+      },
+      {
+        "frame": 5,
+        "duration": 0.12
+      }
+    ]
+  },
+  "rest": {
+    "file": "assets/tomy-seated-rest-v1.png",
+    "cell": 512,
+    "columns": 3,
+    "frames": 6,
+    "offsets": [
+      [
+        0,
+        0
+      ],
+      [
+        32,
+        0
+      ],
+      [
+        58,
+        0
+      ],
+      [
+        -1,
+        33
+      ],
+      [
+        29,
+        33
+      ],
+      [
+        56,
+        34
+      ]
+    ],
+    "bounds": [
+      88,
+      73,
+      498,
+      497
+    ],
+    "durations": [
+      1.2,
+      0.24,
+      0.42,
+      0.7,
+      0.3,
+      1.0
+    ],
+    "timeline": [
+      {
+        "frame": 0,
+        "duration": 1.2
+      },
+      {
+        "frame": 1,
+        "duration": 0.24
+      },
+      {
+        "frame": 2,
+        "duration": 0.3
+      },
+      {
+        "frame": 3,
+        "duration": 0.7
+      },
+      {
+        "frame": 2,
+        "duration": 0.2
+      },
+      {
+        "frame": 1,
+        "duration": 0.24
+      },
+      {
+        "frame": 4,
+        "duration": 0.3
+      },
+      {
+        "frame": 5,
+        "duration": 1.0
+      }
+    ]
+  }
+}
