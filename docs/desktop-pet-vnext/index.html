@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tomy · 动作样片</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;color:#362b26;background:#f6f3eb;font-synthesis:none}
+*{box-sizing:border-box}body{margin:0}button,input{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,.pet:focus-visible{outline:3px solid #b75b45;outline-offset:4px}
+main{max-width:1100px;margin:0 auto;padding:44px 32px 32px}
+header{display:flex;justify-content:space-between;align-items:start;gap:20px;margin-bottom:30px}.eyebrow{font-size:12px;letter-spacing:.16em;color:#827368;margin-bottom:8px}h1{font-size:30px;font-weight:650;letter-spacing:-.04em;margin:0 0 10px}p{color:#88786a;font-size:14px;line-height:1.7;margin:0}.tag{font-size:12px;padding:7px 12px;border:1px solid #dfd7c7;border-radius:30px;color:#8a7060;white-space:nowrap}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:34px}.desktop{position:relative;height:420px;overflow:hidden;border:1px solid #ddd4c3;border-radius:18px;background:#e8e5dd;touch-action:none;transition:background .25s}
+.desktop.dark{background:#232730;border-color:#232730}.desktop .desktop-note{position:absolute;top:22px;left:24px;font-size:12px;color:#9c978d;pointer-events:none}.desktop.dark .desktop-note{color:#8e939d}
+.pet{position:absolute;width:96px;height:96px;padding:0;border:0;background:transparent;cursor:grab;touch-action:none;user-select:none;transform-origin:50% 94%;-webkit-tap-highlight-color:transparent}.pet.dragging{cursor:grabbing}
+canvas{width:100%;height:100%;display:block;image-rendering:pixelated;pointer-events:none}
+.bubble{position:absolute;left:50%;bottom:calc(100% + 8px);white-space:nowrap;transform:translate(-50%,4px);opacity:0;pointer-events:none;background:#fff9ec;color:#4b382c;border:1px solid #d9cbb2;border-radius:11px;padding:8px 12px;font-size:12px;line-height:1.4;box-shadow:0 3px 12px #0000000c;transition:opacity .15s,transform .15s}.bubble span{font-variant-numeric:tabular-nums;margin-left:12px;color:#a36750}.pet:hover .bubble,.pet:focus-visible .bubble{opacity:1;transform:translate(-50%,0)}
+.hint{display:flex;justify-content:space-between;gap:20px;margin:14px 2px;color:#9b8b7c;font-size:12px;line-height:1.7}.hint span:last-child{white-space:nowrap}
+aside{padding-top:4px}h2{font-size:13px;font-weight:600;margin:0 0 12px;color:#745e50}.section{margin-bottom:28px}.segmented{display:flex;background:#eae5da;padding:3px;border-radius:10px;gap:3px}.segmented button{flex:1;border:0;color:#8b7565;background:transparent;padding:9px 7px;border-radius:7px;font-size:12px;white-space:nowrap}.segmented button.active{background:#fffcf5;color:#58382b;box-shadow:0 1px 4px #5645380c}.size-note{font-size:11px;color:#9d8d7f;margin-top:8px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:16px;font-size:13px;color:#786558;margin:12px 0}.row input{accent-color:#bc6650;width:16px;height:16px}.replay{width:100%;border:1px solid #d6cbb9;background:#faf6ec;border-radius:9px;padding:10px;color:#79543e;font-size:13px;margin-top:10px}
+.loupe{margin-top:20px;padding-top:25px;border-top:1px solid #e2dacb}.loupe canvas{width:176px;height:176px;margin:0 auto}.loupe p{text-align:center;font-size:11px;margin-top:6px}
+.reference{margin-top:28px;padding-top:20px;border-top:1px solid #e2dacb;display:flex;align-items:center;gap:22px}.reference img{width:76px;height:76px;object-fit:contain;image-rendering:pixelated}.reference strong{display:block;font-size:12px;color:#7b6758;margin-bottom:5px}.reference p{font-size:12px}.reference small{color:#9b8b7c;font-size:11px}
+.status{min-height:18px;color:#9b8b7c;font-size:12px;line-height:1.6;margin-top:22px}
+@media(max-width:760px){main{padding:24px 18px}.layout{grid-template-columns:1fr;gap:24px}header{margin-bottom:24px}h1{font-size:25px}.desktop{height:360px}aside{display:grid;grid-template-columns:1fr 1fr;gap:18px}.section{margin:0}.loupe{grid-column:1/-1;margin:0}.loupe canvas{width:150px;height:150px}.reference{align-items:start}.tag{font-size:10px}.hint{flex-wrap:wrap;gap:4px}}
+</style>
+<main>
+<header><div><div class="eyebrow">TOMY / 专注伙伴</div><h1>小一点，灵动一点。</h1><p>眨眨眼，轻轻呼吸。陪伴不必占满桌面。</p></div><div class="tag">动作样片 · 01</div></header>
+<div class="layout">
+<section>
+  <div class="desktop" id="desktop"><div class="desktop-note">桌面预览</div>
+    <button class="pet" id="pet" aria-label="Tomy 桌宠。拖动可调整位置，双击可重播动作；方向键可微调位置。"><canvas id="petCanvas" width="288" height="288"></canvas><div class="bubble" aria-hidden="true">Tomy · 专注中<span>25:00</span></div></button>
+  </div>
+  <div class="hint"><span>拖动换个位置 · 悬停看状态 · 双击重播</span><span id="footprint">角色 80 pt</span></div>
+  <div class="reference"><img src="assets/tomy-selected-master.png" alt="选定的第一版圆润番茄母稿"><div><strong>沿用你选定的形象</strong><p>圆润番茄、短小四肢、柔和的像素层次。</p><small>当前为独立动作预览，计时显示是示例。</small></div></div>
+</section>
+<aside>
+  <div class="section"><h2>桌面大小</h2><div class="segmented" id="sizes"><button data-size="64">小巧</button><button data-size="80" class="active">标准</button><button data-size="96">稍大</button></div><div class="size-note">64 / 80 / 96 pt · 按角色实际高度</div></div>
+  <div class="section"><h2>桌面背景</h2><div class="segmented" id="themes"><button data-theme="light" class="active">浅色</button><button data-theme="dark">深色</button></div></div>
+  <div class="section"><h2>动作</h2><label class="row">自然待机<input type="checkbox" id="animate" checked></label><label class="row">减少动态效果<input type="checkbox" id="reduce"></label><button class="replay" id="replay">重播这段动作</button></div>
+  <div class="loupe"><h2>放大看细节</h2><canvas id="detailCanvas" width="528" height="528" aria-label="Tomy 动作细节放大"></canvas><p>与桌面角色同步播放</p></div>
+</aside>
+</div>
+<div id="status" class="status" role="status" aria-live="polite">正在载入动作素材…</div>
+</main>
+<script type="module">
+const $=id=>document.getElementById(id);
+const stage=$('desktop'),pet=$('pet'),canvas=$('petCanvas'),detail=$('detailCanvas');
+const sheet=new Image();sheet.src='assets/tomy-blink-strip.png';
+const meta={cell:724,art:{x:78,y:74,width:562,height:597},eyes:[{x:150,y:335,width:85,height:88},{x:341,y:364,width:85,height:89}]};
+let ready=false,playing=true,reduced=matchMedia('(prefers-reduced-motion:reduce)').matches,height=80,userMoved=false;
+let started=performance.now(),raf=null,hovered=false,drag=null,x=0,y=0,dragKick=0,phase=0;
+$('reduce').checked=reduced;
+function clampPosition(){const w=pet.offsetWidth,h=pet.offsetHeight;if(!userMoved){x=stage.clientWidth-w-28;y=stage.clientHeight-h-26;}x=Math.max(14,Math.min(stage.clientWidth-w-14,x));y=Math.max(54,Math.min(stage.clientHeight-h-14,y));pet.style.left=x+'px';pet.style.top=y+'px';const bubble=pet.querySelector('.bubble');const pad=bubble.offsetWidth/2+8;bubble.style.left=(Math.max(pad,Math.min(stage.clientWidth-pad,x+w/2))-x)+'px'}
+function resize(size){height=size;const slot=size*1.2;pet.style.width=slot+'px';pet.style.height=slot+'px';clampPosition();$('footprint').textContent='角色 '+size+' pt';draw(performance.now());}
+function blinkAt(t){for(const b of [1.25,5.55,8.10]){const d=t-b;if(d>=0&&d<.08)return 1;if(d>=.08&&d<.15)return 2;if(d>=.15&&d<.23)return 1;}return 0;}
+function render(target,t,index,motion){
+ const ctx=target.getContext('2d');const side=target.width;
+ ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,side,side);ctx.imageSmoothingEnabled=false;
+ const scale=side*.833333/meta.art.height;
+ const ox=(side-meta.cell*scale)/2,baseline=side*.94,oy=baseline-(meta.art.y+meta.art.height)*scale;
+ ctx.translate(side/2,baseline);
+ const breath=motion?Math.sin(t*Math.PI*2/4.7):0;
+ const look=motion?(Math.sin(t*Math.PI*2/9.7)*Math.sin(t*Math.PI/9.7)**2):0;
+ const kick=motion?Math.max(0,1-(performance.now()-dragKick)/450):0;
+ ctx.rotate((look*.012+(hovered?.009:0))*(motion?1:0));
+ ctx.scale(1-breath*.0025+kick*.012,1+breath*.005-kick*.014);
+ ctx.translate(-side/2,-baseline);
+ ctx.drawImage(sheet,0,0,meta.cell,meta.cell,ox,oy,meta.cell*scale,meta.cell*scale);
+ // The body's raster is always frame A. Only authored eye regions are switched.
+ if(index)for(const eye of meta.eyes)ctx.drawImage(sheet,index*meta.cell+eye.x,eye.y,eye.width,eye.height,ox+eye.x*scale,oy+eye.y*scale,eye.width*scale,eye.height*scale);
+}
+function draw(now){if(!ready)return;const t=((now-started)/1000)%10;phase=playing?blinkAt(t):0;const motion=playing&&!reduced;render(canvas,t,phase,motion);render(detail,t,phase,motion);pet.dataset.frame=String(phase);}
+function loop(now){raf=null;draw(now);if(playing&&!document.hidden)raf=requestAnimationFrame(loop);}
+function start(){if(raf!==null)cancelAnimationFrame(raf);raf=null;if(ready&&!document.hidden){draw(performance.now());if(playing)raf=requestAnimationFrame(loop);}}
+sheet.onload=()=>{if(sheet.naturalWidth!==2172||sheet.naturalHeight!==724){$('status').textContent='素材尺寸异常，样片暂不可播放。';throw new Error('Unexpected atlas dimensions');}ready=true;x=stage.clientWidth-148;y=stage.clientHeight-126;resize(80);$('status').textContent='10 秒循环 · 眨眼、呼吸、轻微侧身';start();};
+sheet.onerror=()=>{$('status').textContent='动作素材未能载入，请刷新预览。';};
+$('sizes').addEventListener('click',e=>{const b=e.target.closest('button[data-size]');if(!b)return;document.querySelectorAll('#sizes button').forEach(n=>n.classList.toggle('active',n===b));resize(Number(b.dataset.size));});
+$('themes').addEventListener('click',e=>{const b=e.target.closest('button[data-theme]');if(!b)return;document.querySelectorAll('#themes button').forEach(n=>n.classList.toggle('active',n===b));stage.classList.toggle('dark',b.dataset.theme==='dark');});
+$('animate').addEventListener('change',e=>{playing=e.target.checked;$('status').textContent=playing?'10 秒循环 · 眨眼、呼吸、轻微侧身':'静止对照 · 回到母版姿态';start();});
+$('reduce').addEventListener('change',e=>{reduced=e.target.checked;draw(performance.now());$('status').textContent=reduced?'已减少动态 · 保留缓慢眨眼':'10 秒循环 · 眨眼、呼吸、轻微侧身';});
+function replay(){started=performance.now();draw(started);if(!playing){playing=true;$('animate').checked=true;start();}$('status').textContent='已从第一帧重播';}
+$('replay').addEventListener('click',replay);pet.addEventListener('dblclick',replay);
+pet.addEventListener('pointerenter',()=>{hovered=true;draw(performance.now());});pet.addEventListener('pointerleave',()=>{hovered=false;draw(performance.now());});
+pet.addEventListener('pointerdown',e=>{if(e.button!==0)return;drag={id:e.pointerId,px:e.clientX,py:e.clientY,x,y,moved:false};pet.setPointerCapture(e.pointerId);});
+pet.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.px,dy=e.clientY-drag.py;if(Math.hypot(dx,dy)>3){drag.moved=true;userMoved=true;pet.classList.add('dragging');}x=drag.x+dx;y=drag.y+dy;clampPosition();});
+function endDrag(e){if(!drag)return;const moved=drag.moved;drag=null;pet.classList.remove('dragging');if(pet.hasPointerCapture(e.pointerId))pet.releasePointerCapture(e.pointerId);if(moved){dragKick=performance.now();$('status').textContent='位置已调整';}}
+pet.addEventListener('pointerup',endDrag);pet.addEventListener('pointercancel',endDrag);
+pet.addEventListener('keydown',e=>{const deltas={ArrowLeft:[-8,0],ArrowRight:[8,0],ArrowUp:[0,-8],ArrowDown:[0,8]};if(deltas[e.key]){e.preventDefault();userMoved=true;x+=deltas[e.key][0];y+=deltas[e.key][1];clampPosition();}if(e.key==='Enter'){e.preventDefault();replay();}});
+document.addEventListener('visibilitychange',start);new ResizeObserver(clampPosition).observe(stage);
+// Read-only review hooks: force a pose for reproducible visual comparisons.
+window.tomyPreview={getState:()=>({ready,playing,reduced,height,x,y,frame:phase,slot:pet.offsetWidth}),pose:(index)=>{playing=false;$('animate').checked=false;if(raf!==null)cancelAnimationFrame(raf);raf=null;phase=Math.max(0,Math.min(2,index));render(canvas,0,phase,false);render(detail,0,phase,false);pet.dataset.frame=String(phase);},replay};
+</script>
+</html>
