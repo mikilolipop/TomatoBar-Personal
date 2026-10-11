@@ -247,6 +247,24 @@ class MemoryStorage implements Storage {
   }
 }
 describe("Browser data protection", () => {
+  it("keeps restoration blocked when records remain corrupt after resetting settings", async () => {
+    const local = new MemoryStorage();
+    local.setItem(STORAGE_KEY, "broken");
+    local.setItem("TomatoBarPersonal_settings", "broken settings");
+    const c = new FocusController(
+      new FocusRepository(new BrowserStorageTransport(local)),
+    );
+    await c.initialize();
+    expect(await c.restoreDefaultSettings()).toBe(false);
+    expect(c.getSnapshot().ready).toBe(false);
+    expect(c.getSnapshot().error).not.toBeNull();
+    expect(local.getItem(STORAGE_KEY)).toBe("broken");
+    expect(await c.startWork()).toBe(false);
+    expect(await c.importJSON(encodeSessions(createDefaultFocusState()))).toBe(
+      true,
+    );
+    expect(c.getSnapshot().ready).toBe(true);
+  });
   it("restoring sessions preserves previously saved preferences after a corrupt read", async () => {
     const local = new MemoryStorage();
     local.setItem(STORAGE_KEY, "broken");

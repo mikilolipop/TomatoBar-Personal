@@ -260,7 +260,7 @@ export class FocusController {
       try {
         await this.repository.replaceSettings({ ...defaultSettings });
         await this.load();
-        return true;
+        return this.snapshot.ready;
       } catch (e) {
         this.publish({ error: `设置恢复失败：${errorMessage(e)}` });
         return false;
