@@ -4,7 +4,7 @@ import KeyboardShortcuts
 import UniformTypeIdentifiers
 
 struct MainWindowView: View {
-    @ObservedObject var timer: TBTimer
+    let timer: TBTimer
     @ObservedObject var history: FocusHistory
     @State private var period = FocusPeriod.day
     @State private var date = Date()
@@ -30,8 +30,8 @@ struct MainWindowView: View {
     @State private var inlineSubtaskTitles: [UUID: String] = [:]
     @State private var isLooseTodosCollapsed = false
     @State private var isArchivedCollapsed = true
-    private var summary: FocusSummary { FocusSummary(records: history.records, period: period, date: date) }
-    private var filtered: FocusSummary { FocusSummary(records: history.records, period: period, date: date, category: selectedCategory) }
+    private var summary: FocusSummary { history.summary(period: period, date: date) }
+    private var filtered: FocusSummary { history.summary(period: period, date: date, category: selectedCategory) }
     private var visibleRecords: [FocusRecord] {
         let records = historyTab ? history.records.sorted { $0.startedAt < $1.startedAt } : filtered.records
         return records.filter { record in
@@ -745,7 +745,7 @@ struct MainWindowView: View {
 
     @ViewBuilder
     private func todoRow(_ todo: FocusTodo, isSubtask: Bool = false) -> some View {
-        let isCurrent = (timer.state.currentTodoID == todo.id || timer.preparedTodoID == todo.id)
+        let isCurrent = timer.state.currentTodoID == todo.id
         TodoRowView(
             todo: todo,
             isSubtask: isSubtask,
@@ -923,31 +923,7 @@ struct TimerCard: View {
                                 Divider()
                                 if timer.state.pendingTodos.count > 1 {
                                     Text("切换到其他待办：")
-                                    let activeProjects = timer.state.projects.filter { !$0.isArchived }
-                                    let looseTodos = timer.state.pendingTodos.filter { $0.id != current.id && $0.projectID == nil }
-                                    ForEach(activeProjects) { proj in
-                                        let sub = timer.state.pendingTodos.filter { $0.id != current.id && $0.projectID == proj.id }
-                                        if !sub.isEmpty {
-                                            Section(proj.name) {
-                                                ForEach(sub) { todo in
-                                                    Button(todo.title) { timer.selectCurrentTodo(todo.id) }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    if !looseTodos.isEmpty {
-                                        if !activeProjects.isEmpty {
-                                            Section("独立待办") {
-                                                ForEach(looseTodos) { todo in
-                                                    Button(todo.title) { timer.selectCurrentTodo(todo.id) }
-                                                }
-                                            }
-                                        } else {
-                                            ForEach(looseTodos) { todo in
-                                                Button(todo.title) { timer.selectCurrentTodo(todo.id) }
-                                            }
-                                        }
-                                    }
+                                    FocusTaskMenuContent(timer: timer, excluding: current.id, showsPrompt: false)
                                 }
                             } label: {
                                 GardenActionIcon(name: "chevron.up.chevron.down", pointSize: 11, color: Garden.muted)
@@ -973,32 +949,7 @@ struct TimerCard: View {
 
                             if !timer.state.pendingTodos.isEmpty {
                                 Menu {
-                                    Text("选择已有待办专注：")
-                                    let activeProjects = timer.state.projects.filter { !$0.isArchived }
-                                    let looseTodos = timer.state.pendingTodos.filter { $0.projectID == nil }
-                                    ForEach(activeProjects) { proj in
-                                        let sub = timer.state.pendingTodos.filter { $0.projectID == proj.id }
-                                        if !sub.isEmpty {
-                                            Section(proj.name) {
-                                                ForEach(sub) { todo in
-                                                    Button(todo.title) { timer.selectCurrentTodo(todo.id) }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    if !looseTodos.isEmpty {
-                                        if !activeProjects.isEmpty {
-                                            Section("独立待办") {
-                                                ForEach(looseTodos) { todo in
-                                                    Button(todo.title) { timer.selectCurrentTodo(todo.id) }
-                                                }
-                                            }
-                                        } else {
-                                            ForEach(looseTodos) { todo in
-                                                Button(todo.title) { timer.selectCurrentTodo(todo.id) }
-                                            }
-                                        }
-                                    }
+                                    FocusTaskMenuContent(timer: timer)
                                 } label: {
                                     HStack(spacing: 3) {
                                         Image(systemName: "target")
@@ -1017,33 +968,7 @@ struct TimerCard: View {
                             }
 
                             Menu {
-                                if !timer.state.draftTags.isEmpty {
-                                    Button("清除标签") { timer.setDraftTags([]) }
-                                    Divider()
-                                }
-                                if !timer.state.knownTags.isEmpty {
-                                    Text("已有标签")
-                                    ForEach(timer.state.knownTags, id: \.self) { tag in
-                                        Button(tag) {
-                                            if timer.state.draftTags.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) {
-                                                timer.setDraftTags(timer.state.draftTags.filter { $0.caseInsensitiveCompare(tag) != .orderedSame })
-                                            } else {
-                                                timer.setDraftTags(timer.state.draftTags + [tag])
-                                            }
-                                        }
-                                    }
-                                    Divider()
-                                }
-                                Text("常用建议")
-                                ForEach(Garden.suggestedCategories, id: \.self) { tag in
-                                    Button(tag) {
-                                        if timer.state.draftTags.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) {
-                                            timer.setDraftTags(timer.state.draftTags.filter { $0.caseInsensitiveCompare(tag) != .orderedSame })
-                                        } else {
-                                            timer.setDraftTags(timer.state.draftTags + [tag])
-                                        }
-                                    }
-                                }
+                                FocusDraftTagMenuContent(timer: timer)
                             } label: {
                                 HStack(spacing: 3) {
                                     Image(systemName: "tag")
@@ -1383,16 +1308,8 @@ struct TodoRowView: View {
                             onStartCustomTag(todo.id)
                         }
                         Divider()
-                        if !timer.state.knownTags.isEmpty {
-                            Text("已有标签")
-                            ForEach(timer.state.knownTags, id: \.self) { tag in
-                                Button(tag) { timer.setTodoTags(id: todo.id, tags: [tag]) }
-                            }
-                            Divider()
-                        }
-                        Text("常用建议")
-                        ForEach(Garden.suggestedCategories, id: \.self) { tag in
-                            Button(tag) { timer.setTodoTags(id: todo.id, tags: [tag]) }
+                        FocusTagChoices(knownTags: timer.state.knownTags) { tag in
+                            timer.setTodoTags(id: todo.id, tags: [tag])
                         }
                     }
                     Menu("移至大任务") {

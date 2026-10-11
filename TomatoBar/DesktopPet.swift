@@ -429,6 +429,19 @@ struct DesktopPetView: View {
     @State private var isHovered = false
     @State private var frameIndex = 0
     @State private var animTimer: Foundation.Timer?
+    @State private var reduced: Bool
+    @State private var presented = false
+    @State private var dragging = false
+
+    init(timer: TBTimer, reducedMotion: Bool = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) {
+        self.timer = timer
+        _reduced = State(initialValue: reducedMotion)
+    }
+
+    private var canAnimate: Bool {
+        PetAnimationPolicy.allowsAnimation(enabled: animations && showDesktopPet, reduced: reduced,
+                                           presented: presented, dragging: dragging)
+    }
 
     private var petKind: PetKind {
         PetKind(rawValue: petKindRaw) ?? .tomy
@@ -494,13 +507,17 @@ struct DesktopPetView: View {
                         showContextMenu(with: event)
                     },
                     onDragEnded: {
+                        dragging = false
+                        updateAnimationTimer()
                         DesktopPetController.shared?.saveCurrentPosition()
                     },
                     onHoverStateChanged: { hovering in
-                        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                        withAnimation(canAnimate ? .spring(response: 0.25, dampingFraction: 0.8) : nil) {
                             isHovered = hovering
                         }
-                    }
+                    },
+                    onDragBegan: { dragging = true; updateAnimationTimer() },
+                    onPresentationChanged: { value in presented = value; updateAnimationTimer() }
                 )
                 .frame(width: spriteWidth + 20, height: spriteHeight + 20)
             }
@@ -511,47 +528,48 @@ struct DesktopPetView: View {
         }
         .frame(width: 220 * CGFloat(petScale), height: 250 * CGFloat(petScale))
         .onAppear {
+            presented = showDesktopPet
             updateAnimationTimer()
         }
         .onDisappear {
+            presented = false
             animTimer?.invalidate()
             animTimer = nil
         }
         .onChange(of: timer.state.phase) { _ in
-            updateAnimationTimer()
+            updateAnimationTimer(resetFrame: true)
         }
         .onChange(of: timer.state.paused) { _ in
-            updateAnimationTimer()
+            updateAnimationTimer(resetFrame: true)
         }
         .onChange(of: animations) { _ in
             updateAnimationTimer()
         }
-        .onChange(of: showDesktopPet) { isShowing in
-            if !isShowing {
-                animTimer?.invalidate()
-                animTimer = nil
-            } else {
-                updateAnimationTimer()
-            }
+        .onChange(of: showDesktopPet) { _ in
+            updateAnimationTimer()
         }
         .onChange(of: petKindRaw) { _ in
-            frameIndex = 0
+            updateAnimationTimer(resetFrame: true)
+        }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification)) { _ in
+            reduced = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
             updateAnimationTimer()
         }
     }
 
     // MARK: - Animation Driver
 
-    private func updateAnimationTimer() {
+    private func updateAnimationTimer(resetFrame: Bool = false) {
         animTimer?.invalidate()
         animTimer = nil
-        frameIndex = 0
+        if resetFrame { frameIndex = 0 }
 
-        guard animations, showDesktopPet else {
+        guard canAnimate else {
             return
         }
 
         if let strip = petKind.stripAnimation(for: timer.state.phase, paused: timer.state.paused) {
+            if strip.loopMode == .onceHold && frameIndex >= strip.frameCount - 1 { return }
             scheduleStripFrame(strip)
             return
         }
@@ -580,7 +598,7 @@ struct DesktopPetView: View {
     private func scheduleStripFrame(_ strip: PetStripAnimation) {
         let delay = strip.duration(at: frameIndex)
         animTimer = Foundation.Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { _ in
-            guard animations, showDesktopPet,
+            guard canAnimate,
                   let current = petKind.stripAnimation(for: timer.state.phase, paused: timer.state.paused),
                   current.assetName == strip.assetName else {
                 updateAnimationTimer()
@@ -603,7 +621,7 @@ struct DesktopPetView: View {
     }
 
     private var microYOffset: CGFloat {
-        guard animations else { return 0 }
+        guard canAnimate else { return 0 }
         if petKind == .tomy || petKind == .sprout { return 0 }
         if timer.state.needsAttention {
             return (frameIndex % 2 == 1) ? -6 : 0
@@ -612,7 +630,7 @@ struct DesktopPetView: View {
     }
 
     private var microScale: CGFloat {
-        guard animations else { return 1.0 }
+        guard canAnimate else { return 1.0 }
         if petKind == .tomy || petKind == .sprout { return 1.0 }
         if timer.state.needsAttention {
             return (frameIndex % 2 == 1) ? 1.06 : 1.0

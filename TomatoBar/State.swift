@@ -56,13 +56,34 @@ struct FocusRecord: Codable, Identifiable, Equatable {
 
     static func normalizedTags(_ tags: [String]) -> [String] {
         var result: [String] = []
+        var identities = Set<String>()
         for raw in tags {
             let tag = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !tag.isEmpty && !result.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) {
+            if !tag.isEmpty && identities.insert(tagIdentity(tag)).inserted {
                 result.append(tag)
             }
         }
         return result
+    }
+
+    /// Case folding preserves display spelling while giving tags, filters and totals
+    /// the same identity, including Unicode aliases such as Straße/STRASSE.
+    static func tagIdentity(_ tag: String) -> String {
+        tag.folding(options: .caseInsensitive, locale: nil)
+    }
+
+    static func sameTag(_ lhs: String, _ rhs: String) -> Bool {
+        tagIdentity(lhs) == tagIdentity(rhs)
+    }
+
+    static func togglingTag(_ tag: String, in tags: [String]) -> [String] {
+        let tag = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+        let tags = normalizedTags(tags)
+        guard !tag.isEmpty else { return tags }
+        if tags.contains(where: { sameTag($0, tag) }) {
+            return tags.filter { !sameTag($0, tag) }
+        }
+        return tags + [tag]
     }
 
     /// The statistics category *is* the first tag, so changing category means moving the
@@ -78,11 +99,11 @@ struct FocusRecord: Codable, Identifiable, Equatable {
         let primary = category.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalized = normalizedTags(tags)
         guard !primary.isEmpty else { return normalized }
-        return [primary] + normalized.filter { $0.caseInsensitiveCompare(primary) != .orderedSame }
+        return [primary] + normalized.filter { !sameTag($0, primary) }
     }
 
     func hasTag(_ tag: String) -> Bool {
-        tags.contains { $0.caseInsensitiveCompare(tag) == .orderedSame }
+        tags.contains { Self.sameTag($0, tag) }
     }
     var seconds: TimeInterval { segments.reduce(0) { $0 + $1.seconds } }
     func seconds(on day: Date, calendar: Calendar = .current) -> TimeInterval {
@@ -443,11 +464,17 @@ struct FocusState: Codable {
     func focusSeconds(forProject id: UUID) -> TimeInterval {
         let projectTodoIDs = Set(todos.filter { $0.projectID == id }.map(\.id))
         return records.reduce(0) { sum, record in
-            if record.projectID == id || (record.todoID != nil && projectTodoIDs.contains(record.todoID!)) {
-                return sum + record.seconds
-            }
-            return sum
+            // A saved project is historical ownership. Only legacy records without
+            // it follow the linked task, so moving a task cannot count time twice.
+            let belongs = record.projectID.map { $0 == id }
+                ?? record.todoID.map { projectTodoIDs.contains($0) } ?? false
+            return sum + (belongs ? record.seconds : 0)
         }
+    }
+
+    func displayName(for todo: FocusTodo) -> String {
+        guard let project = project(for: todo.projectID) else { return todo.title }
+        return "[\(project.name)] · \(todo.title)"
     }
 
     /// `categoryStyles` defaults to nil so callers that only rename or retag leave the
@@ -473,7 +500,7 @@ struct FocusState: Codable {
         }
         let known = allTags
         let canonicalTags = FocusRecord.normalizedTags(tags).map { tag in
-            known.first { $0.caseInsensitiveCompare(tag) == .orderedSame } ?? tag
+            known.first { FocusRecord.sameTag($0, tag) } ?? tag
         }
         records[index].name = trimmed
         records[index].tags = canonicalTags
@@ -483,7 +510,7 @@ struct FocusState: Codable {
         // disagree on Unicode pairs such as Straße/STRASSE (P12).
         if let styleChanges = styleChanges {
             for (key, value) in styleChanges {
-                let canonical = canonicalTags.first { $0.caseInsensitiveCompare(key) == .orderedSame } ?? key
+                let canonical = canonicalTags.first { FocusRecord.sameTag($0, key) } ?? key
                 let storageKey = canonical.lowercased()
                 if let value = value { categoryStyles[storageKey] = value }
                 else { categoryStyles.removeValue(forKey: storageKey) }
@@ -498,7 +525,7 @@ struct FocusState: Codable {
     /// the whole domain suite otherwise.
     func categoryFilterStillMatches(_ category: String, primaryOnly: Bool) -> Bool {
         if primaryOnly {
-            return records.contains { $0.category.caseInsensitiveCompare(category) == .orderedSame }
+            return records.contains { FocusRecord.sameTag($0.category, category) }
         }
         return records.contains { $0.hasTag(category) }
     }
@@ -509,7 +536,7 @@ struct FocusState: Codable {
     private static func styleValue(in styles: [String: String], forCategory category: String) -> String? {
         let key = category.lowercased()
         if let exact = styles[key] { return exact }
-        return styles.first { $0.key.caseInsensitiveCompare(key) == .orderedSame }?.value
+        return styles.first { FocusRecord.sameTag($0.key, key) }?.value
     }
 
     /// `categoryStyles` originally stored a bare SF Symbol name (for example `star`).
@@ -579,7 +606,7 @@ struct FocusState: Codable {
         }
         let known = allTags
         activeTags = FocusRecord.normalizedTags(tags ?? todoTags).map { tag in
-            known.first { $0.caseInsensitiveCompare(tag) == .orderedSame } ?? tag
+            known.first { FocusRecord.sameTag($0, tag) } ?? tag
         }
         phase = .work
         startedAt = now

@@ -1,5 +1,12 @@
 import Foundation
 
+enum PetAnimationPolicy {
+    static func allowsAnimation(enabled: Bool, reduced: Bool, presented: Bool = true,
+                                dragging: Bool = false) -> Bool {
+        enabled && !reduced && presented && !dragging
+    }
+}
+
 /// Presentation states preserve whether a pause happened during work or rest.
 enum PetMotionState: CaseIterable, Equatable {
     case idle, work, rest, workPaused, restPaused, workFinished, restFinished
@@ -133,7 +140,7 @@ struct PetMotionDriver {
         if self.state != state {
             if self.state.clip != state.clip {
                 sceneFrom = previous.scene; frameFrom = previous.frame; eyesFrom = previous.eyes
-                sceneTransitionAt = enabled && !reduced ? now : nil
+                sceneTransitionAt = PetAnimationPolicy.allowsAnimation(enabled: enabled, reduced: reduced, dragging: dragging) ? now : nil
                 clipTime = 0
             }
             if state.finishesOnce { clipTime = 0 }
@@ -142,14 +149,15 @@ struct PetMotionDriver {
         if self.dragging && !dragging { releaseAt = now }
         self.state = state; self.hovered = hovered; self.dragging = dragging
         self.enabled = enabled; self.reduced = reduced
-        clipStartedAt = state.playsClip && enabled && !reduced && !dragging ? now : nil
+        let animate = PetAnimationPolicy.allowsAnimation(enabled: enabled, reduced: reduced, dragging: dragging)
+        clipStartedAt = state.playsClip && animate ? now : nil
         transitionFrom = previous
-        transitionAt = enabled && !reduced && !dragging ? now : nil
+        transitionAt = animate ? now : nil
     }
 
     func pose(at now: Double) -> PetPose {
         let elapsed = max(0, now - enteredAt)
-        let dynamic = enabled && !reduced && !dragging
+        let dynamic = PetAnimationPolicy.allowsAnimation(enabled: enabled, reduced: reduced, dragging: dragging)
         var result = PetPose()
         switch state {
         case .idle:
@@ -192,7 +200,7 @@ struct PetMotionDriver {
     }
 
     func requiresTicks(at now: Double) -> Bool {
-        guard enabled && !reduced && !dragging else { return false }
+        guard PetAnimationPolicy.allowsAnimation(enabled: enabled, reduced: reduced, dragging: dragging) else { return false }
         if let start = transitionAt, now - start < Self.transitionDuration { return true }
         if let start = sceneTransitionAt, now - start < Self.transitionDuration { return true }
         if let release = releaseAt, now - release < 0.42 { return true }

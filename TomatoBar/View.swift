@@ -3,6 +3,70 @@ import KeyboardShortcuts
 import LaunchAtLogin
 import SwiftUI
 
+struct FocusTaskMenuContent: View {
+    @ObservedObject var timer: TBTimer
+    var excluding: UUID? = nil
+    var showsPrompt = true
+
+    var body: some View {
+        if showsPrompt { Text("选择已有待办专注：") }
+        let projects = timer.state.projects.filter { !$0.isArchived }
+        let todos = timer.state.pendingTodos.filter { $0.id != excluding }
+        ForEach(projects) { project in
+            let tasks = todos.filter { $0.projectID == project.id }
+            if !tasks.isEmpty {
+                Section(project.name) {
+                    ForEach(tasks) { todo in
+                        Button(todo.title) { timer.selectCurrentTodo(todo.id) }
+                    }
+                }
+            }
+        }
+        let loose = todos.filter { $0.projectID == nil }
+        if !loose.isEmpty {
+            if !projects.isEmpty {
+                Section("独立待办") {
+                    ForEach(loose) { todo in Button(todo.title) { timer.selectCurrentTodo(todo.id) } }
+                }
+            } else {
+                ForEach(loose) { todo in Button(todo.title) { timer.selectCurrentTodo(todo.id) } }
+            }
+        }
+    }
+}
+
+struct FocusTagChoices: View {
+    let knownTags: [String]
+    let onSelect: (String) -> Void
+
+    var body: some View {
+        if !knownTags.isEmpty {
+            Text("已有标签")
+            ForEach(knownTags, id: \.self) { tag in Button(tag) { onSelect(tag) } }
+            Divider()
+        }
+        Text("常用建议")
+        ForEach(Garden.suggestedCategories, id: \.self) { tag in Button(tag) { onSelect(tag) } }
+    }
+}
+
+struct FocusDraftTagMenuContent: View {
+    @ObservedObject var timer: TBTimer
+    var onCustomTag: (() -> Void)? = nil
+
+    var body: some View {
+        if !timer.state.draftTags.isEmpty {
+            Button("清除标签") { timer.setDraftTags([]) }
+            Divider()
+        }
+        if let onCustomTag = onCustomTag {
+            Button("+ 自定义新标签...", action: onCustomTag)
+            Divider()
+        }
+        FocusTagChoices(knownTags: timer.state.knownTags, onSelect: timer.toggleDraftTag)
+    }
+}
+
 extension KeyboardShortcuts.Name { static let startStopTimer = Self("startStopTimer") }
 
 struct GardenPrimaryButtonStyle: ButtonStyle {
@@ -366,31 +430,7 @@ struct TBPopoverView: View {
                         Divider()
                         if timer.state.pendingTodos.count > 1 {
                             Text("切换到其他待办：")
-                            let activeProjects = timer.state.projects.filter { !$0.isArchived }
-                            let looseTodos = timer.state.pendingTodos.filter { $0.id != current.id && $0.projectID == nil }
-                            ForEach(activeProjects) { proj in
-                                let sub = timer.state.pendingTodos.filter { $0.id != current.id && $0.projectID == proj.id }
-                                if !sub.isEmpty {
-                                    Section(proj.name) {
-                                        ForEach(sub) { todo in
-                                            Button(todo.title) { timer.selectCurrentTodo(todo.id) }
-                                        }
-                                    }
-                                }
-                            }
-                            if !looseTodos.isEmpty {
-                                if !activeProjects.isEmpty {
-                                    Section("独立待办") {
-                                        ForEach(looseTodos) { todo in
-                                            Button(todo.title) { timer.selectCurrentTodo(todo.id) }
-                                        }
-                                    }
-                                } else {
-                                    ForEach(looseTodos) { todo in
-                                        Button(todo.title) { timer.selectCurrentTodo(todo.id) }
-                                    }
-                                }
-                            }
+                            FocusTaskMenuContent(timer: timer, excluding: current.id, showsPrompt: false)
                             Divider()
                         }
                         Menu("设置任务标签") {
@@ -405,16 +445,8 @@ struct TBPopoverView: View {
                                 showingCustomTagAlert = true
                             }
                             Divider()
-                            if !timer.state.knownTags.isEmpty {
-                                Text("已有标签")
-                                ForEach(timer.state.knownTags, id: \.self) { tag in
-                                    Button(tag) { timer.setTodoTags(id: current.id, tags: [tag]) }
-                                }
-                                Divider()
-                            }
-                            Text("常用建议")
-                            ForEach(Garden.suggestedCategories, id: \.self) { tag in
-                                Button(tag) { timer.setTodoTags(id: current.id, tags: [tag]) }
+                            FocusTagChoices(knownTags: timer.state.knownTags) { tag in
+                                timer.setTodoTags(id: current.id, tags: [tag])
                             }
                         }
                     } label: {
@@ -465,32 +497,7 @@ struct TBPopoverView: View {
 
                         if !timer.state.pendingTodos.isEmpty {
                             Menu {
-                                Text("选择已有待办专注：")
-                                let activeProjects = timer.state.projects.filter { !$0.isArchived }
-                                let looseTodos = timer.state.pendingTodos.filter { $0.projectID == nil }
-                                ForEach(activeProjects) { proj in
-                                    let sub = timer.state.pendingTodos.filter { $0.projectID == proj.id }
-                                    if !sub.isEmpty {
-                                        Section(proj.name) {
-                                            ForEach(sub) { todo in
-                                                Button(todo.title) { timer.selectCurrentTodo(todo.id) }
-                                            }
-                                        }
-                                    }
-                                }
-                                if !looseTodos.isEmpty {
-                                    if !activeProjects.isEmpty {
-                                        Section("独立待办") {
-                                            ForEach(looseTodos) { todo in
-                                                Button(todo.title) { timer.selectCurrentTodo(todo.id) }
-                                            }
-                                        }
-                                    } else {
-                                        ForEach(looseTodos) { todo in
-                                            Button(todo.title) { timer.selectCurrentTodo(todo.id) }
-                                        }
-                                    }
-                                }
+                                FocusTaskMenuContent(timer: timer)
                             } label: {
                                 HStack(spacing: 3) {
                                     Image(systemName: "target")
@@ -518,40 +525,12 @@ struct TBPopoverView: View {
 
                     HStack(spacing: 6) {
                         Menu {
-                            if !timer.state.draftTags.isEmpty {
-                                Button("清除标签") { timer.setDraftTags([]) }
-                                Divider()
-                            }
-                            Button("+ 自定义新标签...") {
+                            FocusDraftTagMenuContent(timer: timer, onCustomTag: {
                                 isCustomTagForDraft = true
                                 customTagTargetTodoID = nil
                                 customTagInput = ""
                                 showingCustomTagAlert = true
-                            }
-                            Divider()
-                            if !timer.state.knownTags.isEmpty {
-                                Text("已有标签")
-                                ForEach(timer.state.knownTags, id: \.self) { tag in
-                                    Button(tag) {
-                                        if timer.state.draftTags.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) {
-                                            timer.setDraftTags(timer.state.draftTags.filter { $0.caseInsensitiveCompare(tag) != .orderedSame })
-                                        } else {
-                                            timer.setDraftTags(timer.state.draftTags + [tag])
-                                        }
-                                    }
-                                }
-                                Divider()
-                            }
-                            Text("常用建议")
-                            ForEach(Garden.suggestedCategories, id: \.self) { tag in
-                                Button(tag) {
-                                    if timer.state.draftTags.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) {
-                                        timer.setDraftTags(timer.state.draftTags.filter { $0.caseInsensitiveCompare(tag) != .orderedSame })
-                                    } else {
-                                        timer.setDraftTags(timer.state.draftTags + [tag])
-                                    }
-                                }
-                            }
+                            })
                         } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "tag")
@@ -606,7 +585,7 @@ struct TBPopoverView: View {
                     .padding(.vertical, 2)
             } else {
                 ForEach(Array(timer.state.pendingTodos.prefix(3))) { todo in
-                    let isCurrent = (timer.state.currentTodoID == todo.id || timer.preparedTodoID == todo.id)
+                    let isCurrent = timer.state.currentTodoID == todo.id
                     HStack(spacing: 7) {
                         Button { timer.toggleTodo(id: todo.id) } label: {
                             GardenActionIcon(name: "circle", pointSize: 14)
@@ -660,16 +639,8 @@ struct TBPopoverView: View {
                                     showingCustomTagAlert = true
                                 }
                                 Divider()
-                                if !timer.state.knownTags.isEmpty {
-                                    Text("已有标签")
-                                    ForEach(timer.state.knownTags, id: \.self) { tag in
-                                        Button(tag) { timer.setTodoTags(id: todo.id, tags: [tag]) }
-                                    }
-                                    Divider()
-                                }
-                                Text("常用建议")
-                                ForEach(Garden.suggestedCategories, id: \.self) { tag in
-                                    Button(tag) { timer.setTodoTags(id: todo.id, tags: [tag]) }
+                                FocusTagChoices(knownTags: timer.state.knownTags) { tag in
+                                    timer.setTodoTags(id: todo.id, tags: [tag])
                                 }
                             }
                             Divider()

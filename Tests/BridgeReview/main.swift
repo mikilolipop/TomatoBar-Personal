@@ -42,7 +42,7 @@ let store = FocusStore(url: scratch.appendingPathComponent("success/sessions.jso
 try store.save(initial)
 let timer = TBTimer(store: store)
 var historyEvents = 0
-let observation = timer.history.$records.dropFirst().sink { _ in historyEvents += 1 }
+let observation = timer.history.objectWillChange.sink { historyEvents += 1 }
 check(timer.editRecord(id: a.id, name: a.name, tags: ["swift"], styleChanges: ["swift": "star"]) == nil, "actual bridge style edit succeeds")
 check(timer.categorySymbol("SWIFT") == "star", "actual bridge resolves ASCII override")
 check(historyEvents == 1, "style-only edit publishes history even with unchanged records")
@@ -478,6 +478,79 @@ petAnimator.configure(state: .workFinished, hovered: false, dragging: false, ena
 drainPetEvents(2.3)
 check(!petAnimator.isTicking, "completed celebration releases the real frame timer")
 petAnimator.stop()
+
+// Main-window summaries reuse a bounded snapshot, but edits with unchanged record
+// count invalidate it. Task/style updates refresh the parent independently of ticks.
+let snapshotStore = FocusStore(url: scratch.appendingPathComponent("snapshot/sessions.json"))
+var snapshotSeed = FocusState()
+let snapshotDate = Date()
+let snapshotRecord = FocusRecord(id: UUID(), name: "QA SNAPSHOT", startedAt: snapshotDate,
+    endedAt: snapshotDate.addingTimeInterval(60), plannedSeconds: 60, completed: true,
+    segments: [FocusSegment(start: snapshotDate, end: snapshotDate.addingTimeInterval(60))], tags: ["Straße"])
+snapshotSeed.records = [snapshotRecord]
+try snapshotStore.save(snapshotSeed)
+let snapshotTimer = TBTimer(store: snapshotStore)
+let snapshots = snapshotTimer.history
+check(Garden.symbol("Straße") == Garden.symbol("STRASSE"),
+      "equivalent Unicode categories share the automatic chart symbol")
+check(Garden.color("Straße") == Garden.color("STRASSE"),
+      "equivalent Unicode categories share the automatic chart color")
+_ = snapshots.summary(period: .day, date: snapshotDate)
+_ = snapshots.summary(period: .day, date: snapshotDate)
+check(snapshots.summaryBuildCount == 1, "repeated overview reads reuse one summary")
+_ = snapshots.summary(period: .day, date: snapshotDate, category: "Straße")
+_ = snapshots.summary(period: .day, date: snapshotDate, category: "STRASSE")
+check(snapshots.summaryBuildCount == 2, "equivalent category filters reuse the selected summary")
+check(snapshotTimer.editRecord(id: snapshotRecord.id, name: snapshotRecord.name, tags: ["数学"]) == nil,
+      "snapshot fixture commits a same-count category edit")
+check(snapshots.summary(period: .day, date: snapshotDate).categories.first?.name == "数学" && snapshots.summaryBuildCount == 3,
+      "same-count edits invalidate cached category totals")
+let buildsBeforeStyle = snapshots.summaryBuildCount
+check(snapshotTimer.editRecord(id: snapshotRecord.id, name: snapshotRecord.name, tags: ["数学"], styleChanges: ["数学": "star"]) == nil,
+      "snapshot fixture commits a style-only edit")
+_ = snapshots.summary(period: .day, date: snapshotDate)
+check(snapshots.summaryBuildCount == buildsBeforeStyle && snapshotTimer.categorySymbol("数学") == "star",
+      "style-only edits keep valid totals while updating display styles")
+var workspaceChanges = 0
+let workspaceObservation = snapshots.objectWillChange.sink { workspaceChanges += 1 }
+snapshotTimer.addProject(name: "QA PROJECT")
+let snapshotProject = snapshotTimer.state.projects.last!.id
+snapshotTimer.addTodo("QA TASK", projectID: snapshotProject)
+let snapshotTask = snapshotTimer.state.todos.last!.id
+snapshotTimer.selectCurrentTodo(snapshotTask)
+check(workspaceChanges == 3 && snapshotTimer.eventName == "[QA PROJECT] · QA TASK",
+      "project, task and selection mutations refresh the slow parent and format its title")
+snapshotTimer.renameProject(id: snapshotProject, name: "QA RENAMED")
+check(snapshotTimer.eventName == "[QA RENAMED] · QA TASK", "project rename refreshes the selected task title")
+snapshotTimer.startWork()
+workspaceChanges = 0
+var clockChanges = 0
+let clockObservation = snapshotTimer.objectWillChange.sink { clockChanges += 1 }
+drainPetEvents(2.2)
+check(clockChanges >= 2 && workspaceChanges == 0,
+      "running seconds publish to the timer without invalidating main-window history/context")
+snapshotTimer.cancel()
+snapshotTimer.toggleTodo(id: snapshotTask)
+check(snapshotTimer.state.currentTodoID == nil, "completing the selected task clears the unified current selection")
+snapshotTimer.deleteTodo(id: snapshotTask)
+check(snapshotTimer.state.todos.isEmpty, "deleting the task leaves no prepared-selection path")
+withExtendedLifetime((workspaceObservation, clockObservation)) {}
+
+let calendarHistory = FocusHistory()
+var calendarChanges = 0
+let calendarObservation = calendarHistory.objectWillChange.sink { calendarChanges += 1 }
+var reviewCalendar = Calendar(identifier: .gregorian)
+reviewCalendar.timeZone = TimeZone(secondsFromGMT: 0)!
+calendarHistory.updateCalendar(at: now, calendar: reviewCalendar)
+calendarChanges = 0
+calendarHistory.updateCalendar(at: now.addingTimeInterval(1), calendar: reviewCalendar)
+check(calendarChanges == 0, "same-day seconds do not refresh the statistics parent")
+calendarHistory.updateCalendar(at: now.addingTimeInterval(86_400), calendar: reviewCalendar)
+check(calendarChanges == 1, "day rollover refreshes date headings even with unchanged records")
+reviewCalendar.timeZone = TimeZone(secondsFromGMT: 8 * 3600)!
+calendarHistory.updateCalendar(at: now.addingTimeInterval(86_400), calendar: reviewCalendar)
+check(calendarChanges == 2, "calendar/time-zone changes refresh the parent independently of records")
+withExtendedLifetime(calendarObservation) {}
 
 print("PASS: \(checks) actual TBTimer bridge checks; isolated QA13 IO, no UI interaction")
 withExtendedLifetime(observation) {}

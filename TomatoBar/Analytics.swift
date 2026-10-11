@@ -26,7 +26,7 @@ extension FocusRecord {
 struct CategoryTotal: Identifiable {
     let name: String
     let seconds: TimeInterval
-    var id: String { name.lowercased() }
+    var id: String { FocusRecord.tagIdentity(name) }
 }
 
 struct FocusDay: Identifiable {
@@ -46,9 +46,10 @@ struct FocusSummary {
     init(records: [FocusRecord], period: FocusPeriod, date: Date, category: String? = nil,
          calendar: Calendar = .current) {
         let interval = period.interval(containing: date, calendar: calendar)
+        let categoryIdentity = category.map(FocusRecord.tagIdentity)
         self.interval = interval
         self.records = records.filter {
-            (category == nil || $0.category.caseInsensitiveCompare(category!) == .orderedSame)
+            (categoryIdentity == nil || FocusRecord.tagIdentity($0.category) == categoryIdentity)
             && $0.seconds(in: interval) > 0
         }.sorted { $0.startedAt < $1.startedAt }
         categories = Self.totals(records: self.records, interval: interval)
@@ -68,7 +69,7 @@ struct FocusSummary {
         for record in records {
             let seconds = record.seconds(in: interval)
             guard seconds > 0 else { continue }
-            let key = record.category.lowercased()
+            let key = FocusRecord.tagIdentity(record.category)
             let current = values[key] ?? (record.category, 0)
             values[key] = (current.name, current.seconds + seconds)
         }

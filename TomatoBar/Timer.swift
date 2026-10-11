@@ -2,7 +2,62 @@ import KeyboardShortcuts
 import SwiftUI
 
 final class FocusHistory: ObservableObject {
-    @Published var records: [FocusRecord] = []
+    @Published var records: [FocusRecord] = [] {
+        didSet { if records != oldValue { summaries.removeAll(keepingCapacity: true) } }
+    }
+    // The main window needs task/style changes, but never the ticking deadline.
+    private struct Context: Equatable {
+        var todos: [FocusTodo] = []
+        var projects: [FocusProject] = []
+        var currentTodoID: UUID?
+        var draftTags: [String] = []
+        var styles: [String: String] = [:]
+    }
+    @Published private var context = Context()
+    private struct CalendarContext: Equatable {
+        let day: Date
+        let calendar: Calendar
+        init(at date: Date, calendar: Calendar) {
+            day = calendar.startOfDay(for: date)
+            self.calendar = calendar
+        }
+    }
+    @Published private var calendarContext = CalendarContext(at: Date(), calendar: .current)
+    private struct SummaryKey: Hashable {
+        let period: String
+        let interval: DateInterval
+        let category: String?
+        let calendar: Calendar
+    }
+    private var summaries: [SummaryKey: FocusSummary] = [:]
+    private(set) var summaryBuildCount = 0
+
+    func update(from state: FocusState) {
+        if records != state.records { records = state.records }
+        let next = Context(todos: state.todos, projects: state.projects,
+                           currentTodoID: state.currentTodoID, draftTags: state.draftTags,
+                           styles: state.categoryStyles)
+        if context != next { context = next }
+    }
+
+    func updateCalendar(at date: Date, calendar: Calendar = .current) {
+        let next = CalendarContext(at: date, calendar: calendar)
+        if next != calendarContext { calendarContext = next }
+    }
+
+    func summary(period: FocusPeriod, date: Date, category: String? = nil,
+                 calendar: Calendar = .current) -> FocusSummary {
+        let key = SummaryKey(period: period.rawValue, interval: period.interval(containing: date, calendar: calendar),
+                             category: category.map(FocusRecord.tagIdentity), calendar: calendar)
+        if let cached = summaries[key] { return cached }
+        // The overview only needs its full and selected-category summaries. Keep
+        // navigation bounded, and invalidate on content changes rather than count.
+        if summaries.count >= 2 { summaries.removeAll(keepingCapacity: true) }
+        let result = FocusSummary(records: records, period: period, date: date, category: category, calendar: calendar)
+        summaries[key] = result
+        summaryBuildCount += 1
+        return result
+    }
 }
 
 final class WindowActivity: ObservableObject {
@@ -23,9 +78,6 @@ final class TBTimer: ObservableObject {
     @Published private(set) var state = FocusState()
     @Published private(set) var now = Date()
     @Published private(set) var storageError: String?
-    /// A task chosen as the next focus target. It is copied into FocusState.activeTodoID
-    /// when a work session begins, then cleared so later manual entries never inherit it.
-    @Published private(set) var preparedTodoID: UUID?
     private let store: FocusStore
     private var ticker: Foundation.Timer?
     private var lastSave = Date.distantPast
@@ -48,9 +100,9 @@ final class TBTimer: ObservableObject {
             loadFailed = true
             storageError = "无法读取专注记录，已保留原文件未覆盖。可打开记录文件夹检查，修复后点「重新读取」。"
         }
-        history.records = state.records
+        history.update(from: state)
         if let current = state.currentTodo, eventName.isEmpty {
-            eventName = current.title
+            eventName = state.displayName(for: current)
         }
         sanitizeSettings()
         KeyboardShortcuts.onKeyUp(for: .startStopTimer) { [weak self] in
@@ -60,6 +112,8 @@ final class TBTimer: ObservableObject {
             self?.tick()
         }
     }
+
+    deinit { ticker?.invalidate() }
 
     private static func clamped(_ value: Int, to range: ClosedRange<Int>) -> Int {
         min(max(value, range.lowerBound), range.upperBound)
@@ -98,10 +152,6 @@ final class TBTimer: ObservableObject {
 
     func setEventName(_ value: String) {
         eventName = value
-        if let id = preparedTodoID,
-           state.todos.first(where: { $0.id == id })?.title != value {
-            preparedTodoID = nil
-        }
         if let id = state.currentTodoID,
            state.todos.first(where: { $0.id == id })?.title != value {
             change { state, _ in
@@ -125,18 +175,9 @@ final class TBTimer: ObservableObject {
         change { state, _ in
             state.selectCurrentTodo(id)
             if let id = id, let todo = state.todos.first(where: { $0.id == id }) {
-                if let pid = todo.projectID, let proj = state.project(for: pid) {
-                    self.eventName = "[\(proj.name)] · \(todo.title)"
-                } else {
-                    self.eventName = todo.title
-                }
+                self.eventName = state.displayName(for: todo)
             }
         }
-    }
-
-    func prepareTodo(_ todo: FocusTodo) {
-        preparedTodoID = todo.id
-        selectCurrentTodo(todo.id)
     }
 
     func addTodo(_ title: String, tags: [String] = [], projectID: UUID? = nil) {
@@ -153,9 +194,8 @@ final class TBTimer: ObservableObject {
         guard storageError == nil else { return }
         change { state, _ in
             state.updateProject(id: id, name: name, tags: tags, color: color)
-            let activeID = self.preparedTodoID ?? state.currentTodoID
-            if let tid = activeID, let todo = state.todos.first(where: { $0.id == tid }), todo.projectID == id {
-                self.eventName = "[\(name.trimmingCharacters(in: .whitespacesAndNewlines))] · \(todo.title)"
+            if let todo = state.currentTodo, todo.projectID == id {
+                self.eventName = state.displayName(for: todo)
             }
         }
     }
@@ -168,9 +208,8 @@ final class TBTimer: ObservableObject {
         guard storageError == nil else { return }
         change { state, _ in
             state.deleteProject(id: id)
-            let activeID = self.preparedTodoID ?? state.currentTodoID
-            if let tid = activeID, let todo = state.todos.first(where: { $0.id == tid }), todo.projectID == nil {
-                self.eventName = todo.title
+            if let todo = state.currentTodo {
+                self.eventName = state.displayName(for: todo)
             }
         }
     }
@@ -184,13 +223,8 @@ final class TBTimer: ObservableObject {
         guard storageError == nil else { return }
         change { state, _ in
             state.setTodoProject(todoID: todoID, projectID: projectID)
-            let activeID = self.preparedTodoID ?? state.currentTodoID
-            if activeID == todoID, let todo = state.todos.first(where: { $0.id == todoID }) {
-                if let pid = todo.projectID, let proj = state.project(for: pid) {
-                    self.eventName = "[\(proj.name)] · \(todo.title)"
-                } else {
-                    self.eventName = todo.title
-                }
+            if let todo = state.currentTodo, todo.id == todoID {
+                self.eventName = state.displayName(for: todo)
             }
         }
     }
@@ -205,32 +239,27 @@ final class TBTimer: ObservableObject {
         change { state, _ in state.setDraftTags(tags) }
     }
 
+    func toggleDraftTag(_ tag: String) {
+        setDraftTags(FocusRecord.togglingTag(tag, in: state.draftTags))
+    }
+
     func renameTodo(id: UUID, title: String) {
         guard storageError == nil else { return }
         change { state, _ in state.renameTodo(id: id, title: title) }
-        if (preparedTodoID == id || state.seriesTodoID == id || state.currentTodoID == id),
+        if (state.seriesTodoID == id || state.currentTodoID == id),
            let todo = state.todos.first(where: { $0.id == id }) {
-            if let pid = todo.projectID, let proj = state.project(for: pid) {
-                eventName = "[\(proj.name)] · \(todo.title)"
-            } else {
-                eventName = todo.title
-            }
+            eventName = state.displayName(for: todo)
         }
     }
 
     func toggleTodo(id: UUID) {
         guard storageError == nil else { return }
         change { state, date in state.toggleTodo(id: id, at: date) }
-        if preparedTodoID == id,
-           state.todos.first(where: { $0.id == id })?.isCompleted == true {
-            preparedTodoID = nil
-        }
     }
 
     func deleteTodo(id: UUID) {
         guard storageError == nil else { return }
         change { state, _ in state.deleteTodo(id: id) }
-        if preparedTodoID == id { preparedTodoID = nil }
     }
 
     func moveTodo(id: UUID, before targetID: UUID?) {
@@ -245,13 +274,11 @@ final class TBTimer: ObservableObject {
     }
     func startWork() {
         guard storageError == nil else { return }
-        let todoID = preparedTodoID ?? state.currentTodoID
-        let previousPhase = state.phase
+        let todoID = state.currentTodoID
         let minutes = Self.clamped(workIntervalLength, to: 1...180)
         let tags: [String]? = (todoID != nil) ? nil : state.draftTags
         change { $0.startWork(name: eventName, seconds: Double(minutes * 60),
                               todoID: todoID, tags: tags, at: $1) }
-        if state.phase == .work && previousPhase != .work { preparedTodoID = nil }
     }
     func startRest() {
         // Same storageError gate as startWork: if the just-completed focus is still only
@@ -302,7 +329,7 @@ final class TBTimer: ObservableObject {
             updated.checkpoint = Date()
             try store.save(updated)
             state = updated
-            history.records = updated.records
+            history.update(from: updated)
             lastSave = updated.checkpoint
             lastFailedSave = .distantPast
             storageError = nil
@@ -329,7 +356,7 @@ final class TBTimer: ObservableObject {
             updated.checkpoint = Date()
             try store.save(updated)
             state = updated
-            history.records = updated.records
+            history.update(from: updated)
             lastSave = updated.checkpoint
             lastFailedSave = .distantPast
             storageError = nil
@@ -365,10 +392,7 @@ final class TBTimer: ObservableObject {
             var loaded = try store.load()
             loaded.recover()
             state = loaded
-            history.records = loaded.records
-            if let id = preparedTodoID, !loaded.todos.contains(where: { $0.id == id }) {
-                preparedTodoID = nil
-            }
+            history.update(from: loaded)
             loadFailed = false
             storageError = nil
             lastSave = Date()
@@ -399,6 +423,7 @@ final class TBTimer: ObservableObject {
     }
     private func tick() {
         let freshNow = Date()
+        history.updateCalendar(at: freshNow)
         // Keep the timer object cheap while idle/paused. We still wake once per second,
         // but publish no SwiftUI change unless the calendar day rolls over.
         guard state.isTiming && !state.paused else {
@@ -419,7 +444,7 @@ final class TBTimer: ObservableObject {
 
     private func persist() {
         guard !loadFailed else { return }
-        if history.records != state.records { history.records = state.records }
+        history.update(from: state)
         state.checkpoint = now
         do { try store.save(state); storageError = nil; lastSave = now; lastFailedSave = .distantPast }
         catch { storageError = "记录保存失败，请检查磁盘空间。当前记录仍保留在内存中。"; lastFailedSave = now }

@@ -50,10 +50,10 @@ enum Garden {
     /// reordering or inserting an entry would silently recolour records the user has
     /// already tagged. Append new suggestions at the end only.
     static let suggestedCategories = ["材料力学", "建模", "英语", "编程", "阅读", "数学", "写作"]
-    /// FNV-1a over the lowercased name, shared by color() and symbol() so a category's
+    /// FNV-1a over the folded tag identity, shared by color() and symbol() so a category's
     /// colour and fallback glyph are both stable for a given name.
     private static func hashOf(_ name: String) -> UInt64 {
-        name.lowercased().utf8.reduce(UInt64(14695981039346656037)) { ($0 ^ UInt64($1)) &* 1099511628211 }
+        FocusRecord.tagIdentity(name).utf8.reduce(UInt64(14695981039346656037)) { ($0 ^ UInt64($1)) &* 1099511628211 }
     }
     /// Glyphs for categories outside the named set. Hashing means different custom
     /// categories look different; before this, every one of them collapsed onto a single

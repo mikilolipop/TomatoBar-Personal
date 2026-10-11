@@ -905,3 +905,55 @@ check(legacyDecodedState.projects.isEmpty && legacyDecodedState.todos.first?.pro
       "pre-projects sessions.json decodes with empty projects and nil subtask projectID")
 
 print("PASS: \(checks) total checks including project hierarchy, tag inheritance, subtask aggregation and legacy compatibility")
+
+// A task can move, but a record with historical project ownership must not move
+// with it or be counted in both projects. Legacy records still follow the task.
+var moved = FocusState()
+let originalProject = moved.addProject(name: "QA PROJECT A", at: base)!
+let destinationProject = moved.addProject(name: "QA PROJECT B", at: base)!
+let movedTask = moved.addTodo(title: "QA TASK", projectID: originalProject, at: base)!
+moved.startWork(name: "QA FOCUS", seconds: 60, todoID: movedTask, at: base)
+moved.tick(at: base.addingTimeInterval(60))
+moved.setTodoProject(todoID: movedTask, projectID: destinationProject)
+check(moved.focusSeconds(forProject: originalProject) == 60 && moved.focusSeconds(forProject: destinationProject) == 0,
+      "moving a task preserves historical ownership without double counting")
+moved.setTodoProject(todoID: movedTask, projectID: nil)
+check(moved.focusSeconds(forProject: originalProject) == 60 && moved.focusSeconds(forProject: destinationProject) == 0,
+      "detaching a task does not erase recorded project time")
+moved.setTodoProject(todoID: movedTask, projectID: destinationProject)
+let legacyProjectRecord = FocusRecord(id: UUID(), name: "QA LEGACY", startedAt: base, endedAt: base.addingTimeInterval(45),
+    plannedSeconds: 45, completed: true, segments: [FocusSegment(start: base, end: base.addingTimeInterval(45))],
+    todoID: movedTask)
+moved.records.append(legacyProjectRecord)
+let movedRoundTrip = try JSONDecoder().decode(FocusState.self, from: JSONEncoder().encode(moved))
+check(movedRoundTrip.focusSeconds(forProject: originalProject) == 60 && movedRoundTrip.focusSeconds(forProject: destinationProject) == 45,
+      "legacy records fall back to current task ownership after JSON round trip")
+moved.deleteTodo(id: movedTask)
+check(moved.focusSeconds(forProject: originalProject) == 60,
+      "deleting a task preserves its recorded project ownership")
+
+// Old/file-exchanged records can contain equivalent primary tags even though
+// new work already reuses canonical spelling. Every period and day must agree.
+let aliasStart = day(2026, 10, 11, 9)
+for (canonical, alias) in [("Straße", "STRASSE"), ("ΟΣ", "ος"), ("École", "e\u{301}COLE")] {
+    let aliasRecords = [statsRecord(aliasStart, aliasStart.addingTimeInterval(60), tags: [canonical]),
+                        statsRecord(aliasStart.addingTimeInterval(120), aliasStart.addingTimeInterval(240), tags: [alias])]
+    var aliasState = FocusState()
+    aliasState.records = try JSONDecoder().decode([FocusRecord].self, from: JSONEncoder().encode(aliasRecords))
+    check(aliasState.allCategories.count == 1, "equivalent Unicode categories are deduplicated: \(canonical)")
+    for period in FocusPeriod.allCases {
+        let all = FocusSummary(records: aliasState.records, period: period, date: aliasStart)
+        let selected = FocusSummary(records: aliasState.records, period: period, date: aliasStart, category: alias)
+        check(all.categories.count == 1 && all.categories[0].seconds == 180 && selected.seconds == 180,
+              "Unicode aggregation and filtering agree: \(canonical) \(period)")
+        check(all.days.reduce(0) { $0 + $1.seconds } == 180 && all.days.flatMap(\.categories).count == 1,
+              "daily breakdown does not fork Unicode categories: \(canonical) \(period)")
+    }
+}
+check(!FocusRecord.sameTag("İ", "i") && !FocusRecord.sameTag("Ａ", "A"),
+      "category identity preserves distinct diacritics and character widths")
+check(FocusRecord.togglingTag("STRASSE", in: ["Straße", "阅读"]) == ["阅读"],
+      "tag toggle removes an equivalent Unicode alias while keeping other tags")
+check(FocusRecord.togglingTag("  学习  ", in: ["阅读"]) == ["阅读", "学习"],
+      "tag toggle trims a new selection and keeps the primary tag order")
+print("PASS: \(checks) total checks including project moves and Unicode category identity")
