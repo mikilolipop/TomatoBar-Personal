@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import type { FocusState, PetKind } from '../types';
-import { DesktopPet } from './DesktopPet';
-import { X, Play, Pause, Square, FastForward } from 'lucide-react';
+import React, { useState } from "react";
+import type { FocusState, PetKind } from "../types";
+import { Modal } from "./Modal";
+import { DesktopPet } from "./DesktopPet";
+import { X, Play, Pause, Square, FastForward } from "lucide-react";
 
 interface ExpandedTimerModalProps {
   state: FocusState;
@@ -13,6 +14,9 @@ interface ExpandedTimerModalProps {
   onStartRest: (durationSec?: number) => void;
   onSkipRest: () => void;
   onClose: () => void;
+  onCancel: () => void;
+  restMinutes: number;
+  busy: boolean;
 }
 
 export const ExpandedTimerModal: React.FC<ExpandedTimerModalProps> = ({
@@ -25,12 +29,18 @@ export const ExpandedTimerModal: React.FC<ExpandedTimerModalProps> = ({
   onStartRest,
   onSkipRest,
   onClose,
+  onCancel,
+  restMinutes,
+  busy,
 }) => {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
-  const { phase, paused, remaining, name, currentTodoID, todos, projects } = state;
+  const { phase, paused, remaining, name, currentTodoID, todos, projects } =
+    state;
 
-  const currentTodo = todos.find((t) => t.id === currentTodoID);
+  const currentTodo = todos.find(
+    (t) => t.id === (phase === "work" ? state.activeTodoID : currentTodoID),
+  );
   const currentProject = currentTodo?.projectID
     ? projects.find((p) => p.id === currentTodo.projectID)
     : null;
@@ -38,31 +48,35 @@ export const ExpandedTimerModal: React.FC<ExpandedTimerModalProps> = ({
   const formatTime = (seconds: number) => {
     const mins = Math.floor(Math.max(0, seconds) / 60);
     const secs = Math.floor(Math.max(0, seconds) % 60);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
   const getPhaseLabel = () => {
-    if (paused) return '已暂停';
+    if (paused) return "已暂停";
     switch (phase) {
-      case 'work':
-        return '专注中';
-      case 'rest':
-        return '休息中';
-      case 'workFinished':
-        return '专注达成';
-      case 'restFinished':
-        return '休息完毕';
+      case "work":
+        return "专注中";
+      case "rest":
+        return "休息中";
+      case "workFinished":
+        return "专注达成";
+      case "restFinished":
+        return "休息完毕";
       default:
-        return '准备就绪';
+        return "准备就绪";
     }
   };
 
   return (
-    <div className="garden-modal-overlay">
+    <Modal title="专注计时器" onClose={onClose}>
       <div className="expanded-timer-card">
         {/* Top Header */}
         <div className="expanded-timer-top">
-          <button className="expanded-close-btn" onClick={onClose} title="收起计时器">
+          <button
+            className="expanded-close-btn"
+            onClick={onClose}
+            title="收起计时器"
+          >
             <X size={16} /> 收起
           </button>
         </div>
@@ -86,7 +100,9 @@ export const ExpandedTimerModal: React.FC<ExpandedTimerModalProps> = ({
           {currentTodo ? (
             <div className="expanded-todo-badge">
               <span className="target-icon">🎯</span>
-              {currentProject && <span className="proj-name">[{currentProject.name}] · </span>}
+              {currentProject && (
+                <span className="proj-name">[{currentProject.name}] · </span>
+              )}
               <span className="task-title">{currentTodo.title}</span>
               {currentTodo.tags.length > 0 && (
                 <span className="tag-group">
@@ -99,26 +115,28 @@ export const ExpandedTimerModal: React.FC<ExpandedTimerModalProps> = ({
               )}
             </div>
           ) : (
-            <div className="expanded-task-text">{name || '自由专注'}</div>
+            <div className="expanded-task-text">{name || "自由专注"}</div>
           )}
         </div>
 
         {/* Giant Countdown Digits (Garden Red) */}
         <div className="expanded-digits-wrapper">
           <div className="expanded-digits">
-            {phase === 'workFinished' || phase === 'restFinished' ? '完成' : formatTime(remaining)}
+            {phase === "workFinished" || phase === "restFinished"
+              ? "完成"
+              : formatTime(remaining)}
           </div>
         </div>
 
         {/* Main Action Buttons */}
-        <div className="expanded-actions-container">
-          {phase === 'idle' && (
+        <fieldset className="expanded-actions-container" disabled={busy}>
+          {phase === "idle" && (
             <button className="garden-btn-primary" onClick={onStartWork}>
               <Play size={16} fill="currentColor" /> 开始专注
             </button>
           )}
 
-          {phase === 'work' && (
+          {phase === "work" && (
             <div className="expanded-btn-stack">
               {!paused ? (
                 <button className="garden-btn-primary" onClick={onPause}>
@@ -145,7 +163,7 @@ export const ExpandedTimerModal: React.FC<ExpandedTimerModalProps> = ({
             </div>
           )}
 
-          {phase === 'rest' && (
+          {phase === "rest" && (
             <div className="expanded-btn-stack">
               {!paused ? (
                 <button className="garden-btn-primary" onClick={onPause}>
@@ -161,60 +179,74 @@ export const ExpandedTimerModal: React.FC<ExpandedTimerModalProps> = ({
                 <button className="garden-btn-secondary" onClick={onSkipRest}>
                   <FastForward size={14} /> 跳过休息
                 </button>
-                <button className="garden-btn-secondary btn-muted" onClick={onStopEarly}>
+                <button
+                  className="garden-btn-secondary btn-muted"
+                  onClick={onStopEarly}
+                >
                   结束本组
                 </button>
               </div>
             </div>
           )}
 
-          {phase === 'workFinished' && (
+          {phase === "workFinished" && (
             <div className="expanded-btn-stack">
-              <button className="garden-btn-primary" onClick={() => onStartRest(5 * 60)}>
-                开始短休 (5m)
+              <button
+                className="garden-btn-primary"
+                onClick={() => onStartRest()}
+              >
+                开始休息 ({restMinutes} 分钟)
               </button>
               <button className="garden-btn-secondary" onClick={onSkipRest}>
-                跳过休息并开始下一轮
+                跳过休息，准备下一轮
               </button>
             </div>
           )}
 
-          {phase === 'restFinished' && (
+          {phase === "restFinished" && (
             <button className="garden-btn-primary" onClick={onStartWork}>
               开启下一轮专注
             </button>
           )}
-        </div>
+        </fieldset>
 
         {/* Footer Hint */}
         <div className="expanded-footer-hint">
-          收起或关闭主窗口后，任务栏会继续陪你专注。
+          收起或关闭主窗口后，托盘会继续陪你专注。
         </div>
 
         {/* Cancel Confirmation Alert */}
         {showCancelConfirm && (
-          <div className="garden-submodal-overlay">
+          <Modal
+            title="取消当前专注"
+            onClose={() => setShowCancelConfirm(false)}
+          >
             <div className="garden-submodal-card">
               <h4>取消这段专注？</h4>
-              <p>取消后，当前进行中的时段将直接丢弃，不计入统计也不保存为记录。</p>
+              <p>
+                取消后，当前进行中的时段将直接丢弃，不计入统计也不保存为记录。
+              </p>
               <div className="submodal-actions">
-                <button className="garden-btn-secondary" onClick={() => setShowCancelConfirm(false)}>
+                <button
+                  className="garden-btn-secondary"
+                  onClick={() => setShowCancelConfirm(false)}
+                >
                   继续专注
                 </button>
                 <button
                   className="garden-btn-danger"
                   onClick={() => {
                     setShowCancelConfirm(false);
-                    onStopEarly();
+                    onCancel();
                   }}
                 >
                   确认取消
                 </button>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
       </div>
-    </div>
+    </Modal>
   );
 };

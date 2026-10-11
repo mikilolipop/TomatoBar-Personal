@@ -57,6 +57,18 @@ macOS 菜单栏番茄钟，是 [ivoronin/TomatoBar](https://github.com/ivoronin/
 
 ---
 
+## Windows 客户端（2026-10-11 重构）
+
+Windows 工程在 `TomatoBar-Desktop/`，React 19 + TypeScript + Tauri 2，详见子工程 README。
+`core` 是领域和格式协议，`application/FocusController` 是唯一计时/写入所有者，`platform` 隔离 Tauri；UI 只调用控制器。
+原生 Rust 只访问固定 `sessions.json` / `settings.json`，异步串行原子写入；读取损坏必须阻断覆盖，导入前另存永久备份。
+数据协议必须兼容 Swift 默认 2001 日期纪元，不得把 ISO 日期字符串直接称为 macOS 互通。
+Windows 更改必跑 `npm run format:check`、`npm run check`、`cargo fmt --check`、`cargo test --locked`、`cargo clippy --locked --all-targets -- -D warnings`。
+Mac 可另跑 `npm run test:interop` 验证真实 Swift 编解码；它只用临时合成数据。
+Windows CI 自动生成 NSIS/MSI，构建通过不代替 Windows 实机托盘/隐藏后台/睡眠/置顶/DPI 验收。不要启动相同 identifier 的跨平台 Mac 客户端去验证用户正式数据。
+
+---
+
 ## 必须遵守的不变量
 
 改计时相关代码前请先理解这些，它们都有对应测试：

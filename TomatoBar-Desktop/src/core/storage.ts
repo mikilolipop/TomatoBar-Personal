@@ -1,137 +1,93 @@
-/**
- * TomatoBar Personal - Pluggable Storage Layer
- * Supports LocalStorage (Web/Dev mode) and Desktop Native File I/O.
- * Fully compatible with macOS sessions.json schema, with atomic write and recovery.
- */
+import type { FocusState } from "../types";
+import { createDefaultFocusState } from "../types";
+import { decodeSessions, encodeSessions } from "./sessionsCodec";
+import { decodeSettings, defaultSettings } from "./settings";
+import type { AppSettings } from "./settings";
 
-import type { FocusState } from '../types';
-import { createDefaultFocusState, normalizeTags } from '../types';
-
+export interface StorageTransport {
+  read(file: "sessions" | "settings"): Promise<string | null>;
+  write(
+    file: "sessions" | "settings",
+    json: string,
+    preserve?: boolean,
+  ): Promise<void>;
+}
 export interface IStorageProvider {
   load(): Promise<FocusState>;
   save(state: FocusState): Promise<void>;
-  exportJSON(state: FocusState): string;
-  importJSON(jsonString: string): FocusState;
+  replace(state: FocusState): Promise<void>;
+  loadSettings(): Promise<AppSettings>;
+  saveSettings(settings: AppSettings): Promise<void>;
+  replaceSettings(settings: AppSettings): Promise<void>;
+}
+export const STORAGE_KEY = "TomatoBarPersonal_sessions";
+const SETTINGS_KEY = "TomatoBarPersonal_settings";
+
+/** No silent empty-state or backup fallback: failed reads must block writes. */
+export class FocusRepository implements IStorageProvider {
+  private readonly transport: StorageTransport;
+  constructor(transport: StorageTransport) {
+    this.transport = transport;
+  }
+  async load() {
+    const raw = await this.transport.read("sessions");
+    return raw === null ? createDefaultFocusState() : decodeSessions(raw);
+  }
+  async save(state: FocusState) {
+    await this.transport.write("sessions", encodeSessions(state));
+  }
+  async replace(state: FocusState) {
+    await this.transport.write("sessions", encodeSessions(state), true);
+  }
+  async loadSettings() {
+    const raw = await this.transport.read("settings");
+    return raw === null ? { ...defaultSettings } : decodeSettings(raw);
+  }
+  async replaceSettings(settings: AppSettings) {
+    await this.transport.write(
+      "settings",
+      JSON.stringify(decodeSettings(JSON.stringify(settings)), null, 2),
+      true,
+    );
+  }
+  async saveSettings(settings: AppSettings) {
+    await this.transport.write(
+      "settings",
+      JSON.stringify(decodeSettings(JSON.stringify(settings)), null, 2),
+    );
+  }
 }
 
-const STORAGE_KEY = 'TomatoBarPersonal_sessions';
-const BACKUP_KEY = 'TomatoBarPersonal_sessions_backup';
-
-export class LocalStorageProvider implements IStorageProvider {
-  async load(): Promise<FocusState> {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        return createDefaultFocusState();
-      }
-
-      const parsed = JSON.parse(raw);
-      return this.sanitizeState(parsed);
-    } catch (err) {
-      console.error('[Storage] Failed to load state, attempting backup recovery', err);
-      try {
-        const backupRaw = localStorage.getItem(BACKUP_KEY);
-        if (backupRaw) {
-          const parsed = JSON.parse(backupRaw);
-          return this.sanitizeState(parsed);
-        }
-      } catch (backupErr) {
-        console.error('[Storage] Backup recovery failed', backupErr);
-      }
-      return createDefaultFocusState();
+export class BrowserStorageTransport implements StorageTransport {
+  private readonly storage: Storage;
+  constructor(storage: Storage) {
+    this.storage = storage;
+  }
+  async read(file: "sessions" | "settings") {
+    const raw = this.storage.getItem(
+      file === "sessions" ? STORAGE_KEY : SETTINGS_KEY,
+    );
+    if (file === "settings" && raw === null) {
+      const kind = this.storage.getItem("TomatoBar_petKind");
+      const visible = this.storage.getItem("TomatoBar_showPet");
+      if (kind !== null || visible !== null)
+        return JSON.stringify({
+          ...defaultSettings,
+          petKind: kind === "sprout" ? "sprout" : "tomy",
+          showPet: visible !== "false",
+        });
     }
+    return raw;
   }
-
-  async save(state: FocusState): Promise<void> {
-    try {
-      const serialized = JSON.stringify(state, null, 2);
-      // Keep previous as backup before overwriting (similar to atomic write logic)
-      const existing = localStorage.getItem(STORAGE_KEY);
-      if (existing) {
-        localStorage.setItem(BACKUP_KEY, existing);
-      }
-      localStorage.setItem(STORAGE_KEY, serialized);
-    } catch (err) {
-      console.error('[Storage] Failed to save state to localStorage', err);
-      throw err;
-    }
-  }
-
-  exportJSON(state: FocusState): string {
-    return JSON.stringify(state, null, 2);
-  }
-
-  importJSON(jsonString: string): FocusState {
-    const parsed = JSON.parse(jsonString);
-    return this.sanitizeState(parsed);
-  }
-
-  /**
-   * Sanitizes and migrates old format records/todos to ensure full compatibility
-   */
-  private sanitizeState(data: any): FocusState {
-    const defaults = createDefaultFocusState();
-    if (!data || typeof data !== 'object') return defaults;
-
-    const records = Array.isArray(data.records)
-      ? data.records.map((r: any) => ({
-          id: r.id || crypto.randomUUID(),
-          name: r.name || '未命名专注',
-          startedAt: r.startedAt || new Date().toISOString(),
-          endedAt: r.endedAt || new Date().toISOString(),
-          plannedSeconds: Number(r.plannedSeconds) || 1500,
-          completed: Boolean(r.completed),
-          segments: Array.isArray(r.segments) ? r.segments : [],
-          tags: normalizeTags(Array.isArray(r.tags) ? r.tags : []),
-          todoID: r.todoID || null,
-          projectID: r.projectID || null,
-        }))
-      : [];
-
-    const todos = Array.isArray(data.todos)
-      ? data.todos.map((t: any) => ({
-          id: t.id || crypto.randomUUID(),
-          title: t.title || '',
-          isCompleted: Boolean(t.isCompleted),
-          createdAt: t.createdAt || new Date().toISOString(),
-          completedAt: t.completedAt || null,
-          tags: normalizeTags(Array.isArray(t.tags) ? t.tags : []),
-          projectID: t.projectID || null,
-        }))
-      : [];
-
-    const projects = Array.isArray(data.projects)
-      ? data.projects.map((p: any) => ({
-          id: p.id || crypto.randomUUID(),
-          name: p.name || '',
-          tags: normalizeTags(Array.isArray(p.tags) ? p.tags : []),
-          color: p.color || null,
-          isArchived: Boolean(p.isArchived),
-          createdAt: p.createdAt || new Date().toISOString(),
-        }))
-      : [];
-
-    return {
-      phase: ['idle', 'work', 'rest', 'workFinished', 'restFinished'].includes(data.phase) ? data.phase : 'idle',
-      paused: Boolean(data.paused),
-      name: typeof data.name === 'string' ? data.name : '',
-      startedAt: data.startedAt || null,
-      segmentStart: data.segmentStart || null,
-      deadline: data.deadline || null,
-      remaining: typeof data.remaining === 'number' ? data.remaining : 1500,
-      planned: typeof data.planned === 'number' ? data.planned : 1500,
-      segments: Array.isArray(data.segments) ? data.segments : [],
-      rounds: typeof data.rounds === 'number' ? data.rounds : 0,
-      records,
-      todos,
-      projects,
-      activeTodoID: data.activeTodoID || null,
-      seriesTodoID: data.seriesTodoID || null,
-      currentTodoID: data.currentTodoID || null,
-      draftTags: normalizeTags(Array.isArray(data.draftTags) ? data.draftTags : []),
-      activeTags: normalizeTags(Array.isArray(data.activeTags) ? data.activeTags : []),
-      checkpoint: data.checkpoint || new Date(0).toISOString(),
-      categoryStyles: data.categoryStyles && typeof data.categoryStyles === 'object' ? data.categoryStyles : {},
-    };
+  async write(file: "sessions" | "settings", json: string, preserve = false) {
+    const key = file === "sessions" ? STORAGE_KEY : SETTINGS_KEY;
+    const previous = this.storage.getItem(key);
+    if (preserve && previous !== null)
+      this.storage.setItem(
+        `${key}_import_backup_${crypto.randomUUID()}`,
+        previous,
+      );
+    if (previous !== null) this.storage.setItem(`${key}_backup`, previous);
+    this.storage.setItem(key, json);
   }
 }

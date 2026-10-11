@@ -3,9 +3,9 @@
  * 1:1 aligned with Analytics.swift logic
  */
 
-import type { FocusRecord } from '../types';
+import type { FocusRecord } from "../types";
 
-export type FocusPeriod = 'day' | 'week' | 'month';
+export type FocusPeriod = "day" | "week" | "month";
 
 export interface CategoryTotal {
   name: string;
@@ -25,21 +25,27 @@ export function formatDurationChinese(seconds: number): string {
   if (minutes < 60) return `${minutes}分钟`;
   const hours = Math.floor(minutes / 60);
   const remainingMins = minutes % 60;
-  return remainingMins === 0 ? `${hours}小时` : `${hours}小时${remainingMins}分`;
+  return remainingMins === 0
+    ? `${hours}小时`
+    : `${hours}小时${remainingMins}分`;
 }
 
 export function formatTimeRange(startIso: string, endIso: string): string {
   const dStart = new Date(startIso);
   const dEnd = new Date(endIso);
-  const pad = (n: number) => n.toString().padStart(2, '0');
+  const pad = (n: number) => n.toString().padStart(2, "0");
   return `${pad(dStart.getHours())}:${pad(dStart.getMinutes())} - ${pad(dEnd.getHours())}:${pad(dEnd.getMinutes())}`;
 }
 
 export function getRecordCategory(record: FocusRecord): string {
-  return record.tags[0] || '未分类';
+  return record.tags[0] || "未分类";
 }
 
-export function recordSecondsInInterval(record: FocusRecord, start: Date, end: Date): number {
+export function recordSecondsInInterval(
+  record: FocusRecord,
+  start: Date,
+  end: Date,
+): number {
   const startMs = start.getTime();
   const endMs = end.getTime();
 
@@ -55,21 +61,56 @@ export function recordSecondsInInterval(record: FocusRecord, start: Date, end: D
   }, 0);
 }
 
-export function getPeriodInterval(period: FocusPeriod, targetDate: Date = new Date()): { start: Date; end: Date } {
+export function getPeriodInterval(
+  period: FocusPeriod,
+  targetDate: Date = new Date(),
+): { start: Date; end: Date } {
   const date = new Date(targetDate);
 
-  if (period === 'day') {
-    const start = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
-    const end = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1, 0, 0, 0, 0);
+  if (period === "day") {
+    const start = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      0,
+      0,
+      0,
+      0,
+    );
+    const end = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate() + 1,
+      0,
+      0,
+      0,
+      0,
+    );
     return { start, end };
   }
 
-  if (period === 'week') {
+  if (period === "week") {
     // Week starts on Monday
     const day = date.getDay();
     const diff = (day === 0 ? -6 : 1) - day; // day 0 is Sunday -> -6 to get Monday
-    const monday = new Date(date.getFullYear(), date.getMonth(), date.getDate() + diff, 0, 0, 0, 0);
-    const nextMonday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 7, 0, 0, 0, 0);
+    const monday = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate() + diff,
+      0,
+      0,
+      0,
+      0,
+    );
+    const nextMonday = new Date(
+      monday.getFullYear(),
+      monday.getMonth(),
+      monday.getDate() + 7,
+      0,
+      0,
+      0,
+      0,
+    );
     return { start: monday, end: nextMonday };
   }
 
@@ -83,7 +124,7 @@ export function computeFocusSummary(
   records: FocusRecord[],
   period: FocusPeriod,
   date: Date = new Date(),
-  selectedCategory?: string | null
+  selectedCategory?: string | null,
 ): {
   interval: { start: Date; end: Date };
   totalSeconds: number;
@@ -96,11 +137,17 @@ export function computeFocusSummary(
   // Filter records in interval
   const recordsInPeriod = records
     .filter((r) => {
-      const matchCat = !selectedCategory || getRecordCategory(r).toLowerCase() === selectedCategory.toLowerCase();
-      const inInt = recordSecondsInInterval(r, interval.start, interval.end) > 0;
+      const matchCat =
+        !selectedCategory ||
+        getRecordCategory(r).toLowerCase() === selectedCategory.toLowerCase();
+      const inInt =
+        recordSecondsInInterval(r, interval.start, interval.end) > 0;
       return matchCat && inInt;
     })
-    .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
+    .sort(
+      (a, b) =>
+        new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime(),
+    );
 
   // Category totals
   const catMap = new Map<string, { name: string; seconds: number }>();
@@ -113,14 +160,24 @@ export function computeFocusSummary(
     catMap.set(key, { name: cur.name, seconds: cur.seconds + sec });
   }
 
-  const categories: CategoryTotal[] = Array.from(catMap.values()).sort((a, b) => b.seconds - a.seconds);
+  const categories: CategoryTotal[] = Array.from(catMap.values()).sort(
+    (a, b) => b.seconds - a.seconds,
+  );
   const totalSeconds = categories.reduce((sum, c) => sum + c.seconds, 0);
 
   // Daily breakdown
   const days: FocusDay[] = [];
   let cursor = new Date(interval.start);
   while (cursor < interval.end) {
-    const nextDay = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1, 0, 0, 0, 0);
+    const nextDay = new Date(
+      cursor.getFullYear(),
+      cursor.getMonth(),
+      cursor.getDate() + 1,
+      0,
+      0,
+      0,
+      0,
+    );
     const dayEnd = nextDay < interval.end ? nextDay : interval.end;
 
     const dayCatMap = new Map<string, { name: string; seconds: number }>();
@@ -133,7 +190,9 @@ export function computeFocusSummary(
       dayCatMap.set(key, { name: cur.name, seconds: cur.seconds + sec });
     }
 
-    const dayCats = Array.from(dayCatMap.values()).sort((a, b) => b.seconds - a.seconds);
+    const dayCats = Array.from(dayCatMap.values()).sort(
+      (a, b) => b.seconds - a.seconds,
+    );
     const daySec = dayCats.reduce((s, c) => s + c.seconds, 0);
 
     days.push({
@@ -152,4 +211,27 @@ export function computeFocusSummary(
     recordsInPeriod,
     days,
   };
+}
+
+/** Month navigation clamps the day, so January 31 moves to February instead of March. */
+export function shiftPeriodDate(
+  date: Date,
+  period: FocusPeriod,
+  direction: -1 | 1,
+): Date {
+  const next = new Date(date);
+  if (period !== "month")
+    next.setDate(next.getDate() + direction * (period === "week" ? 7 : 1));
+  else {
+    const day = next.getDate();
+    next.setDate(1);
+    next.setMonth(next.getMonth() + direction);
+    const lastDay = new Date(
+      next.getFullYear(),
+      next.getMonth() + 1,
+      0,
+    ).getDate();
+    next.setDate(Math.min(day, lastDay));
+  }
+  return next;
 }

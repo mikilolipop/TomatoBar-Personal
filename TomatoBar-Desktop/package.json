@@ -8,8 +8,12 @@
     "build": "tsc -b && vite build",
     "test": "vitest run",
     "tauri": "tauri",
-    "lint": "oxlint",
-    "preview": "vite preview"
+    "lint": "oxlint --deny-warnings",
+    "preview": "vite preview",
+    "check": "npm run lint && npm test && npm run build",
+    "format": "prettier --write src",
+    "format:check": "prettier --check src",
+    "test:interop": "node scripts/test-swift-interop.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.1",
@@ -24,6 +28,7 @@
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
     "oxlint": "^1.81.0",
+    "prettier": "^3.9.10",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.3"

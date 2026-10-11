@@ -1,419 +1,391 @@
-/**
- * TomatoBar Personal - Domain State Machine
- * Implements segment-based timing, deadline bounding, and atomic state transitions.
- * All mutation functions take an explicit `now: Date` parameter for 100% determinism.
- */
+/** Pure transitions: time is supplied by the caller, never sampled here. */
+import type { FocusState, FocusRecord, FocusSegment } from "../types";
+import { normalizeTags } from "../types";
 
-import type {
-  FocusState,
-  FocusRecord,
-  FocusSegment,
-  FocusTodo,
-  FocusProject,
-} from '../types';
-import {
-  normalizeTags,
-  segmentSeconds,
-} from '../types';
-
-export function generateUUID(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
+export const isTiming = (s: FocusState) =>
+  s.phase === "work" || s.phase === "rest";
+export const canStartWork = (s: FocusState) =>
+  s.phase === "idle" || s.phase === "restFinished";
 
 export class FocusStateMachine {
-  /**
-   * Closes the active segment if one is open, bounding by deadline.
-   */
-  private static closeActiveSegment(state: FocusState, now: Date): FocusSegment[] {
-    if (!state.segmentStart) return [...state.segments];
-    const segStart = new Date(state.segmentStart).getTime();
-    const nowTime = now.getTime();
-    const deadTime = state.deadline ? new Date(state.deadline).getTime() : nowTime;
-    const boundedEnd = Math.min(nowTime, deadTime);
-
-    if (boundedEnd > segStart) {
-      const newSeg: FocusSegment = {
-        start: new Date(segStart).toISOString(),
-        end: new Date(boundedEnd).toISOString(),
-      };
-      return [...state.segments, newSeg];
-    }
-    return [...state.segments];
+  private static closeSegment(state: FocusState, now: Date): FocusSegment[] {
+    if (!state.segmentStart) return state.segments;
+    const start = Date.parse(state.segmentStart);
+    const end = Math.max(
+      start,
+      Math.min(
+        now.getTime(),
+        state.deadline ? Date.parse(state.deadline) : now.getTime(),
+      ),
+    );
+    return end > start
+      ? [
+          ...state.segments,
+          { start: state.segmentStart, end: new Date(end).toISOString() },
+        ]
+      : state.segments;
   }
 
-  /**
-   * Start a work (pomodoro) focus session
-   */
+  private static record(
+    state: FocusState,
+    now: Date,
+    completed: boolean,
+  ): FocusRecord {
+    return {
+      id: crypto.randomUUID(),
+      name: state.name.trim() || "未命名专注",
+      startedAt: state.startedAt!,
+      endedAt: now.toISOString(),
+      plannedSeconds: state.planned,
+      completed,
+      segments: this.closeSegment(state, now),
+      tags: state.activeTags,
+      todoID: state.activeTodoID ?? null,
+      projectID:
+        state.todos.find((t) => t.id === state.activeTodoID)?.projectID ?? null,
+    };
+  }
+
   static startWork(
     state: FocusState,
     name: string,
     tags: string[],
-    durationSeconds = 25 * 60,
-    todoID: string | null = null,
-    now: Date = new Date()
+    durationSeconds: number,
+    todoID: string | null,
+    now: Date,
   ): FocusState {
-    const normTags = normalizeTags(tags);
-    const deadline = new Date(now.getTime() + durationSeconds * 1000).toISOString();
-
+    if (
+      !canStartWork(state) ||
+      !Number.isFinite(durationSeconds) ||
+      durationSeconds <= 0
+    )
+      return state;
+    const id =
+      todoID ??
+      (state.phase === "restFinished"
+        ? (state.seriesTodoID ?? state.currentTodoID)
+        : state.currentTodoID);
+    const todo = state.todos.find((t) => t.id === id && !t.isCompleted);
+    const inherited = todo?.tags.length
+      ? todo.tags
+      : (state.projects.find((p) => p.id === todo?.projectID)?.tags ?? []);
     return {
       ...state,
-      phase: 'work',
+      phase: "work",
       paused: false,
-      name: name.trim() || '未命名专注',
+      name: todo?.title ?? (name.trim() || "未命名专注"),
       startedAt: now.toISOString(),
       segmentStart: now.toISOString(),
-      deadline,
+      deadline: new Date(now.getTime() + durationSeconds * 1000).toISOString(),
       planned: durationSeconds,
       remaining: durationSeconds,
       segments: [],
-      activeTags: normTags,
-      activeTodoID: todoID,
-      seriesTodoID: todoID ?? state.seriesTodoID,
-      currentTodoID: todoID ?? state.currentTodoID,
+      activeTags: normalizeTags(todo ? inherited : tags),
+      activeTodoID: todo?.id ?? null,
+      seriesTodoID: todo?.id ?? null,
       checkpoint: now.toISOString(),
     };
   }
 
-  /**
-   * Pause the active focus or rest timer
-   */
-  static pause(state: FocusState, now: Date = new Date()): FocusState {
-    if (state.paused || state.phase === 'idle' || state.phase === 'workFinished' || state.phase === 'restFinished') {
-      return state;
-    }
-
-    const segments = state.phase === 'work' ? this.closeActiveSegment(state, now) : state.segments;
-    let remaining = state.remaining;
-    if (state.deadline) {
-      const deadTime = new Date(state.deadline).getTime();
-      remaining = Math.max(0, Math.round((deadTime - now.getTime()) / 1000));
-    }
-
-    return {
-      ...state,
-      paused: true,
-      segmentStart: null,
-      deadline: null,
-      remaining,
-      segments,
-      checkpoint: now.toISOString(),
-    };
-  }
-
-  /**
-   * Resume a paused focus or rest timer
-   */
-  static resume(state: FocusState, now: Date = new Date()): FocusState {
-    if (!state.paused || state.phase === 'idle') {
-      return state;
-    }
-
-    const deadline = new Date(now.getTime() + state.remaining * 1000).toISOString();
-
-    return {
-      ...state,
-      paused: false,
-      segmentStart: state.phase === 'work' ? now.toISOString() : null,
-      deadline,
-      checkpoint: now.toISOString(),
-    };
-  }
-
-  /**
-   * Regular 1-second interval tick to advance countdown & auto-finish
-   */
-  static tick(state: FocusState, now: Date = new Date()): { nextState: FocusState; eventTriggered?: 'workFinished' | 'restFinished' } {
-    if (state.paused || state.phase === 'idle' || state.phase === 'workFinished' || state.phase === 'restFinished') {
+  static tick(
+    state: FocusState,
+    now: Date,
+  ): {
+    nextState: FocusState;
+    eventTriggered?: "workFinished" | "restFinished";
+  } {
+    if (!isTiming(state) || state.paused || !state.deadline)
       return { nextState: state };
-    }
-
-    if (!state.deadline) {
-      return { nextState: state };
-    }
-
-    const deadTime = new Date(state.deadline).getTime();
-    const remaining = Math.max(0, Math.round((deadTime - now.getTime()) / 1000));
-
-    if (remaining > 0) {
+    const deadline = Date.parse(state.deadline);
+    // Never complete half a second early by rounding the display value.
+    if (now.getTime() < deadline)
       return {
         nextState: {
           ...state,
-          remaining,
-          checkpoint: now.toISOString(),
+          remaining: Math.ceil((deadline - now.getTime()) / 1000),
         },
       };
-    }
-
-    // Time is up!
-    if (state.phase === 'work') {
-      const segments = this.closeActiveSegment(state, new Date(deadTime));
-      const record: FocusRecord = {
-        id: generateUUID(),
-        name: state.name || '未命名专注',
-        startedAt: state.startedAt || now.toISOString(),
-        endedAt: new Date(deadTime).toISOString(),
-        plannedSeconds: state.planned,
-        completed: true,
-        segments,
-        tags: state.activeTags,
-        todoID: state.activeTodoID,
-        projectID: null,
-      };
-
-      return {
-        nextState: {
-          ...state,
-          phase: 'workFinished',
-          paused: false,
-          remaining: 0,
-          segmentStart: null,
-          deadline: null,
-          segments: [],
-          rounds: state.rounds + 1,
-          records: [record, ...state.records],
-          checkpoint: now.toISOString(),
-        },
-        eventTriggered: 'workFinished',
-      };
-    }
-
-    if (state.phase === 'rest') {
-      return {
-        nextState: {
-          ...state,
-          phase: 'restFinished',
-          paused: false,
-          remaining: 0,
-          segmentStart: null,
-          deadline: null,
-          checkpoint: now.toISOString(),
-        },
-        eventTriggered: 'restFinished',
-      };
-    }
-
-    return { nextState: state };
-  }
-
-  /**
-   * Start a rest interval (short rest 5m or long rest 15m)
-   */
-  static startRest(state: FocusState, durationSeconds = 5 * 60, now: Date = new Date()): FocusState {
-    const deadline = new Date(now.getTime() + durationSeconds * 1000).toISOString();
-
+    const phase = state.phase === "work" ? "workFinished" : "restFinished";
     return {
-      ...state,
-      phase: 'rest',
-      paused: false,
-      planned: durationSeconds,
-      remaining: durationSeconds,
-      startedAt: now.toISOString(),
-      segmentStart: null,
-      deadline,
-      checkpoint: now.toISOString(),
-    };
-  }
-
-  /**
-   * Skip rest and return to idle
-   */
-  static skipRest(state: FocusState, _now: Date = new Date()): FocusState {
-    return {
-      ...state,
-      phase: 'idle',
-      paused: false,
-      deadline: null,
-      remaining: 25 * 60,
-      planned: 25 * 60,
-      checkpoint: _now.toISOString(),
-    };
-  }
-
-  /**
-   * Stop work early
-   */
-  static stopEarly(state: FocusState, now: Date = new Date()): FocusState {
-    if (state.phase === 'work') {
-      const segments = this.closeActiveSegment(state, now);
-      const totalSec = segments.reduce((sum, s) => sum + segmentSeconds(s), 0);
-
-      // If user worked for at least 60s, keep an incomplete record
-      let updatedRecords = state.records;
-      if (totalSec >= 60) {
-        const incompleteRecord: FocusRecord = {
-          id: generateUUID(),
-          name: (state.name || '未命名专注') + ' (提前结束)',
-          startedAt: state.startedAt || now.toISOString(),
-          endedAt: now.toISOString(),
-          plannedSeconds: state.planned,
-          completed: false,
-          segments,
-          tags: state.activeTags,
-          todoID: state.activeTodoID,
-          projectID: null,
-        };
-        updatedRecords = [incompleteRecord, ...state.records];
-      }
-
-      return {
+      nextState: {
         ...state,
-        phase: 'idle',
+        phase,
         paused: false,
+        remaining: 0,
         segmentStart: null,
         deadline: null,
-        remaining: 25 * 60,
-        planned: 25 * 60,
+        startedAt: null,
         segments: [],
-        records: updatedRecords,
         activeTodoID: null,
+        activeTags: [],
+        rounds: state.rounds + (state.phase === "work" ? 1 : 0),
+        records:
+          state.phase === "work"
+            ? [this.record(state, new Date(deadline), true), ...state.records]
+            : state.records,
         checkpoint: now.toISOString(),
-      };
-    }
+      },
+      eventTriggered: phase,
+    };
+  }
 
+  static pause(state: FocusState, now: Date): FocusState {
+    const { nextState } = this.tick(state, now);
+    if (!isTiming(nextState) || nextState.paused) return nextState;
     return {
-      ...state,
-      phase: 'idle',
-      paused: false,
+      ...nextState,
+      paused: true,
+      segments:
+        nextState.phase === "work"
+          ? this.closeSegment(nextState, now)
+          : nextState.segments,
+      remaining: nextState.deadline
+        ? Math.max(0, (Date.parse(nextState.deadline) - now.getTime()) / 1000)
+        : nextState.remaining,
       segmentStart: null,
       deadline: null,
-      remaining: 25 * 60,
-      planned: 25 * 60,
       checkpoint: now.toISOString(),
     };
   }
 
-  // MARK: - Todo Actions
+  static resume(state: FocusState, now: Date): FocusState {
+    if (!isTiming(state) || !state.paused) return state;
+    return {
+      ...state,
+      paused: false,
+      segmentStart: state.phase === "work" ? now.toISOString() : null,
+      deadline: new Date(now.getTime() + state.remaining * 1000).toISOString(),
+      checkpoint: now.toISOString(),
+    };
+  }
+
+  static recover(state: FocusState): FocusState {
+    return isTiming(state) && !state.paused
+      ? this.pause(state, new Date(state.checkpoint))
+      : state;
+  }
+
+  static startRest(state: FocusState, seconds: number, now: Date): FocusState {
+    if (
+      state.phase !== "workFinished" ||
+      !Number.isFinite(seconds) ||
+      seconds <= 0
+    )
+      return state;
+    return {
+      ...state,
+      phase: "rest",
+      paused: false,
+      planned: seconds,
+      remaining: seconds,
+      startedAt: now.toISOString(),
+      segmentStart: null,
+      segments: [],
+      deadline: new Date(now.getTime() + seconds * 1000).toISOString(),
+      checkpoint: now.toISOString(),
+    };
+  }
+
+  static skipRest(state: FocusState, now: Date): FocusState {
+    if (state.phase !== "rest" && state.phase !== "workFinished") return state;
+    return {
+      ...state,
+      phase: "restFinished",
+      paused: false,
+      deadline: null,
+      segmentStart: null,
+      startedAt: null,
+      segments: [],
+      remaining: 0,
+      checkpoint: now.toISOString(),
+    };
+  }
+
+  static stopEarly(state: FocusState, now: Date): FocusState {
+    const next = this.tick(state, now).nextState;
+    const records =
+      next.phase === "work" && next.startedAt
+        ? [this.record(next, now, false), ...next.records]
+        : next.records;
+    return {
+      ...next,
+      phase: "idle",
+      paused: false,
+      deadline: null,
+      segmentStart: null,
+      startedAt: null,
+      remaining: 0,
+      planned: 0,
+      segments: [],
+      records,
+      activeTodoID: null,
+      seriesTodoID: null,
+      activeTags: [],
+      rounds: 0,
+      checkpoint: now.toISOString(),
+    };
+  }
+
+  static cancel(state: FocusState, now: Date): FocusState {
+    if (state.phase !== "work") return state;
+    return {
+      ...state,
+      phase: "idle",
+      paused: false,
+      deadline: null,
+      segmentStart: null,
+      startedAt: null,
+      remaining: 0,
+      planned: 0,
+      segments: [],
+      activeTodoID: null,
+      seriesTodoID: null,
+      activeTags: [],
+      checkpoint: now.toISOString(),
+    };
+  }
+
+  static selectTodo(
+    state: FocusState,
+    id: string | null,
+    now: Date,
+  ): FocusState {
+    if (!canStartWork(state)) return state;
+    const todo = state.todos.find((t) => t.id === id && !t.isCompleted);
+    return {
+      ...state,
+      currentTodoID: todo?.id ?? null,
+      seriesTodoID: null,
+      name: todo?.title ?? "",
+      draftTags: todo?.tags ?? [],
+      checkpoint: now.toISOString(),
+    };
+  }
 
   static addTodo(
     state: FocusState,
     title: string,
-    tags: string[] = [],
-    projectID: string | null = null,
-    now: Date = new Date()
+    tags: string[],
+    projectID: string | null,
+    now: Date,
   ): FocusState {
-    const cleanTitle = title.trim();
-    if (!cleanTitle) return state;
-
-    const newTodo: FocusTodo = {
-      id: generateUUID(),
-      title: cleanTitle,
-      isCompleted: false,
-      createdAt: now.toISOString(),
-      tags: normalizeTags(tags),
-      projectID,
-    };
-
+    if (!title.trim()) return state;
+    const project = state.projects.find(
+      (p) => p.id === projectID && !p.isArchived,
+    );
     return {
       ...state,
-      todos: [newTodo, ...state.todos],
+      todos: [
+        ...state.todos,
+        {
+          id: crypto.randomUUID(),
+          title: title.trim(),
+          tags: normalizeTags(tags.length ? tags : (project?.tags ?? [])),
+          projectID: project?.id ?? null,
+          isCompleted: false,
+          createdAt: now.toISOString(),
+          completedAt: null,
+        },
+      ],
       checkpoint: now.toISOString(),
     };
   }
 
-  static toggleTodo(state: FocusState, todoID: string, now: Date = new Date()): FocusState {
-    const updated = state.todos.map((todo) => {
-      if (todo.id === todoID) {
-        const isCompleted = !todo.isCompleted;
-        return {
-          ...todo,
-          isCompleted,
-          completedAt: isCompleted ? now.toISOString() : null,
-        };
-      }
-      return todo;
-    });
-
+  static toggleTodo(state: FocusState, id: string, now: Date): FocusState {
+    const completing = state.todos.some((t) => t.id === id && !t.isCompleted);
     return {
       ...state,
-      todos: updated,
+      todos: state.todos.map((t) =>
+        t.id === id
+          ? {
+              ...t,
+              isCompleted: !t.isCompleted,
+              completedAt: t.isCompleted ? null : now.toISOString(),
+            }
+          : t,
+      ),
+      currentTodoID:
+        completing && state.currentTodoID === id ? null : state.currentTodoID,
+      seriesTodoID:
+        completing && state.seriesTodoID === id ? null : state.seriesTodoID,
       checkpoint: now.toISOString(),
     };
   }
 
-  static deleteTodo(state: FocusState, todoID: string, now: Date = new Date()): FocusState {
+  static deleteTodo(state: FocusState, id: string, now: Date): FocusState {
     return {
       ...state,
-      todos: state.todos.filter((t) => t.id !== todoID),
-      activeTodoID: state.activeTodoID === todoID ? null : state.activeTodoID,
-      seriesTodoID: state.seriesTodoID === todoID ? null : state.seriesTodoID,
-      currentTodoID: state.currentTodoID === todoID ? null : state.currentTodoID,
+      todos: state.todos.filter((t) => t.id !== id),
+      currentTodoID: state.currentTodoID === id ? null : state.currentTodoID,
+      seriesTodoID: state.seriesTodoID === id ? null : state.seriesTodoID,
       checkpoint: now.toISOString(),
     };
   }
-
-  // MARK: - History Record Actions
 
   static updateRecord(
     state: FocusState,
-    recordID: string,
-    updates: Partial<Pick<FocusRecord, 'name' | 'tags'>>,
-    now: Date = new Date()
+    id: string,
+    updates: Partial<Pick<FocusRecord, "name" | "tags">>,
+    now: Date,
   ): FocusState {
-    const updated = state.records.map((r) => {
-      if (r.id === recordID) {
-        return {
-          ...r,
-          name: updates.name !== undefined ? updates.name.trim() : r.name,
-          tags: updates.tags !== undefined ? normalizeTags(updates.tags) : r.tags,
-        };
-      }
-      return r;
-    });
-
+    if (updates.name !== undefined && !updates.name.trim())
+      throw new Error("事件名称不能为空。");
+    if (!state.records.some((r) => r.id === id))
+      throw new Error("这条记录已不存在，请重新打开记录列表。");
     return {
       ...state,
-      records: updated,
+      records: state.records.map((r) =>
+        r.id === id
+          ? {
+              ...r,
+              name: updates.name?.trim() ?? r.name,
+              tags: updates.tags ? normalizeTags(updates.tags) : r.tags,
+            }
+          : r,
+      ),
       checkpoint: now.toISOString(),
     };
   }
 
-  static deleteRecord(state: FocusState, recordID: string, now: Date = new Date()): FocusState {
+  static deleteRecord(state: FocusState, id: string, now: Date): FocusState {
     return {
       ...state,
-      records: state.records.filter((r) => r.id !== recordID),
+      records: state.records.filter((r) => r.id !== id),
       checkpoint: now.toISOString(),
     };
   }
-
-  // MARK: - Project Actions
 
   static addProject(
     state: FocusState,
     name: string,
-    tags: string[] = [],
-    now: Date = new Date()
+    tags: string[],
+    now: Date,
   ): FocusState {
-    const cleanName = name.trim();
-    if (!cleanName) return state;
-
-    const newProject: FocusProject = {
-      id: generateUUID(),
-      name: cleanName,
-      tags: normalizeTags(tags),
-      color: null,
-      isArchived: false,
-      createdAt: now.toISOString(),
-    };
-
+    if (!name.trim()) return state;
     return {
       ...state,
-      projects: [...state.projects, newProject],
+      projects: [
+        ...state.projects,
+        {
+          id: crypto.randomUUID(),
+          name: name.trim(),
+          tags: normalizeTags(tags),
+          color: null,
+          isArchived: false,
+          createdAt: now.toISOString(),
+        },
+      ],
       checkpoint: now.toISOString(),
     };
   }
 
-  static deleteProject(state: FocusState, projectID: string, now: Date = new Date()): FocusState {
+  static deleteProject(state: FocusState, id: string, now: Date): FocusState {
     return {
       ...state,
-      projects: state.projects.filter((p) => p.id !== projectID),
-      todos: state.todos.map((t) => (t.projectID === projectID ? { ...t, projectID: null } : t)),
+      projects: state.projects.filter((p) => p.id !== id),
+      todos: state.todos.map((t) =>
+        t.projectID === id ? { ...t, projectID: null } : t,
+      ),
       checkpoint: now.toISOString(),
     };
   }

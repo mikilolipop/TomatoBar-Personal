@@ -1,314 +1,295 @@
-import React, { useState, useEffect } from 'react';
-import type { FocusState, PetKind, FocusTodo, FocusRecord } from './types';
-import { createDefaultFocusState } from './types';
-import { FocusStateMachine } from './core/stateMachine';
-import { LocalStorageProvider } from './core/storage';
-import type { FocusPeriod } from './core/analytics';
-import { GardenOverview } from './components/GardenOverview';
-import { ExpandedTimerModal } from './components/ExpandedTimerModal';
-import { RecordEditorModal } from './components/RecordEditorModal';
-import { SettingsModal } from './components/SettingsModal';
-import { ReminderModal } from './components/ReminderModal';
-import { HistoryList } from './components/HistoryList';
-import { ChevronLeft } from 'lucide-react';
+import { useState, useEffect } from "react";
+import type { FocusRecord, FocusTodo } from "./types";
+import type { FocusPeriod } from "./core/analytics";
+import { FocusStateMachine as Machine, isTiming } from "./core/stateMachine";
+import { restSeconds } from "./core/settings";
+import { encodeSessions } from "./core/sessionsCodec";
+import { createRepository, desktop } from "./platform/desktop";
+import { FocusController } from "./application/focusController";
+import { useFocusController } from "./hooks/useFocusController";
+import { GardenOverview } from "./components/GardenOverview";
+import { ExpandedTimerModal } from "./components/ExpandedTimerModal";
+import { RecordEditorModal } from "./components/RecordEditorModal";
+import { SettingsModal } from "./components/SettingsModal";
+import { ReminderModal } from "./components/ReminderModal";
+import { HistoryList } from "./components/HistoryList";
+import { WindowHeader } from "./components/WindowHeader";
+import { DesktopPet } from "./components/DesktopPet";
 
-const storage = new LocalStorageProvider();
-
-export const App: React.FC = () => {
-  const [state, setState] = useState<FocusState>(createDefaultFocusState());
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  // Nav tab: overview (Garden) or history
-  const [activeTab, setActiveTab] = useState<'overview' | 'history'>('overview');
-
-  // Period & Date filters for Garden
-  const [period, setPeriod] = useState<FocusPeriod>('day');
-  const [currentDate, setCurrentDate] = useState<Date>(new Date());
-
-  // Modal dialog states
-  const [showExpandedTimer, setShowExpandedTimer] = useState(false);
+const controller = new FocusController(createRepository());
+export default function App() {
+  const { state, settings, ready, busy, error, reminder } =
+    useFocusController(controller);
+  const [activeTab, setActiveTab] = useState<"overview" | "history">(
+    "overview",
+  );
+  const [period, setPeriod] = useState<FocusPeriod>("day");
+  const [currentDate, setCurrentDate] = useState(() => new Date());
+  const [showTimer, setShowTimer] = useState(false);
   const [editingRecord, setEditingRecord] = useState<FocusRecord | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [showReminder, setShowReminder] = useState(false);
+  const [desktopError, setDesktopError] = useState<string | null>(null);
+  const restMinutes = restSeconds(state.rounds, settings) / 60;
 
-  // Settings
-  const [workMinutes, setWorkMinutes] = useState(25);
-  const [shortRestMinutes, setShortRestMinutes] = useState(5);
-  const [longRestMinutes, setLongRestMinutes] = useState(15);
-  const [petKind, setPetKind] = useState<PetKind>('tomy');
-  const [showPet, setShowPet] = useState(true);
-
-  // Load state on mount
   useEffect(() => {
-    async function init() {
-      const loaded = await storage.load();
-      if (loaded.phase === 'work' && !loaded.paused) {
-        // Interrupted session: pause to avoid overrun
-        const pausedState = FocusStateMachine.pause(loaded, new Date());
-        setState(pausedState);
-      } else {
-        setState(loaded);
+    let disposed = false;
+    const cleanups: (() => void)[] = [];
+    const bind = async () => {
+      for (const subscribe of [
+        () =>
+          desktop.onQuit(() => {
+            void controller
+              .prepareQuit()
+              .then((saved) => (saved ? desktop.quit() : undefined))
+              .catch((e) => setDesktopError(String(e)));
+          }),
+        () =>
+          desktop.onToggle(() => {
+            void controller.toggle();
+          }),
+      ]) {
+        const cleanup = await subscribe();
+        if (disposed) cleanup();
+        else cleanups.push(cleanup);
       }
-      setIsLoaded(true);
-
-      const savedPet = localStorage.getItem('TomatoBar_petKind') as PetKind;
-      if (savedPet) setPetKind(savedPet);
-      const savedShowPet = localStorage.getItem('TomatoBar_showPet');
-      if (savedShowPet !== null) setShowPet(savedShowPet === 'true');
-    }
-    init();
+    };
+    void bind().catch((e) => setDesktopError(String(e)));
+    return () => {
+      disposed = true;
+      cleanups.forEach((fn) => fn());
+    };
   }, []);
-
-  // Persist state updates
   useEffect(() => {
-    if (!isLoaded) return;
-    storage.save(state).catch((e) => console.error('Save failed', e));
-  }, [state, isLoaded]);
-
-  // 1-second interval timer tick
-  useEffect(() => {
-    if (!isLoaded) return;
-
-    const interval = window.setInterval(() => {
-      setState((prev) => {
-        if (prev.paused || prev.phase === 'idle') return prev;
-
-        const { nextState, eventTriggered } = FocusStateMachine.tick(prev, new Date());
-        if (eventTriggered) {
-          setShowReminder(true);
-        }
-        return nextState;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isLoaded]);
-
-  // Actions
-  const handleStartWork = () => {
-    const currentTodo = state.todos.find((t) => t.id === state.currentTodoID);
-    const taskName = currentTodo ? currentTodo.title : state.name || '专注时光';
-    const taskTags = currentTodo ? currentTodo.tags : state.draftTags;
-
-    const next = FocusStateMachine.startWork(
-      state,
-      taskName,
-      taskTags,
-      workMinutes * 60,
-      state.currentTodoID,
-      new Date()
+    void (reminder ? desktop.showReminder() : desktop.dismissReminder()).catch(
+      (e) => setDesktopError(`窗口提醒未能更新：${String(e)}`),
     );
-    setState(next);
-    setShowExpandedTimer(true);
-  };
+  }, [reminder]);
 
-  const handlePause = () => {
-    setState((prev) => FocusStateMachine.pause(prev, new Date()));
+  const startWork = () => {
+    void controller.startWork().then((saved) => {
+      if (saved) setShowTimer(true);
+    });
   };
-
-  const handleResume = () => {
-    setState((prev) => FocusStateMachine.resume(prev, new Date()));
+  const exportData = () => {
+    const url = URL.createObjectURL(
+      new Blob([encodeSessions(state)], { type: "application/json" }),
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "sessions.json";
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
-
-  const handleStopEarly = () => {
-    setState((prev) => FocusStateMachine.stopEarly(prev, new Date()));
+  const saveRecord = (id: string, name: string, tags: string[]) =>
+    controller.transition((s, now) =>
+      Machine.updateRecord(s, id, { name, tags }, now),
+    );
+  const deleteRecord = (id: string) =>
+    controller.transition((s, now) => Machine.deleteRecord(s, id, now));
+  const selectTodo = (todo: FocusTodo) => {
+    void controller.transition((s, now) => Machine.selectTodo(s, todo.id, now));
   };
-
-  const handleStartRest = (durationSec = shortRestMinutes * 60) => {
-    setShowReminder(false);
-    setState((prev) => FocusStateMachine.startRest(prev, durationSec, new Date()));
-  };
-
-  const handleSkipRest = () => {
-    setShowReminder(false);
-    setState((prev) => FocusStateMachine.skipRest(prev, new Date()));
-  };
-
-  const handleAddTodo = (title: string, tags: string[], projectID?: string | null) => {
-    setState((prev) => FocusStateMachine.addTodo(prev, title, tags, projectID ?? null, new Date()));
-  };
-
-  const handleToggleTodo = (id: string) => {
-    setState((prev) => FocusStateMachine.toggleTodo(prev, id, new Date()));
-  };
-
-  const handleDeleteTodo = (id: string) => {
-    setState((prev) => FocusStateMachine.deleteTodo(prev, id, new Date()));
-  };
-
-  const handleSelectTodoForFocus = (todo: FocusTodo) => {
-    setState((prev) => ({
-      ...prev,
-      currentTodoID: todo.id,
-      name: todo.title,
-      draftTags: todo.tags,
-    }));
-  };
-
-  const handleAddProject = (name: string, tags: string[]) => {
-    setState((prev) => FocusStateMachine.addProject(prev, name, tags, new Date()));
-  };
-
-  const handleDeleteProject = (id: string) => {
-    setState((prev) => FocusStateMachine.deleteProject(prev, id, new Date()));
-  };
-
-  const handleSaveRecord = (id: string, name: string, tags: string[]) => {
-    setState((prev) => FocusStateMachine.updateRecord(prev, id, { name, tags }, new Date()));
-  };
-
-  const handleDeleteRecord = (id: string) => {
-    setState((prev) => FocusStateMachine.deleteRecord(prev, id, new Date()));
-  };
-
-  const handleExportData = () => {
-    const jsonStr = storage.exportJSON(state);
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `sessions-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleImportData = (imported: FocusState) => {
-    setState(imported);
-    storage.save(imported);
-  };
-
-  const handleUpdatePet = (kind: PetKind, show: boolean) => {
-    setPetKind(kind);
-    setShowPet(show);
-    localStorage.setItem('TomatoBar_petKind', kind);
-    localStorage.setItem('TomatoBar_showPet', String(show));
-  };
+  const blocked = !ready || busy || !!error;
+  const displayState =
+    state.phase === "idle"
+      ? { ...state, remaining: settings.workMinutes * 60 }
+      : state;
 
   return (
     <div className="garden-app-wrapper">
-      {activeTab === 'overview' ? (
-        <GardenOverview
-          state={state}
-          period={period}
-          currentDate={currentDate}
-          onSetPeriod={setPeriod}
-          onSetDate={setCurrentDate}
-          onStartFocus={handleStartWork}
-          onPause={handlePause}
-          onResume={handleResume}
-          onSkipRest={handleSkipRest}
-          onOpenExpandedTimer={() => setShowExpandedTimer(true)}
-          onOpenSettings={() => setShowSettings(true)}
-          onSwitchTab={(tab) => setActiveTab(tab)}
-          onAddTodo={handleAddTodo}
-          onToggleTodo={handleToggleTodo}
-          onDeleteTodo={handleDeleteTodo}
-          onSelectTodoForFocus={handleSelectTodoForFocus}
-          onAddProject={handleAddProject}
-          onDeleteProject={handleDeleteProject}
-          onEditRecord={(record) => setEditingRecord(record)}
-        />
-      ) : (
-        <div className="garden-root">
-          <div className="garden-window-topbar">
-            <div className="mac-traffic-dots">
-              <span className="dot dot-red" />
-              <span className="dot dot-amber" />
-              <span className="dot dot-green" />
-              <span className="window-title-text">TomatoBar · 历史回顾</span>
-            </div>
-
-            <div className="garden-nav-tabs">
-              <span className="brand-logo-text">TomatoBar</span>
-              <button className="nav-link" onClick={() => setActiveTab('overview')}>
-                概览
+      {(error || desktopError) && (
+        <div className="app-status-banner" role="alert">
+          <span>{error || desktopError}</span>
+          {error && (
+            <>
+              <button
+                onClick={() => {
+                  void controller.retry();
+                }}
+                disabled={busy}
+              >
+                重试
               </button>
-              <button className="nav-link active" onClick={() => setActiveTab('history')}>
-                历史
-              </button>
-            </div>
-
-            <div className="garden-top-right">
-              <button className="garden-btn-secondary" onClick={() => setActiveTab('overview')}>
-                <ChevronLeft size={14} /> 返回概览
-              </button>
-            </div>
-          </div>
-
-          <div className="garden-divider-line" />
-
-          <div style={{ padding: '24px 32px' }}>
-            <HistoryList
-              records={state.records}
-              onUpdateRecord={(id, updates) =>
-                setState((prev) => FocusStateMachine.updateRecord(prev, id, updates, new Date()))
-              }
-              onDeleteRecord={handleDeleteRecord}
-            />
-          </div>
+              <button onClick={() => setShowSettings(true)}>备份与恢复</button>
+            </>
+          )}
+          {desktopError && !error && (
+            <button onClick={() => setDesktopError(null)}>关闭提示</button>
+          )}
         </div>
       )}
-
-      {/* Expanded Timer Modal */}
-      {showExpandedTimer && (
+      {!ready && !error && (
+        <div className="app-status-banner" role="status">
+          正在读取本地记录…
+        </div>
+      )}
+      <main inert={blocked} aria-busy={busy}>
+        <div className="garden-root">
+          <WindowHeader
+            tab={activeTab}
+            onTab={setActiveTab}
+            onSettings={() => setShowSettings(true)}
+          />
+          <div className="garden-divider-line" />
+          {activeTab === "overview" ? (
+            <GardenOverview
+              state={displayState}
+              period={period}
+              currentDate={currentDate}
+              onSetPeriod={setPeriod}
+              onSetDate={setCurrentDate}
+              onStartFocus={startWork}
+              onPause={() => {
+                void controller.pause();
+              }}
+              onResume={() => {
+                void controller.resume();
+              }}
+              onStartRest={() => {
+                void controller.startRest();
+              }}
+              onSkipRest={() => {
+                void controller.skipRest();
+              }}
+              onOpenExpandedTimer={() => setShowTimer(true)}
+              restMinutes={restMinutes}
+              onAddTodo={(title, tags, projectID) => {
+                void controller.transition((s, now) =>
+                  Machine.addTodo(s, title, tags, projectID ?? null, now),
+                );
+              }}
+              onToggleTodo={(id) => {
+                void controller.transition((s, now) =>
+                  Machine.toggleTodo(s, id, now),
+                );
+              }}
+              onDeleteTodo={(id) => {
+                void controller.transition((s, now) =>
+                  Machine.deleteTodo(s, id, now),
+                );
+              }}
+              onSelectTodoForFocus={selectTodo}
+              onAddProject={(name, tags) => {
+                void controller.transition((s, now) =>
+                  Machine.addProject(s, name, tags, now),
+                );
+              }}
+              onDeleteProject={(id) => {
+                void controller.transition((s, now) =>
+                  Machine.deleteProject(s, id, now),
+                );
+              }}
+              onEditRecord={setEditingRecord}
+              onFreeFocus={() => {
+                void controller.transition((s, now) =>
+                  Machine.selectTodo(s, null, now),
+                );
+              }}
+            />
+          ) : (
+            <div className="history-page">
+              <HistoryList
+                records={state.records}
+                onEditRecord={setEditingRecord}
+                onDeleteRecord={(id) => {
+                  void deleteRecord(id);
+                }}
+              />
+            </div>
+          )}
+        </div>
+      </main>
+      {ready &&
+        settings.showPet &&
+        !showTimer &&
+        !showSettings &&
+        !editingRecord &&
+        !reminder && (
+          <DesktopPet
+            kind={settings.petKind}
+            phase={state.phase}
+            paused={state.paused}
+            size={80}
+            floating
+          />
+        )}
+      {showTimer && (
         <ExpandedTimerModal
-          state={state}
-          petKind={petKind}
-          onStartWork={handleStartWork}
-          onPause={handlePause}
-          onResume={handleResume}
-          onStopEarly={handleStopEarly}
-          onStartRest={handleStartRest}
-          onSkipRest={handleSkipRest}
-          onClose={() => setShowExpandedTimer(false)}
+          state={displayState}
+          petKind={settings.petKind}
+          restMinutes={restMinutes}
+          busy={blocked}
+          onStartWork={startWork}
+          onPause={() => {
+            void controller.pause();
+          }}
+          onResume={() => {
+            void controller.resume();
+          }}
+          onStopEarly={() => {
+            void controller.stop();
+          }}
+          onCancel={() => {
+            void controller.cancel();
+          }}
+          onStartRest={() => {
+            void controller.startRest();
+          }}
+          onSkipRest={() => {
+            void controller.skipRest();
+          }}
+          onClose={() => setShowTimer(false)}
         />
       )}
-
-      {/* Record Editor Modal */}
       {editingRecord && (
         <RecordEditorModal
           record={editingRecord}
-          onSave={handleSaveRecord}
-          onDelete={handleDeleteRecord}
+          onSave={saveRecord}
+          onDelete={deleteRecord}
           onClose={() => setEditingRecord(null)}
         />
       )}
-
-      {/* Settings Modal */}
       {showSettings && (
         <SettingsModal
-          workMinutes={workMinutes}
-          shortRestMinutes={shortRestMinutes}
-          longRestMinutes={longRestMinutes}
-          petKind={petKind}
-          showPet={showPet}
+          settings={settings}
           state={state}
-          onUpdateDurations={(w, sr, lr) => {
-            setWorkMinutes(w);
-            setShortRestMinutes(sr);
-            setLongRestMinutes(lr);
-          }}
-          onUpdatePet={handleUpdatePet}
-          onExportData={handleExportData}
-          onImportData={handleImportData}
+          canExport={ready}
+          busy={busy}
+          error={error}
+          onUpdateSettings={(changes) => controller.updateSettings(changes)}
+          onExportData={exportData}
+          onImportData={(json) => controller.importJSON(json)}
+          onRestoreDefaults={() => controller.restoreDefaultSettings()}
           onClose={() => setShowSettings(false)}
         />
       )}
-
-      {/* Silent Sticky Reminder Modal */}
-      {showReminder && (
+      {reminder && (
         <ReminderModal
           phase={state.phase}
           rounds={state.rounds}
           taskName={state.name}
-          onStartRest={handleStartRest}
-          onSkipRest={handleSkipRest}
-          onStartWork={handleStartWork}
-          onDismiss={() => setShowReminder(false)}
+          workMinutes={settings.workMinutes}
+          restMinutes={restMinutes}
+          busy={blocked}
+          onStartRest={() => {
+            void controller.startRest();
+          }}
+          onSkipRest={() => {
+            void controller.skipRest();
+          }}
+          onStartWork={startWork}
+          onDismiss={controller.dismissReminder}
         />
+      )}
+      {isTiming(state) && (
+        <span className="visually-hidden" role="status">
+          {state.paused
+            ? "计时已暂停"
+            : state.phase === "work"
+              ? "正在专注"
+              : "正在休息"}
+        </span>
       )}
     </div>
   );
-};
-
-export default App;
+}

@@ -1,230 +1,217 @@
-import React, { useRef } from 'react';
-import type { PetKind, FocusState } from '../types';
-import { X, Download, Upload, Sliders, Sparkles, Database } from 'lucide-react';
+import { useRef, useState } from "react";
+import type { FocusState } from "../types";
+import type { AppSettings } from "../core/settings";
+import { decodeSessions } from "../core/sessionsCodec";
+import { Modal } from "./Modal";
+import { X, Download, Upload, Sliders, Sparkles, Database } from "lucide-react";
 
-interface SettingsModalProps {
-  workMinutes: number;
-  shortRestMinutes: number;
-  longRestMinutes: number;
-  petKind: PetKind;
-  showPet: boolean;
-  state: FocusState;
-  onUpdateDurations: (work: number, shortRest: number, longRest: number) => void;
-  onUpdatePet: (kind: PetKind, show: boolean) => void;
-  onExportData: () => void;
-  onImportData: (importedState: FocusState) => void;
-  onClose: () => void;
-}
-
-export const SettingsModal: React.FC<SettingsModalProps> = ({
-  workMinutes,
-  shortRestMinutes,
-  longRestMinutes,
-  petKind,
-  showPet,
+export function SettingsModal({
+  settings,
   state,
-  onUpdateDurations,
-  onUpdatePet,
+  canExport,
+  busy,
+  error,
+  onUpdateSettings,
   onExportData,
   onImportData,
   onClose,
-}) => {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  onRestoreDefaults,
+}: {
+  settings: AppSettings;
+  state: FocusState;
+  canExport: boolean;
+  busy: boolean;
+  error: string | null;
+  onUpdateSettings: (changes: Partial<AppSettings>) => Promise<boolean>;
+  onExportData: () => void;
+  onImportData: (json: string) => Promise<boolean>;
+  onClose: () => void;
+  onRestoreDefaults: () => Promise<boolean>;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const [message, setMessage] = useState("");
+  const [importing, setImporting] = useState(false);
+  const changeFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
     if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const text = event.target?.result as string;
-        const parsed = JSON.parse(text);
-        if (window.confirm('导入数据将合并/替换当前数据，是否确认继续？')) {
-          onImportData(parsed);
-          alert('数据导入成功！');
-          onClose();
-        }
-      } catch (err) {
-        alert('文件解析失败，请确保选择的是有效的 sessions.json 格式文件。');
-      }
-    };
-    reader.readAsText(file);
+    setImporting(true);
+    setMessage("");
+    try {
+      if (file.size > 20 * 1024 * 1024)
+        throw new Error("文件超过 20 MB，请选择较小的记录备份。");
+      const json = await file.text();
+      const imported = decodeSessions(json);
+      if (
+        !window.confirm(
+          `将用备份中的 ${imported.records.length} 条记录和 ${imported.todos.length} 个待办替换当前数据。当前数据会保留为备份。继续导入？`,
+        )
+      )
+        return;
+      const saved = await onImportData(json);
+      setMessage(saved ? "数据已校验并保存。" : "数据未能保存，请重试。");
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : String(e));
+    } finally {
+      setImporting(false);
+    }
   };
-
+  const disabled = busy || importing || !!error;
   return (
-    <div className="garden-modal-overlay">
-      <div className="garden-dialog-card settings-card" style={{ maxWidth: 560 }}>
+    <Modal title="偏好设置" onClose={onClose}>
+      <div className="garden-dialog-card settings-card">
         <div className="dialog-header-row">
-          <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 700 }}>
-            <Sliders size={18} /> 偏好设置
+          <h3>
+            <Sliders size={18} />
+            偏好设置
           </h3>
-          <button className="dialog-close-icon" onClick={onClose} title="关闭">
+          <button
+            className="dialog-close-icon"
+            aria-label="关闭设置"
+            onClick={onClose}
+          >
             <X size={16} />
           </button>
         </div>
-
-        <div className="dialog-field">
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
-            ⏱️ 专注时长配置
-          </label>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 6 }}>
-            <div>
-              <span style={{ fontSize: 12, color: 'var(--garden-muted)' }}>工作专注时长</span>
-              <select
-                value={workMinutes}
-                onChange={(e) => onUpdateDurations(Number(e.target.value), shortRestMinutes, longRestMinutes)}
-                className="garden-input"
-                style={{ marginTop: 4 }}
-              >
-                <option value={15}>15 分钟</option>
-                <option value={20}>20 分钟</option>
-                <option value={25}>25 分钟 (经典番茄)</option>
-                <option value={30}>30 分钟</option>
-                <option value={45}>45 分钟</option>
-                <option value={50}>50 分钟</option>
-                <option value={60}>60 分钟</option>
-              </select>
-            </div>
-
-            <div>
-              <span style={{ fontSize: 12, color: 'var(--garden-muted)' }}>短休息时长</span>
-              <select
-                value={shortRestMinutes}
-                onChange={(e) => onUpdateDurations(workMinutes, Number(e.target.value), longRestMinutes)}
-                className="garden-input"
-                style={{ marginTop: 4 }}
-              >
-                <option value={3}>3 分钟</option>
-                <option value={5}>5 分钟 (默认)</option>
-                <option value={10}>10 分钟</option>
-              </select>
-            </div>
+        <fieldset disabled={disabled} className="settings-fields">
+          <div className="settings-duration-grid">
+            {(
+              [
+                ["workMinutes", "专注时长", [15, 20, 25, 30, 45, 50, 60]],
+                ["shortRestMinutes", "短休息时长", [3, 5, 10]],
+                ["longRestMinutes", "长休息时长", [10, 15, 20, 30]],
+                ["longRestEvery", "长休息间隔", [2, 3, 4, 5, 6]],
+              ] as const
+            ).map(([key, label, values]) => (
+              <label key={key}>
+                {label}
+                <select
+                  aria-label={label}
+                  className="garden-input"
+                  value={settings[key]}
+                  onChange={(e) => {
+                    void onUpdateSettings({ [key]: Number(e.target.value) });
+                  }}
+                >
+                  {Array.from(new Set([...values, settings[key]]))
+                    .sort((a, b) => a - b)
+                    .map((n) => (
+                      <option key={n} value={n}>
+                        {n} {key === "longRestEvery" ? "轮" : "分钟"}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            ))}
           </div>
-        </div>
-
-        <div className="dialog-field" style={{ marginTop: 14 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
-            <Sparkles size={15} /> 桌面挂件 / 桌面宠物
-          </label>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '10px 14px',
-              background: 'rgba(239, 230, 214, 0.45)',
-              borderRadius: 8,
-              marginTop: 6,
-            }}
-          >
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>开启桌面宠物挂件</div>
-              <div style={{ fontSize: 11, color: 'var(--garden-muted)' }}>
-                在屏幕上悬浮显示随专注状态互动的像素小宠物（支持自由拖拽）
+          <div className="dialog-field">
+            <h4>
+              <Sparkles size={15} />
+              窗口宠物
+            </h4>
+            <label className="pet-toggle">
+              <span>在应用窗口中显示可拖动宠物</span>
+              <input
+                type="checkbox"
+                checked={settings.showPet}
+                onChange={(e) => {
+                  void onUpdateSettings({ showPet: e.target.checked });
+                }}
+              />
+            </label>
+            {settings.showPet && (
+              <div className="pet-choices">
+                {(["tomy", "sprout"] as const).map((kind) => (
+                  <button
+                    key={kind}
+                    className="garden-btn-secondary"
+                    aria-pressed={settings.petKind === kind}
+                    onClick={() => {
+                      void onUpdateSettings({ petKind: kind });
+                    }}
+                  >
+                    {kind === "tomy"
+                      ? "🍅 番茄仔 · Tomy"
+                      : "🌱 植小芽 · Sprout"}
+                  </button>
+                ))}
               </div>
-            </div>
-            <input
-              type="checkbox"
-              checked={showPet}
-              onChange={(e) => onUpdatePet(petKind, e.target.checked)}
-              style={{ width: 18, height: 18, accentColor: 'var(--garden-red)', cursor: 'pointer' }}
-            />
+            )}
           </div>
-
-          {showPet && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
-              <button
-                type="button"
-                className={`garden-btn-secondary ${petKind === 'tomy' ? 'active-pet' : ''}`}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '8px 12px',
-                  border: petKind === 'tomy' ? '2px solid var(--garden-red)' : '1px solid var(--garden-line)',
-                  background: petKind === 'tomy' ? 'rgba(179, 77, 61, 0.08)' : 'var(--garden-surface)',
-                  borderRadius: 8,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-                onClick={() => onUpdatePet('tomy', true)}
-              >
-                <span style={{ fontSize: 20 }}>🍅</span>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700 }}>番茄仔 · Tomy</div>
-                  <div style={{ fontSize: 10, color: 'var(--garden-muted)' }}>敲键盘的番茄小极客</div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                className={`garden-btn-secondary ${petKind === 'sprout' ? 'active-pet' : ''}`}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '8px 12px',
-                  border: petKind === 'sprout' ? '2px solid var(--garden-red)' : '1px solid var(--garden-line)',
-                  background: petKind === 'sprout' ? 'rgba(179, 77, 61, 0.08)' : 'var(--garden-surface)',
-                  borderRadius: 8,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-                onClick={() => onUpdatePet('sprout', true)}
-              >
-                <span style={{ fontSize: 20 }}>🌱</span>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700 }}>植小芽 · Sprout</div>
-                  <div style={{ fontSize: 10, color: 'var(--garden-muted)' }}>抱书静心翻阅的小芽</div>
-                </div>
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="dialog-field" style={{ marginTop: 14 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
-            <Database size={15} /> 本地数据与跨端互通
-          </label>
-          <div style={{ fontSize: 12, color: 'var(--garden-muted)', marginTop: 4 }}>
-            当前包含 <strong>{state.records.length}</strong> 条历史记录与 <strong>{state.todos.length}</strong> 个待办任务。
-            数据格式与 macOS 原生版本 100% 互通。
-          </div>
-
-          <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+        </fieldset>
+        <div className="dialog-field">
+          <h4>
+            <Database size={15} />
+            本地数据与备份
+          </h4>
+          <p className="settings-hint">
+            {canExport
+              ? `${state.records.length} 条历史记录 · ${state.todos.length} 个待办`
+              : "当前记录读取失败，请重试读取或导入有效备份。"}
+            <br />
+            支持旧版 Windows 与 macOS 的 sessions.json。导入会替换当前数据。
+          </p>
+          <div className="settings-data-actions">
             <button
-              type="button"
               className="garden-btn-secondary"
-              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+              disabled={!canExport || importing}
               onClick={onExportData}
             >
-              <Download size={14} /> 导出 sessions.json
+              <Download size={14} />
+              导出备份
             </button>
             <button
-              type="button"
               className="garden-btn-secondary"
-              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-              onClick={() => fileInputRef.current?.click()}
+              disabled={busy || importing}
+              onClick={() => input.current?.click()}
             >
-              <Upload size={14} /> 导入 sessions.json
+              <Upload size={14} />
+              {importing ? "正在导入…" : "导入备份"}
             </button>
             <input
+              ref={input}
               type="file"
-              ref={fileInputRef}
-              style={{ display: 'none' }}
-              accept=".json"
-              onChange={handleFileChange}
+              accept=".json,application/json"
+              hidden
+              onChange={(e) => {
+                void changeFile(e);
+              }}
             />
           </div>
+          {!canExport && (
+            <button
+              className="garden-btn-secondary"
+              disabled={busy || importing}
+              onClick={async () => {
+                if (
+                  window.confirm(
+                    "恢复默认时长和宠物偏好？原设置会保留备份，专注记录不修改。",
+                  )
+                ) {
+                  const restored = await onRestoreDefaults();
+                  setMessage(
+                    restored
+                      ? "默认设置已保存。记录仍有错误时，可继续导入记录备份。"
+                      : "设置未能恢复，请重试。",
+                  );
+                }
+              }}
+            >
+              恢复默认设置
+            </button>
+          )}
+          {(message || error) && (
+            <p className="settings-message" role="status">
+              {message || error}
+            </p>
+          )}
         </div>
-
-        <div className="dialog-actions" style={{ marginTop: 18 }}>
-          <button type="button" className="garden-btn-primary" onClick={onClose} style={{ minWidth: 100 }}>
+        <div className="dialog-actions">
+          <button className="garden-btn-primary" onClick={onClose}>
             完成
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
-};
+}

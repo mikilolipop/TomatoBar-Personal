@@ -6,6 +6,9 @@ on:
       - feature/personal-focus
     tags:
       - 'v*'
+    paths:
+      - 'TomatoBar-Desktop/**'
+      - '.github/workflows/windows-build.yml'
   pull_request:
     paths:
       - 'TomatoBar-Desktop/**'
@@ -36,6 +39,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
+          components: rustfmt, clippy
 
       - name: Rust Cache
         uses: swatinem/rust-cache@v2
@@ -46,13 +50,18 @@ jobs:
         working-directory: TomatoBar-Desktop
         run: npm ci
 
-      - name: Run Domain Unit Tests
+      - name: Check Frontend Format, Lint, Tests and Build
         working-directory: TomatoBar-Desktop
-        run: npm test
+        run: |
+          npm run format:check
+          npm run check
 
-      - name: Build Web Frontend
-        working-directory: TomatoBar-Desktop
-        run: npm run build
+      - name: Check Rust Format, Storage Tests and Clippy
+        working-directory: TomatoBar-Desktop/src-tauri
+        run: |
+          cargo fmt --check
+          cargo test --locked
+          cargo clippy --locked --all-targets -- -D warnings
 
       - name: Build Windows Tauri Package
         working-directory: TomatoBar-Desktop
@@ -66,4 +75,4 @@ jobs:
             TomatoBar-Desktop/src-tauri/target/release/bundle/nsis/*.exe
             TomatoBar-Desktop/src-tauri/target/release/bundle/msi/*.msi
             TomatoBar-Desktop/src-tauri/target/release/*.exe
-          if-no-files-found: warn
+          if-no-files-found: error

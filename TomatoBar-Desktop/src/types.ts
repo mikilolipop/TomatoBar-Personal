@@ -1,13 +1,14 @@
 /**
  * TomatoBar Personal - Core Domain Data Types
- * 100% strictly compatible with macOS Swift State.swift schema and sessions.json
+ * Domain dates are ISO strings. The sessions codec handles Swift's 2001 date epoch.
  */
 
-export type FocusPhase = 'idle' | 'work' | 'rest' | 'workFinished' | 'restFinished';
+export type FocusPhase =
+  "idle" | "work" | "rest" | "workFinished" | "restFinished";
 
 export interface FocusSegment {
   start: string; // ISO 8601 string
-  end: string;   // ISO 8601 string
+  end: string; // ISO 8601 string
 }
 
 export function segmentSeconds(segment: FocusSegment): number {
@@ -34,7 +35,7 @@ export function recordSeconds(record: FocusRecord): number {
 }
 
 export function recordCategory(record: FocusRecord): string {
-  return record.tags[0] || '未分类';
+  return record.tags[0] || "未分类";
 }
 
 export interface FocusProject {
@@ -81,9 +82,9 @@ export interface FocusState {
 
 export function createDefaultFocusState(): FocusState {
   return {
-    phase: 'idle',
+    phase: "idle",
     paused: false,
-    name: '',
+    name: "",
     startedAt: null,
     segmentStart: null,
     deadline: null,
@@ -115,13 +116,16 @@ export function normalizeTags(tags: string[]): string[] {
   return result;
 }
 
-export function parseInputWithTags(raw: string): { title: string; tags: string[] } {
+export function parseInputWithTags(raw: string): {
+  title: string;
+  tags: string[];
+} {
   const parts = raw.split(/\s+/).filter(Boolean);
   const tags: string[] = [];
   const titleWords: string[] = [];
 
   for (const part of parts) {
-    if (part.startsWith('#') && part.length > 1) {
+    if (part.startsWith("#") && part.length > 1) {
       const tag = part.slice(1).trim();
       if (tag) tags.push(tag);
     } else {
@@ -129,14 +133,14 @@ export function parseInputWithTags(raw: string): { title: string; tags: string[]
     }
   }
 
-  const title = titleWords.join(' ').trim();
+  const title = titleWords.join(" ").trim();
   return {
     title: title || raw.trim(),
     tags: normalizeTags(tags),
   };
 }
 
-export type PetKind = 'tomy' | 'sprout' | 'chip' | 'clay';
+export type PetKind = "tomy" | "sprout";
 
 export interface PetConfig {
   kind: PetKind;
