@@ -1,0 +1,10 @@
+# Keep formatter input identical across macOS and Windows Git checkouts.
+*.ts text eol=lf
+*.tsx text eol=lf
+*.css text eol=lf
+*.json text eol=lf
+*.mjs text eol=lf
+*.rs text eol=lf
+*.toml text eol=lf
+*.lock text eol=lf
+*.html text eol=lf
