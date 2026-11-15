@@ -348,6 +348,77 @@ check(PetKind.chip.stripAnimation(for: .work, paused: false) == nil,
 check(PetKind.clay.stripAnimation(for: .work, paused: false) == nil,
       "Clay uses frame sequence rather than sprite strip")
 
+// Desktop pet lineup normalization (2026-11-15): the four generated Chip work
+// drawings are unrelated scenes (monitor sides swap, facing flips, a second cat
+// appears), so the pet must hold a single frame instead of flickering.
+check(PetKind.chip.frameNames(for: .work) == ["pet_chip_work_0"],
+      "Chip work holds one authored scene instead of cycling unrelated drawings")
+check(PetKind.chip.frameNames(for: .workFinished) == ["pet_chip_work_3"] &&
+      PetKind.chip.frameNames(for: .restFinished) == ["pet_chip_work_3"],
+      "Chip completion holds the two-cat celebration drawing")
+check(PetKind.chip.frameNames(for: .idle) == ["pet_chip_idle"] &&
+      PetKind.chip.frameNames(for: .rest) == ["pet_chip_rest"],
+      "Chip idle/rest no longer re-draw identical frames on a timer")
+check(PetKind.clay.frameNames(for: .work) == ["pet_clay_focus"] &&
+      PetKind.clay.frameNames(for: .idle) == ["pet_clay_idle"] &&
+      PetKind.clay.frameNames(for: .rest) == ["pet_clay_rest"],
+      "Clay phases each resolve to one asset")
+let chipAssets = PetKind.chip.legacyDisplayAssets
+check(chipAssets.count == 4 && Set(chipAssets.map(\.name)) ==
+      ["pet_chip_idle", "pet_chip_work_0", "pet_chip_rest", "pet_chip_work_3"],
+      "Chip size normalization covers exactly the four displayed assets")
+let sproutAssets = PetKind.sprout.legacyDisplayAssets
+check(sproutAssets.count == 7 && Set(sproutAssets.map(\.name)).contains("pet_sprout_work_paused_v3"),
+      "Sprout size normalization covers every strip including paused variants")
+check(PetKind.tomy.legacyDisplayAssets.isEmpty,
+      "Tomy is normalized by the compact atlas, not legacy assets")
+
+// Shared status capsule: all four pets use the same text/indicator rules.
+let idlePill = PetStatusModel(kind: .chip, phase: .idle, paused: false, timeLeft: "25:00")
+check(idlePill.style == .name && idlePill.text == "码小黑" && idlePill.indicator == .none,
+      "idle capsule shows the pet name badge")
+let workPill = PetStatusModel(kind: .clay, phase: .work, paused: false, timeLeft: "24:59")
+check(workPill.style == .timer && workPill.text == "24:59" && workPill.indicator == .red,
+      "work capsule shows the red timer")
+let restPill = PetStatusModel(kind: .sprout, phase: .rest, paused: false, timeLeft: "04:00")
+check(restPill.style == .timer && restPill.indicator == .green,
+      "rest capsule shows the green timer")
+let pausedPill = PetStatusModel(kind: .tomy, phase: .work, paused: true, timeLeft: "12:34")
+check(pausedPill.style == .paused && pausedPill.text == "⏸ 12:34" && pausedPill.indicator == .muted,
+      "paused capsule shows the muted pause marker")
+let donePill = PetStatusModel(kind: .tomy, phase: .workFinished, paused: false, timeLeft: "00:00")
+let restDonePill = PetStatusModel(kind: .tomy, phase: .restFinished, paused: false, timeLeft: "00:00")
+check(donePill.style == .attention && donePill.text == "🎉 达成" && donePill.indicator == .orange &&
+      restDonePill.text == "☕️ 结束",
+      "completion capsule announces 达成 / 结束 with an orange indicator")
+
+// Content normalization primitives.
+var alphaPixels = [UInt8](repeating: 0, count: 8 * 8 * 4)
+alphaPixels[(3 * 8 + 2) * 4 + 3] = 200
+alphaPixels[(5 * 8 + 6) * 4 + 3] = 100
+check(PetAlphaBounds.bounds(in: alphaPixels, width: 8, height: 8) ==
+      CGRect(x: 2, y: 3, width: 5, height: 3),
+      "alpha bounds use top-left pixel coordinates")
+var faintPixels = [UInt8](repeating: 0, count: 4 * 4 * 4)
+faintPixels[(1 * 4 + 1) * 4 + 3] = 8
+check(PetAlphaBounds.bounds(in: faintPixels, width: 4, height: 4) == nil &&
+      PetAlphaBounds.bounds(in: faintPixels, width: 4, height: 4, threshold: 4) ==
+      CGRect(x: 1, y: 1, width: 1, height: 1),
+      "alpha threshold ignores sub-threshold noise")
+check(PetAlphaBounds.bounds(in: [UInt8](repeating: 0, count: 16), width: 2, height: 2) == nil,
+      "fully transparent buffer has no bounds")
+check(PetSpriteFit.scale(cellSize: CGSize(width: 200, height: 100),
+                         box: CGSize(width: 100, height: 100)) == 0.5,
+      "fit scale uses the limiting dimension")
+check(PetSpriteFit.scale(cellSize: .zero, box: CGSize(width: 100, height: 100)) == 1,
+      "fit scale is safe for empty cells")
+check(PetSpriteFit.petScale(cellSizes: [CGSize(width: 100, height: 100),
+                                        CGSize(width: 200, height: 100)],
+                            box: CGSize(width: 100, height: 100)) == 0.5 &&
+      PetSpriteFit.petScale(cellSizes: [], box: CGSize(width: 100, height: 100)) == nil,
+      "per-pet scale is the tightest state and optional when empty")
+
+
 // Compact Tomy uses the approved neutral body and authored eye patches, not the legacy strip.
 let atlasURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
     .appendingPathComponent("TomatoBar/Assets.xcassets/pet_tomy_compact_v1.imageset/pet_tomy_compact_v1.png")
@@ -535,6 +606,101 @@ check(snapshotTimer.state.currentTodoID == nil, "completing the selected task cl
 snapshotTimer.deleteTodo(id: snapshotTask)
 check(snapshotTimer.state.todos.isEmpty, "deleting the task leaves no prepared-selection path")
 withExtendedLifetime((workspaceObservation, clockObservation)) {}
+
+// Renaming the carried task must not overwrite the event field once another task is the
+// explicit current selection: the next round would otherwise record the selected task
+// under the old task's new name.
+let renameDir = scratch.appendingPathComponent("bridge-rename")
+let renameStore = FocusStore(url: renameDir.appendingPathComponent("sessions.json"))
+var renameSeed = FocusState()
+let renameA = renameSeed.addTodo(title: "旧任务", at: now)!
+let renameB = renameSeed.addTodo(title: "历史作业", at: now)!
+renameSeed.currentTodoID = renameB
+renameSeed.seriesTodoID = renameA
+try renameStore.save(renameSeed)
+let renameTimer = TBTimer(store: renameStore)
+check(renameTimer.eventName == "历史作业", "init mirrors the selected task into the event field")
+renameTimer.renameTodo(id: renameA, title: "旧任务改名")
+check(renameTimer.state.currentTodoID == renameB && renameTimer.eventName == "历史作业",
+      "renaming the carried task leaves the selected task's event field alone")
+renameTimer.renameTodo(id: renameB, title: "历史作业改名")
+check(renameTimer.eventName == "历史作业改名", "renaming the current task follows into the event field")
+
+// The event field mirrors the display name (with project prefix), so echoing that value
+// back must not be mistaken for a manual edit that drops the task selection.
+let prefixDir = scratch.appendingPathComponent("bridge-prefix")
+let prefixStore = FocusStore(url: prefixDir.appendingPathComponent("sessions.json"))
+var prefixSeed = FocusState()
+let prefixProject = prefixSeed.addProject(name: "QA PROJECT", at: now)!
+let prefixTodo = prefixSeed.addTodo(title: "复习", projectID: prefixProject, at: now)!
+try prefixStore.save(prefixSeed)
+let prefixTimer = TBTimer(store: prefixStore)
+prefixTimer.selectCurrentTodo(prefixTodo)
+check(prefixTimer.eventName == "[QA PROJECT] · 复习", "selection fills the prefixed display name")
+prefixTimer.setEventName("[QA PROJECT] · 复习")
+check(prefixTimer.state.currentTodoID == prefixTodo, "echoing the prefixed name keeps the selection")
+prefixTimer.updateProject(id: prefixProject, name: "QA RENAMED")
+prefixTimer.setEventName("[QA RENAMED] · 复习")
+check(prefixTimer.state.currentTodoID == prefixTodo, "a renamed project's prefixed name keeps the selection")
+prefixTimer.setEventName("临时改名")
+check(prefixTimer.state.currentTodoID == nil, "a genuinely manual name clears the selection")
+
+// A successful reload must re-mirror the recovered selection: the field could otherwise
+// still hold the name typed while the file was unreadable.
+let reloadDir = scratch.appendingPathComponent("bridge-reload")
+let reloadURL = reloadDir.appendingPathComponent("sessions.json")
+let reloadStore = FocusStore(url: reloadURL)
+var reloadSeed = FocusState()
+let reloadTodo = reloadSeed.addTodo(title: "恢复任务", at: now)!
+reloadSeed.currentTodoID = reloadTodo
+try FileManager.default.createDirectory(at: reloadDir, withIntermediateDirectories: true)
+try Data("broken".utf8).write(to: reloadURL)
+let reloadTimer = TBTimer(store: reloadStore)
+check(reloadTimer.storageError != nil, "reload probe starts from an unreadable file")
+reloadTimer.setEventName("临时名字")
+try reloadStore.save(reloadSeed)
+reloadTimer.retryStorage()
+check(reloadTimer.storageError == nil && reloadTimer.state.currentTodoID == reloadTodo,
+      "retryStorage recovers the selection")
+check(reloadTimer.eventName == "恢复任务", "a successful reload re-mirrors the recovered selection")
+
+// Bounded summary cache: eviction must drop only filtered summaries, so the unfiltered
+// one every panel reads stays cached across a category switch.
+let evictStore = FocusStore(url: scratch.appendingPathComponent("evict/sessions.json"))
+var evictSeed = FocusState()
+let evictRecord = FocusRecord(id: UUID(), name: "QA EVICT", startedAt: now,
+    endedAt: now.addingTimeInterval(60), plannedSeconds: 60, completed: true,
+    segments: [FocusSegment(start: now, end: now.addingTimeInterval(60))], tags: ["Straße"])
+evictSeed.records = [evictRecord]
+try evictStore.save(evictSeed)
+let evictTimer = TBTimer(store: evictStore)
+let evictHistory = evictTimer.history
+_ = evictHistory.summary(period: .day, date: now)
+_ = evictHistory.summary(period: .day, date: now, category: "Straße")
+let buildsBeforeSwitch = evictHistory.summaryBuildCount
+_ = evictHistory.summary(period: .day, date: now, category: "STRASSE")
+check(evictHistory.summaryBuildCount == buildsBeforeSwitch, "equivalent filters still reuse one summary")
+_ = evictHistory.summary(period: .day, date: now, category: "数学")
+check(evictHistory.summaryBuildCount == buildsBeforeSwitch + 1, "a new filter builds exactly one summary")
+_ = evictHistory.summary(period: .day, date: now)
+check(evictHistory.summaryBuildCount == buildsBeforeSwitch + 1,
+      "switching filtered categories never evicts the unfiltered summary")
+
+// Row controls read the coarse session state from history (P5 layering: the parent stays
+// on history only), so phase transitions must publish there while plain ticks must not.
+let sessionStore = FocusStore(url: scratch.appendingPathComponent("session/sessions.json"))
+try sessionStore.save(FocusState())
+let sessionTimer = TBTimer(store: sessionStore)
+check(!sessionTimer.history.session.isTiming && !sessionTimer.history.session.needsAttention,
+      "history session starts idle")
+sessionTimer.startWork()
+check(sessionTimer.history.session.isTiming && sessionTimer.history.session.storageError == nil,
+      "starting work publishes the running session to history")
+let sessionHistory = sessionTimer.history
+let changesWhileStarting = sessionHistory.summaryBuildCount
+sessionTimer.stop()
+check(!sessionHistory.session.isTiming && sessionHistory.summaryBuildCount == changesWhileStarting,
+      "stopping work publishes the idle session without touching summaries")
 
 let calendarHistory = FocusHistory()
 var calendarChanges = 0

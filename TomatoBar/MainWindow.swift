@@ -4,6 +4,9 @@ import KeyboardShortcuts
 import UniformTypeIdentifiers
 
 struct MainWindowView: View {
+    // Parent observes history only (P5 layering): row controls gate on
+    // `history.session`, which excludes the ticking deadline, so a per-second tick
+    // cannot re-evaluate this whole page.
     let timer: TBTimer
     @ObservedObject var history: FocusHistory
     @State private var period = FocusPeriod.day
@@ -257,6 +260,13 @@ struct MainWindowView: View {
     private func step(_ value: Int) {
         if let next = Calendar.current.date(byAdding: period == .week ? .day : period.component, value: period == .week ? value * 7 : value, to: date) { date = next }
     }
+    /// Selection and toggle-off use the same identity as `clearStaleFilter` and the chart
+    /// filter. Plain `==` missed equivalent spellings ("Straße"/"STRASSE"), leaving the
+    /// row unhighlighted while the chart stayed filtered, and clicking it re-filtered
+    /// instead of clearing.
+    private func isSelected(_ category: String) -> Bool {
+        selectedCategory.map { FocusRecord.sameTag($0, category) } ?? false
+    }
     private var summaryPanel: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("\(period == .day ? "当日" : period == .week ? "本周" : "本月")累计专注（不含进行中）")
@@ -270,17 +280,17 @@ struct MainWindowView: View {
             ScrollView {
                 VStack(spacing: 7) {
                     ForEach(showAllCategories ? summary.categories : Array(summary.categories.prefix(5))) { category in
-                        Button { selectedCategory = selectedCategory == category.name ? nil : category.name } label: {
+                        Button { selectedCategory = isSelected(category.name) ? nil : category.name } label: {
                             HStack {
                                 Rectangle().fill(Garden.color(category.name, styles: timer.state.categoryStyles)).frame(width: 10, height: 10)
                                 Text(category.name).lineLimit(1)
                                 Spacer()
                                 Text(focusDuration(category.seconds)).foregroundColor(Garden.muted)
                             }.font(.system(size: 13)).padding(.vertical, 2)
-                                .background(selectedCategory == category.name ? Garden.line.opacity(0.4) : .clear)
+                                .background(isSelected(category.name) ? Garden.line.opacity(0.4) : .clear)
                         }.buttonStyle(.plain)
                             .accessibilityLabel("筛选主分类：\(category.name)，\(focusDuration(category.seconds))")
-                            .accessibilityValue(selectedCategory == category.name ? "已选中" : "未选中")
+                            .accessibilityValue(isSelected(category.name) ? "已选中" : "未选中")
                     }
                     if summary.categories.count > 5 {
                         Button(showAllCategories ? "收起标签" : "展开其余 \(summary.categories.count - 5) 个标签") { showAllCategories.toggle() }
@@ -750,6 +760,7 @@ struct MainWindowView: View {
             todo: todo,
             isSubtask: isSubtask,
             isCurrent: isCurrent,
+            isBlocked: history.session.isTiming || history.session.needsAttention || history.session.storageError != nil,
             timer: timer,
             editingTodoID: $editingTodoID,
             editingTodoTitle: $editingTodoTitle,
@@ -1043,11 +1054,9 @@ struct ExpandedTimer: View {
                 if let current = timer.state.currentTodo {
                     HStack(spacing: 8) {
                         Text("🎯")
-                        if let proj = current.projectID.flatMap({ timer.state.project(for: $0) }) {
-                            Text("[\(proj.name)] · \(current.title)").font(.title3).fontWeight(.medium)
-                        } else {
-                            Text(current.title).font(.title3).fontWeight(.medium)
-                        }
+                        // One formatter for every surface; a hand-built prefix here drifted
+                        // from the one recorded into the session.
+                        Text(timer.state.displayName(for: current)).font(.title3).fontWeight(.medium)
                         if !current.tags.isEmpty {
                             Text(current.tags.map { "#\($0)" }.joined(separator: " "))
                                 .font(.subheadline)
@@ -1218,6 +1227,10 @@ struct TodoRowView: View {
     let todo: FocusTodo
     let isSubtask: Bool
     let isCurrent: Bool
+    /// Why another task must not start right now (a running session or an unsaved
+    /// storage failure). Passed in from the parent's observed history session, so the
+    /// row never has to observe the ticking timer itself.
+    let isBlocked: Bool
     let timer: TBTimer
     @Binding var editingTodoID: UUID?
     @Binding var editingTodoTitle: String
@@ -1293,7 +1306,7 @@ struct TodoRowView: View {
                     .buttonStyle(.plain)
                     .help("立即开始这项待办")
                     .accessibilityLabel("开始待办：\(todo.title)")
-                    .disabled(timer.state.isTiming || timer.state.needsAttention || timer.storageError != nil)
+                    .disabled(isBlocked)
                     .opacity(isHovered || isCurrent ? 1.0 : 0.0)
                 }
 

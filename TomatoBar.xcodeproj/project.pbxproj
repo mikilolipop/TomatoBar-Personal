@@ -24,6 +24,7 @@
 		D12000000000000000000012 /* FocusCharts.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12000000000000000000002 /* FocusCharts.swift */; };
 		D13000000000000000000010 /* LaunchContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = D13000000000000000000000 /* LaunchContext.swift */; };
 		D12000000000000000000013 /* DesktopPet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12000000000000000000003 /* DesktopPet.swift */; };
+		D15000000000000000000010 /* PetSpriteMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D15000000000000000000000 /* PetSpriteMetrics.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -52,6 +53,7 @@
 		D12000000000000000000002 /* FocusCharts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusCharts.swift; sourceTree = "<group>"; };
 		D13000000000000000000000 /* LaunchContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchContext.swift; sourceTree = "<group>"; };
 		D12000000000000000000003 /* DesktopPet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPet.swift; sourceTree = "<group>"; };
+		D15000000000000000000000 /* PetSpriteMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetSpriteMetrics.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -90,6 +92,7 @@
 				8A21B78B27EE31A20009E5DB /* App.swift */,
 				D12000000000000000000003 /* DesktopPet.swift */,
 				D14000000000000000000001 /* CompactDesktopPet.swift */,
+				D15000000000000000000000 /* PetSpriteMetrics.swift */,
 				D14000000000000000000000 /* PetMotion.swift */,
 				D13000000000000000000000 /* LaunchContext.swift */,
 				D12000000000000000000002 /* FocusCharts.swift */,
@@ -224,6 +227,7 @@
 				D13000000000000000000010 /* LaunchContext.swift in Sources */,
 				D12000000000000000000013 /* DesktopPet.swift in Sources */,
 				D14000000000000000000011 /* CompactDesktopPet.swift in Sources */,
+				D15000000000000000000010 /* PetSpriteMetrics.swift in Sources */,
 				D14000000000000000000010 /* PetMotion.swift in Sources */,
 				D12000000000000000000012 /* FocusCharts.swift in Sources */,
 				D12000000000000000000011 /* MainWindow.swift in Sources */,

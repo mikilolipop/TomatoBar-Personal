@@ -76,6 +76,12 @@ struct FocusRecord: Codable, Identifiable, Equatable {
         tagIdentity(lhs) == tagIdentity(rhs)
     }
 
+    /// Key `categoryStyles` stores an override under for a *newly written* override.
+    /// `lowercased()` is kept because existing sessions.json files already use it, but it
+    /// is only half the contract: matching an existing key must use `sameTag`, otherwise
+    /// editor and save path can disagree on the spelling of the same category.
+    static func styleStorageKey(for category: String) -> String { category.lowercased() }
+
     static func togglingTag(_ tag: String, in tags: [String]) -> [String] {
         let tag = tag.trimmingCharacters(in: .whitespacesAndNewlines)
         let tags = normalizedTags(tags)
@@ -462,13 +468,12 @@ struct FocusState: Codable {
     }
 
     func focusSeconds(forProject id: UUID) -> TimeInterval {
-        let projectTodoIDs = Set(todos.filter { $0.projectID == id }.map(\.id))
-        return records.reduce(0) { sum, record in
-            // A saved project is historical ownership. Only legacy records without
-            // it follow the linked task, so moving a task cannot count time twice.
-            let belongs = record.projectID.map { $0 == id }
-                ?? record.todoID.map { projectTodoIDs.contains($0) } ?? false
-            return sum + (belongs ? record.seconds : 0)
+        records.reduce(0) { sum, record in
+            // A saved project is the record's historical ownership, and a record without
+            // one was free or project-less work at the time. Falling back to the linked
+            // task's *current* project would retroactively move old sessions into a
+            // project the task only joined later, so attribution is strict here.
+            sum + (record.projectID == id ? record.seconds : 0)
         }
     }
 
@@ -507,13 +512,21 @@ struct FocusState: Codable {
         // Merge only the keys this edit touched, so two editors holding separate drafts
         // cannot wipe each other's saved overrides (P13). Keys are re-spelled to the
         // canonical tag before storage, because caseInsensitiveCompare and lowercased()
-        // disagree on Unicode pairs such as Straße/STRASSE (P12).
+        // disagree on Unicode pairs such as Straße/STRASSE (P12). Removal matches every
+        // alias of the touched identity first: a reset spelled differently from the
+        // stored key (old builds wrote one, the new spelling reads another) used to leave
+        // the old override resolving, so 恢复全部自动 silently did nothing.
         if let styleChanges = styleChanges {
+            let canonicalKeys = styleChanges.keys.map { key in
+                canonicalTags.first { FocusRecord.sameTag($0, key) } ?? key
+            }
+            categoryStyles = categoryStyles.filter { existing in
+                !canonicalKeys.contains { FocusRecord.sameTag($0, existing.key) }
+            }
             for (key, value) in styleChanges {
+                guard let value = value else { continue }
                 let canonical = canonicalTags.first { FocusRecord.sameTag($0, key) } ?? key
-                let storageKey = canonical.lowercased()
-                if let value = value { categoryStyles[storageKey] = value }
-                else { categoryStyles.removeValue(forKey: storageKey) }
+                categoryStyles[FocusRecord.styleStorageKey(for: canonical)] = value
             }
         }
     }

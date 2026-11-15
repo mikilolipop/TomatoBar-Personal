@@ -4,6 +4,8 @@ import SwiftUI
 enum CompactPetLayout {
     static let slot = 96.0
     static let characterHeight = 80.0
+    /// Reserved strip below the character for the shared status capsule.
+    static let statusArea = 26.0
     static func scale(_ value: Double) -> Double {
         value.isFinite && value > 0.5 ? min(1.2, max(0.8, value)) : 1
     }
@@ -205,25 +207,36 @@ struct CompactDesktopPetView: View {
     private var state: PetMotionState { PetMotionState(phase: timer.state.phase, paused: timer.state.paused) }
 
     var body: some View {
-        ZStack {
-            CompactTomySprite(pose: animator.pose)
-            DesktopPetEventRepresentable(
-                onSingleClick: { timer.primaryAction() },
-                onDoubleClick: { TBStatusItem.shared?.showMainWindow() },
-                onRightClick: { DesktopPetController.shared?.showCompactContextMenu(with: $0) },
-                onDragEnded: {
-                    dragging = false; updateMotion()
-                    DesktopPetController.shared?.saveCurrentPosition()
-                },
-                onHoverStateChanged: { value in hovered = value; updateMotion() },
-                onDragBegan: {
-                    dragging = true; updateMotion()
-                },
-                acceptsPoint: { point, size in CompactTomyAtlas.shared.contains(point, size: size, pose: animator.pose) },
-                onPresentationChanged: { animator.setPresented($0) },
-                accessibilityName: "Tomy，\(state.label)")
+        VStack(spacing: 4) {
+            ZStack {
+                CompactTomySprite(pose: animator.pose)
+                DesktopPetEventRepresentable(
+                    onSingleClick: { timer.primaryAction() },
+                    onDoubleClick: { TBStatusItem.shared?.showMainWindow() },
+                    onRightClick: { DesktopPetController.shared?.showCompactContextMenu(with: $0) },
+                    onDragEnded: {
+                        dragging = false; updateMotion()
+                        DesktopPetController.shared?.saveCurrentPosition()
+                    },
+                    onHoverStateChanged: { value in hovered = value; updateMotion() },
+                    onDragBegan: {
+                        dragging = true; updateMotion()
+                    },
+                    acceptsPoint: { point, size in CompactTomyAtlas.shared.contains(point, size: size, pose: animator.pose) },
+                    onPresentationChanged: { animator.setPresented($0) },
+                    accessibilityName: "\(PetKind.tomy.shortName)，\(state.label)")
+            }
+            .frame(width: side, height: side)
+
+            // Same status capsule as the legacy pets, so all four characters
+            // present the timer state in one visual language.
+            PetStatusPill(model: PetStatusModel(kind: .tomy,
+                                                phase: timer.state.phase,
+                                                paused: timer.state.paused,
+                                                timeLeft: timer.timeLeft),
+                          compact: true)
         }
-        .frame(width: side, height: side)
+        .frame(width: side, height: side + CompactPetLayout.statusArea)
         .onAppear { updateMotion(); animator.setPresented(show) }
         .onDisappear { animator.stop() }
         .onChange(of: timer.state.phase) { _ in updateMotion() }
@@ -255,7 +268,7 @@ struct CompactPetTooltipView: View {
     }
     var body: some View {
         HStack(spacing: 8) {
-            Text("Tomy").fontWeight(.semibold)
+            Text(PetKind.tomy.shortName).fontWeight(.semibold)
             Text(state.label).foregroundColor(Garden.muted)
             Spacer(minLength: 4)
             Text(detail).monospacedDigit().foregroundColor(Garden.red)

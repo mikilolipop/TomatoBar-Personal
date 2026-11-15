@@ -355,6 +355,19 @@ check(uniState.records[0].category == "Straße", "canonical spelling wins on sav
 check(uniState.categoryStyles.keys.first == "straße", "override key is re-spelled to the canonical tag")
 check(FocusState.styleSymbol(in: uniState.categoryStyles, forCategory: uniState.records[0].category) == "star",
       "override written from a draft spelling resolves against the canonical category")
+check(FocusRecord.styleStorageKey(for: "Straße") == "straße" && FocusRecord.styleStorageKey(for: "STRASSE") == "strasse",
+      "new overrides keep the legacy lowercased key for each spelling")
+// A reset drafted under an alias spelling must clear the override the save path stored
+// under the canonical one; keying the two differently left the old entry resolving and
+// the reset silently did nothing.
+var staleAlias = uniState
+staleAlias.categoryStyles["strasse"] = "globe"
+try staleAlias.editRecord(id: uniRecord.id, name: uniRecord.name, tags: uniRecord.tags,
+                          styleChanges: [FocusRecord.styleStorageKey(for: "STRASSE"): nil])
+check(staleAlias.categoryStyles.isEmpty,
+      "a reset clears both the canonical override and a stale alias key")
+check(FocusState.styleSymbol(in: staleAlias.categoryStyles, forCategory: "Straße") == nil,
+      "no alias key survives a reset")
 check(FocusState.styleSymbol(in: ["swift": "star"], forCategory: "Swift") == "star", "exact lowercased key resolves")
 check(FocusState.styleSymbol(in: ["Swift": "star"], forCategory: "swift") == "star", "alias fallback matches across case")
 check(FocusState.styleSymbol(in: [:], forCategory: "学习") == nil, "no override resolves to nil")
@@ -907,7 +920,9 @@ check(legacyDecodedState.projects.isEmpty && legacyDecodedState.todos.first?.pro
 print("PASS: \(checks) total checks including project hierarchy, tag inheritance, subtask aggregation and legacy compatibility")
 
 // A task can move, but a record with historical project ownership must not move
-// with it or be counted in both projects. Legacy records still follow the task.
+// with it or be counted in both projects. A record without project ownership keeps
+// none: inferring it from the task's *current* project would retroactively count
+// pre-move sessions for the destination.
 var moved = FocusState()
 let originalProject = moved.addProject(name: "QA PROJECT A", at: base)!
 let destinationProject = moved.addProject(name: "QA PROJECT B", at: base)!
@@ -926,8 +941,13 @@ let legacyProjectRecord = FocusRecord(id: UUID(), name: "QA LEGACY", startedAt: 
     todoID: movedTask)
 moved.records.append(legacyProjectRecord)
 let movedRoundTrip = try JSONDecoder().decode(FocusState.self, from: JSONEncoder().encode(moved))
-check(movedRoundTrip.focusSeconds(forProject: originalProject) == 60 && movedRoundTrip.focusSeconds(forProject: destinationProject) == 45,
-      "legacy records fall back to current task ownership after JSON round trip")
+check(movedRoundTrip.focusSeconds(forProject: originalProject) == 60 && movedRoundTrip.focusSeconds(forProject: destinationProject) == 0,
+      "a record without project ownership is never attributed retroactively")
+moved.stop(at: base.addingTimeInterval(61))
+moved.startWork(name: "QA AFTER MOVE", seconds: 60, todoID: movedTask, at: base.addingTimeInterval(100))
+moved.tick(at: base.addingTimeInterval(160))
+check(moved.focusSeconds(forProject: destinationProject) == 60,
+      "work recorded after the move carries the destination project")
 moved.deleteTodo(id: movedTask)
 check(moved.focusSeconds(forProject: originalProject) == 60,
       "deleting a task preserves its recorded project ownership")

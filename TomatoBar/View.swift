@@ -358,7 +358,7 @@ struct TBPopoverView: View {
                 if !tag.isEmpty {
                     if isCustomTagForDraft {
                         let current = timer.state.draftTags
-                        if !current.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) {
+                        if !current.contains(where: { FocusRecord.sameTag($0, tag) }) {
                             timer.setDraftTags(current + [tag])
                         }
                     } else if let id = customTagTargetTodoID {
@@ -941,7 +941,7 @@ private struct CategoryMenuButton: NSViewRepresentable {
             for category in categories {
                 let item = NSMenuItem(title: category, action: nil, keyEquivalent: "")
                 item.representedObject = category
-                item.state = category == selection ? .on : .off
+                item.state = FocusRecord.sameTag(category, selection) ? .on : .off
                 menu.addItem(item)
             }
         }
@@ -1061,11 +1061,14 @@ struct RecordEditor: View {
         return image
     }
     private func setStyle(symbol: String?, colorIndex: Int?) {
-        let key = category.lowercased()
+        let key = FocusRecord.styleStorageKey(for: category)
+        // Drop any alias spelling first. Leaving an old "straße" entry beside a new
+        // "strasse" one made 恢复全部自动 a no-op: resolution still found the old key.
+        for existing in Array(localStyles.keys) where FocusRecord.sameTag(existing, key) {
+            localStyles.removeValue(forKey: existing)
+        }
         if let value = FocusState.composedStyle(symbol: symbol, colorIndex: colorIndex) {
             localStyles[key] = value
-        } else {
-            localStyles.removeValue(forKey: key)
         }
     }
     /// Only the keys this draft changed, so saving never replays a stale whole-map
@@ -1089,7 +1092,7 @@ struct RecordEditor: View {
     /// out of this menu so "主分类" and "其他标签" keep distinct meanings.
     private var unusedSuggestions: [String] {
         Garden.suggestedCategories.filter { suggested in
-            !availableCategories.contains { $0.caseInsensitiveCompare(suggested) == .orderedSame }
+            !availableCategories.contains { FocusRecord.sameTag($0, suggested) }
         }
     }
 

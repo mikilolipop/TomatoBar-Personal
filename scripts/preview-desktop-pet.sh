@@ -15,7 +15,7 @@ sed '/^@main$/d' TomatoBar/App.swift > "$qa_dir/App.swift"
 xcrun swiftc -I "$products" \
   TomatoBar/State.swift TomatoBar/Log.swift TomatoBar/Analytics.swift \
   TomatoBar/Timer.swift TomatoBar/View.swift TomatoBar/MainWindow.swift \
-  TomatoBar/FocusCharts.swift TomatoBar/DesktopPet.swift TomatoBar/PetMotion.swift \
+  TomatoBar/FocusCharts.swift TomatoBar/DesktopPet.swift TomatoBar/PetSpriteMetrics.swift TomatoBar/PetMotion.swift \
   TomatoBar/CompactDesktopPet.swift TomatoBar/Notifications.swift TomatoBar/LaunchContext.swift \
   "$qa_dir/App.swift" Tests/DesktopPetPreview/main.swift \
   "$products/KeyboardShortcuts.o" "$products/LaunchAtLogin.o" -o "$qa_app/Contents/MacOS/Tomy Desktop QA"

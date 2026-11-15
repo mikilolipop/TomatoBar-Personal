@@ -21,7 +21,35 @@ struct PetStripAnimation: Equatable {
     }
 }
 
+/// One frame of a strip, content-cropped and grounded on the bottom edge of
+/// the shared content box.
 private struct PetSpriteStripView: View {
+    let asset: PetSpriteAsset
+    let frameCount: Int
+    let frameIndex: Int
+    let scale: CGFloat
+    let box: CGSize
+
+    var body: some View {
+        let safeCount = max(frameCount, 1)
+        let safeIndex = min(max(frameIndex, 0), safeCount - 1)
+        let cellWidth = asset.cellSize.width * scale
+        let cellHeight = asset.cellSize.height * scale
+
+        Image(nsImage: asset.image)
+            .resizable()
+            .interpolation(.none)
+            .frame(width: asset.pixelSize.width * scale, height: cellHeight)
+            .offset(x: -cellWidth * CGFloat(safeIndex))
+            .frame(width: cellWidth, height: cellHeight, alignment: .leading)
+            .clipped()
+            .frame(width: box.width, height: box.height, alignment: .bottom)
+    }
+}
+
+/// Fallback for contexts without an asset catalog (tests, probes). Keeps the
+/// previous canvas-fitting behavior so a missing scan never blanks the pet.
+private struct PetSpriteStripFallbackView: View {
     let assetName: String
     let frameCount: Int
     let frameIndex: Int
@@ -39,6 +67,21 @@ private struct PetSpriteStripView: View {
             .offset(x: -width * CGFloat(safeIndex))
             .frame(width: width, height: height, alignment: .leading)
             .clipped()
+    }
+}
+
+/// A single content-cropped image, grounded on the shared baseline.
+private struct PetSpriteStillView: View {
+    let asset: PetSpriteAsset
+    let scale: CGFloat
+    let box: CGSize
+
+    var body: some View {
+        Image(nsImage: asset.image)
+            .resizable()
+            .interpolation(.none)
+            .frame(width: asset.pixelSize.width * scale, height: asset.pixelSize.height * scale)
+            .frame(width: box.width, height: box.height, alignment: .bottom)
     }
 }
 
@@ -226,20 +269,25 @@ enum PetKind: String, CaseIterable, Identifiable {
         case .chip:
             switch phase {
             case .work:
-                return ["pet_chip_work_0", "pet_chip_work_1", "pet_chip_work_2", "pet_chip_work_3"]
+                // The four generated work drawings are unrelated compositions
+                // (the monitor swaps sides, the cat flips, and one frame adds a
+                // second cat), so cycling them read as flicker. Hold the
+                // cleanest single scene instead.
+                return ["pet_chip_work_0"]
             case .rest:
-                return ["pet_chip_rest", "pet_chip_rest", "pet_chip_rest", "pet_chip_rest"]
+                return ["pet_chip_rest"]
             case .workFinished, .restFinished:
-                return ["pet_chip_work_3", "pet_chip_work_2", "pet_chip_work_1", "pet_chip_work_0"]
+                // The two-cat desk is the drawing authored as a celebration;
+                // hold it instead of replaying the four scenes backwards.
+                return ["pet_chip_work_3"]
             case .idle:
-                return ["pet_chip_idle", "pet_chip_idle", "pet_chip_idle", "pet_chip_idle"]
+                return ["pet_chip_idle"]
             }
         case .sprout:
             let single = singleImageName(for: phase)
             return [single, single, single, single]
         case .clay:
-            let single = singleImageName(for: phase)
-            return [single, single, single, single]
+            return [singleImageName(for: phase)]
         }
     }
 
@@ -274,6 +322,30 @@ enum PetKind: String, CaseIterable, Identifiable {
 
     func imageName(for phase: FocusPhase) -> String {
         singleImageName(for: phase)
+    }
+
+    /// Every image the legacy (non-compact) view can display for this pet.
+    /// Used to normalize apparent size across phases before the first frame is
+    /// drawn. Tomy uses the compact atlas and therefore has no legacy assets.
+    var legacyDisplayAssets: [(name: String, frames: Int)] {
+        guard self != .tomy else { return [] }
+        var seen = Set<String>()
+        var result: [(name: String, frames: Int)] = []
+        let phases: [FocusPhase] = [.idle, .work, .rest, .workFinished, .restFinished]
+        for phase in phases {
+            for paused in [false, true] {
+                if let strip = stripAnimation(for: phase, paused: paused) {
+                    if seen.insert(strip.assetName).inserted {
+                        result.append((strip.assetName, strip.frameCount))
+                    }
+                    continue
+                }
+                for name in frameNames(for: phase) where seen.insert(name).inserted {
+                    result.append((name, 1))
+                }
+            }
+        }
+        return result
     }
 }
 
@@ -417,6 +489,99 @@ struct DesktopPetEventRepresentable: NSViewRepresentable {
     }
 }
 
+// MARK: - Shared Status Capsule
+
+/// Presentation rules for the status capsule shown under every pet, so the
+/// compact Tomy view and the legacy sprite view speak the same language.
+struct PetStatusModel: Equatable {
+    enum Style: Equatable { case name, timer, paused, attention }
+    enum Indicator: Equatable { case none, red, green, muted, orange }
+
+    let style: Style
+    let indicator: Indicator
+    let text: String
+
+    init(kind: PetKind, phase: FocusPhase, paused: Bool, timeLeft: String) {
+        switch phase {
+        case .workFinished:
+            style = .attention
+            indicator = .orange
+            text = "🎉 达成"
+        case .restFinished:
+            style = .attention
+            indicator = .orange
+            text = "☕️ 结束"
+        case .idle:
+            style = .name
+            indicator = .none
+            text = kind.shortName
+        case .work, .rest:
+            if paused {
+                style = .paused
+                indicator = .muted
+                text = "⏸ \(timeLeft)"
+            } else {
+                style = .timer
+                indicator = phase == .work ? .red : .green
+                text = timeLeft
+            }
+        }
+    }
+}
+
+struct PetStatusPill: View {
+    let model: PetStatusModel
+    var compact = false
+
+    var body: some View {
+        if model.style == .name {
+            Text(model.text)
+                .font(.system(size: compact ? 9 : 10, weight: .medium))
+                .foregroundColor(Garden.muted)
+                .lineLimit(1)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(
+                    Capsule()
+                        .fill(Garden.paper.opacity(0.85))
+                        .overlay(Capsule().stroke(Garden.line.opacity(0.7), lineWidth: 0.6))
+                )
+        } else {
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(indicatorColor)
+                    .frame(width: 6, height: 6)
+
+                Text(model.text)
+                    .font(.system(size: compact ? 10 : 11, weight: .semibold, design: .monospaced))
+                    .foregroundColor(Garden.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .padding(.horizontal, compact ? 8 : 10)
+            .padding(.vertical, compact ? 3 : 4)
+            .background(
+                Capsule()
+                    .fill(Garden.paper.opacity(0.95))
+                    .shadow(color: Color.black.opacity(0.10), radius: 4, x: 0, y: 2)
+                    .overlay(
+                        Capsule().stroke(Garden.line, lineWidth: 0.8)
+                    )
+            )
+        }
+    }
+
+    private var indicatorColor: Color {
+        switch model.indicator {
+        case .none: return Garden.muted
+        case .red: return Garden.red
+        case .green: return Color.green
+        case .muted: return Garden.muted
+        case .orange: return Color.orange
+        }
+    }
+}
+
 // MARK: - SwiftUI Desktop Pet View
 
 struct DesktopPetView: View {
@@ -432,6 +597,7 @@ struct DesktopPetView: View {
     @State private var reduced: Bool
     @State private var presented = false
     @State private var dragging = false
+    @State private var hop = false
 
     init(timer: TBTimer, reducedMotion: Bool = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) {
         self.timer = timer
@@ -455,6 +621,20 @@ struct DesktopPetView: View {
         110 * CGFloat(petScale)
     }
 
+    /// Shared drawing box for every legacy state. Content is scaled to fit and
+    /// grounded on the bottom edge, so switching phase or pet never shifts the
+    /// apparent size or the baseline.
+    private var contentBox: CGSize {
+        let side = 104 * CGFloat(petScale)
+        return CGSize(width: side, height: side)
+    }
+
+    /// Chip and Clay are single-image pets; a slow breath keeps them alive
+    /// without inventing fake frame sequences.
+    private var breathingEnabled: Bool {
+        canAnimate && (petKind == .chip || petKind == .clay)
+    }
+
     var body: some View {
         VStack(spacing: 6) {
             // Top Slot: Reserved height so pet stays stationary when tooltip appears
@@ -468,32 +648,13 @@ struct DesktopPetView: View {
             }
             .frame(height: 28)
 
-            // Main Pet Sprite. Tomy uses deterministic sprite strips; legacy pets keep frame assets.
+            // Main Pet Sprite. Tomy uses deterministic sprite strips; legacy
+            // pets use content-normalized frame assets.
             ZStack {
-                if let strip = petKind.stripAnimation(for: timer.state.phase, paused: timer.state.paused) {
-                    PetSpriteStripView(
-                        assetName: strip.assetName,
-                        frameCount: strip.frameCount,
-                        frameIndex: frameIndex,
-                        width: spriteWidth,
-                        height: spriteHeight
-                    )
+                animatedPetSprite
                     .shadow(color: Color.black.opacity(0.12), radius: 6, x: 0, y: 3)
-                } else {
-                    let frames = petKind.frameNames(for: timer.state.phase)
-                    let currentFrameName = (frameIndex < frames.count)
-                        ? frames[frameIndex]
-                        : petKind.singleImageName(for: timer.state.phase)
-
-                    Image(currentFrameName)
-                        .resizable()
-                        .interpolation(.none)
-                        .scaledToFit()
-                        .frame(width: spriteWidth, height: spriteHeight)
-                        .shadow(color: Color.black.opacity(0.12), radius: 6, x: 0, y: 3)
-                        .offset(y: microYOffset)
-                        .scaleEffect(microScale)
-                }
+                    .scaleEffect(hop ? 1.05 : 1.0, anchor: .bottom)
+                    .offset(y: hop ? -4 : 0)
 
                 // Native Dragging and Gesture Overlay
                 DesktopPetEventRepresentable(
@@ -523,18 +684,32 @@ struct DesktopPetView: View {
             }
 
             // Bottom Status Capsule
-            statusPill
+            PetStatusPill(model: PetStatusModel(kind: petKind,
+                                                phase: timer.state.phase,
+                                                paused: timer.state.paused,
+                                                timeLeft: timer.timeLeft))
                 .padding(.bottom, 8)
         }
         .frame(width: 220 * CGFloat(petScale), height: 250 * CGFloat(petScale))
         .onAppear {
-            presented = showDesktopPet
+            // Presentation is owned by the controller, which knows whether the panel is
+            // on screen and whether the Mac is awake; register() already reported it.
+            // Re-asserting the `showDesktopPet` preference here would start animation
+            // for a panel that is hidden or sleep-suspended.
+            presented = DesktopPetController.shared?.isPresenting ?? false
             updateAnimationTimer()
         }
         .onDisappear {
             presented = false
             animTimer?.invalidate()
             animTimer = nil
+        }
+        .onChange(of: timer.state.needsAttention) { value in
+            guard value, canAnimate else { return }
+            withAnimation(.easeOut(duration: 0.18)) { hop = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                withAnimation(.easeInOut(duration: 0.28)) { hop = false }
+            }
         }
         .onChange(of: timer.state.phase) { _ in
             updateAnimationTimer(resetFrame: true)
@@ -557,6 +732,76 @@ struct DesktopPetView: View {
         }
     }
 
+    // MARK: - Pet Sprite
+
+    /// Chip and Clay have no authored frames, so a deterministic, time-based
+    /// breath keeps them alive. TimelineView only exists while the panel is
+    /// actually presented, animated and motion is allowed.
+    @ViewBuilder
+    private var animatedPetSprite: some View {
+        if breathingEnabled {
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: false)) { context in
+                petSprite
+                    .scaleEffect(breathScale(at: context.date), anchor: .bottom)
+            }
+        } else {
+            petSprite
+        }
+    }
+
+    /// Smooth 0…1 breath over a 4.2 s cycle; starts at rest so appearing never
+    /// pops.
+    private func breathScale(at date: Date) -> CGFloat {
+        let cycle = 4.2
+        let phase = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: cycle) / cycle
+        let wave = 0.5 - 0.5 * cos(phase * 2 * .pi)
+        return 1 + 0.014 * wave
+    }
+
+    @ViewBuilder
+    private var petSprite: some View {
+        if let strip = petKind.stripAnimation(for: timer.state.phase, paused: timer.state.paused) {
+            if let asset = PetSpriteMetrics.shared.asset(named: strip.assetName,
+                                                         frameCount: strip.frameCount) {
+                PetSpriteStripView(asset: asset,
+                                   frameCount: strip.frameCount,
+                                   frameIndex: frameIndex,
+                                   scale: spriteScale(for: asset),
+                                   box: contentBox)
+            } else {
+                PetSpriteStripFallbackView(assetName: strip.assetName,
+                                           frameCount: strip.frameCount,
+                                           frameIndex: frameIndex,
+                                           width: spriteWidth,
+                                           height: spriteHeight)
+            }
+        } else {
+            let frames = petKind.frameNames(for: timer.state.phase)
+            let name = (frameIndex < frames.count)
+                ? frames[frameIndex]
+                : petKind.singleImageName(for: timer.state.phase)
+            if let asset = PetSpriteMetrics.shared.asset(named: name, frameCount: 1) {
+                PetSpriteStillView(asset: asset, scale: spriteScale(for: asset), box: contentBox)
+            } else {
+                Image(name)
+                    .resizable()
+                    .interpolation(.none)
+                    .scaledToFit()
+                    .frame(width: spriteWidth, height: spriteHeight)
+            }
+        }
+    }
+
+    private func spriteScale(for asset: PetSpriteAsset) -> CGFloat {
+        let fit = PetSpriteFit.scale(cellSize: asset.cellSize, box: contentBox)
+        switch PetSpriteFit.policy {
+        case .eachState:
+            return fit
+        case .perPet:
+            return PetSpriteMetrics.shared.contentScale(for: petKind, box: contentBox) ?? fit
+        }
+    }
+
     // MARK: - Animation Driver
 
     private func updateAnimationTimer(resetFrame: Bool = false) {
@@ -573,6 +818,10 @@ struct DesktopPetView: View {
             scheduleStripFrame(strip)
             return
         }
+
+        // Single-image phases (Chip, Clay) have nothing to cycle; do not keep a
+        // timer alive just to re-draw the same asset.
+        guard petKind.frameNames(for: timer.state.phase).count > 1 else { return }
 
         let interval: TimeInterval
         switch timer.state.phase {
@@ -620,24 +869,6 @@ struct DesktopPetView: View {
         }
     }
 
-    private var microYOffset: CGFloat {
-        guard canAnimate else { return 0 }
-        if petKind == .tomy || petKind == .sprout { return 0 }
-        if timer.state.needsAttention {
-            return (frameIndex % 2 == 1) ? -6 : 0
-        }
-        return 0
-    }
-
-    private var microScale: CGFloat {
-        guard canAnimate else { return 1.0 }
-        if petKind == .tomy || petKind == .sprout { return 1.0 }
-        if timer.state.needsAttention {
-            return (frameIndex % 2 == 1) ? 1.06 : 1.0
-        }
-        return 1.0
-    }
-
     // MARK: - Subviews
 
     private var hoverCard: some View {
@@ -665,74 +896,7 @@ struct DesktopPetView: View {
     }
 
     private var phaseShortLabel: String {
-        switch timer.state.phase {
-        case .idle: return "准备中"
-        case .work: return timer.state.paused ? "已暂停" : "专注中"
-        case .rest: return timer.state.paused ? "已暂停" : "休息中"
-        case .workFinished: return "专注达成"
-        case .restFinished: return "休息结束"
-        }
-    }
-
-    @ViewBuilder
-    private var statusPill: some View {
-        if timer.state.phase != .idle || timer.state.needsAttention {
-            HStack(spacing: 5) {
-                Circle()
-                    .fill(statusIndicatorColor)
-                    .frame(width: 6, height: 6)
-
-                Text(pillText)
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundColor(Garden.ink)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(
-                Capsule()
-                    .fill(Garden.paper.opacity(0.95))
-                    .shadow(color: Color.black.opacity(0.10), radius: 4, x: 0, y: 2)
-                    .overlay(
-                        Capsule().stroke(Garden.line, lineWidth: 0.8)
-                    )
-            )
-        } else {
-            // Idle character badge
-            Text(petKind.shortName)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundColor(Garden.muted)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(
-                    Capsule()
-                        .fill(Garden.paper.opacity(0.85))
-                        .overlay(Capsule().stroke(Garden.line.opacity(0.7), lineWidth: 0.6))
-                )
-        }
-    }
-
-    private var statusIndicatorColor: Color {
-        if timer.state.needsAttention {
-            return Color.orange
-        }
-        if timer.state.paused {
-            return Garden.muted
-        }
-        switch timer.state.phase {
-        case .work: return Garden.red
-        case .rest: return Color.green
-        default: return Garden.muted
-        }
-    }
-
-    private var pillText: String {
-        if timer.state.needsAttention {
-            return timer.state.phase == .workFinished ? "🎉 达成" : "☕️ 结束"
-        }
-        if timer.state.paused {
-            return "⏸ \(timer.timeLeft)"
-        }
-        return timer.timeLeft
+        PetMotionState(phase: timer.state.phase, paused: timer.state.paused).label
     }
 
     // MARK: - Native Context Menu
@@ -881,6 +1045,9 @@ final class DesktopPetController: NSObject, NSWindowDelegate {
     private var dragging = false
     private var menuOpen = false
     private var sleeping = false
+    /// The same answer register() hands the SwiftUI view, exposed for the initial mount:
+    /// a panel that is on screen while the Mac is awake is the only meaning of visible.
+    var isPresenting: Bool { panel?.isVisible == true && !sleeping }
     private let originXKey = "desktopPetOriginX"
     private let originYKey = "desktopPetOriginY"
     private let showKey = "showDesktopPet"
@@ -890,7 +1057,9 @@ final class DesktopPetController: NSObject, NSWindowDelegate {
         let scale = UserDefaults.standard.double(forKey: scaleKey)
         if compact {
             let side = CompactPetLayout.slot * CompactPetLayout.scale(scale)
-            return NSSize(width: side, height: side)
+            // The compact pet now shares the status capsule with the legacy
+            // pets, so the panel reserves a strip below the character.
+            return NSSize(width: side, height: side + CompactPetLayout.statusArea)
         }
         let actual = scale.isFinite && scale > 0.5 ? scale : 1
         return NSSize(width: 220 * actual, height: 250 * actual)
@@ -927,7 +1096,7 @@ final class DesktopPetController: NSObject, NSWindowDelegate {
         eventView?.cancelPendingClick()
         eventView?.onPresentationChanged?(false)
         eventView = view
-        view.onPresentationChanged?(panel?.isVisible == true && !sleeping)
+        view.onPresentationChanged?(isPresenting)
         refreshPointer()
     }
 

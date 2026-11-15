@@ -2,6 +2,32 @@
 
 已知问题清单。每条附**证据（file:line）**、**独立核验方法**、**严重性**与**状态**。
 
+## 2026-11-15 桌宠四人组 A+B+C 改善（基线 `66e94e2`）
+
+用户对四只桌宠“十分不满意”，要求 A（止血）+B（统一规格）+C（贴图改善）并尽力改善。仅编译 + 隔离渲染验收，未做真实窗口交互验收。
+
+- **已修复 · 码小黑工作闪烁**：`PetKind.frameNames(for:)`（`DesktopPet.swift:270`）原先把 `pet_chip_work_0…3` 每 0.12 s 轮播一次。四张是互不相干的整幅构图（显示器左右换边、朝向翻转、`work_3` 多一只猫），视觉上是 8 fps 镜头跳切；完成态又把四张倒放一遍。现工作固定 `work_0`、完成固定 `work_3`（两只猫本来就是庆祝构图）；`Tests/BridgeReview/main.swift` 断言锁定。
+- **已修复 · 陶土团完全静止**：三个状态各一张 256×256 静态图，且单帧状态仍在跑帧定时器。现单帧状态不再创建定时器；码小黑/陶土团增加 4.2 s 呼吸（`DesktopPetView.animatedPetSprite`，`TimelineView(.animation)`，`breathingEnabled` 由 `canAnimate` 门控），完成提醒改为一次性轻跳（`onChange(of: needsAttention)`）。
+- **已修复 · 状态/换宠尺寸跳变**：旧素材透明留白差异极大（码小黑待机内容占 256 画布的 167×246，工作场景只有 160×160；陶土团待机 238×237、休息 244×124）。新增 `PetSpriteMetrics.swift` 运行时扫描 alpha 包围盒：单图裁掉四周空白，条带只裁共享的上下留白以保持逐帧对齐；`PetSpriteFit.policy = .eachState` 把每个状态的内容适配 104 pt 内容框并底边对齐（`DesktopPetView.contentBox`）。实测四只全部状态的内容底边落在同一基线（渲染快照 349 px @2x）。
+- **已修复 · 呈现不统一**：状态胶囊提取为 `PetStatusModel` + `PetStatusPill`（同文案/同指示色规则），紧凑番茄仔也显示同一胶囊（`CompactPetLayout.statusArea = 26`，面板高度 +26 pt）；悬停文案统一走 `PetMotionState.label`。`PetStatusModel` 六种状态规则有桥接断言。
+- **C 实测结论 · 不改素材**：坐姿精灵表（`pet_tomy_seated_work_v1/rest_v1`）alpha 直方图：>97% 的非透明像素落在 224–255，0 个 255（生成器上限 254），低于 224 的边缘噪点约 1%；实际 80 pt 高度下为亚像素。黑底真实渲染无可见暗晕/脏边。此前的“整体半透明”判断被测量推翻，故不做 alpha 提纯/重导出，避免无收益的像素手术。
+- **验证**：隔离 harness（独立 bundle、临时 FocusStore、真实 `Assets.car`）渲染 4 只 × 7 状态 + 0.8/1.2 缩放 + 黑底共 40 张；呼吸用相隔 2.1 s 的快照差异 12,270 px 证实。295 领域 + 145 桥接 + 49 动画 + 8 启动全部通过；Release 构建与严格签名通过。真实拖动、点击穿透、睡眠唤醒、多屏/Space 未交互验收。
+- **首帧扫描耗时实测**：隔离 harness 冷扫描 Sprout 全部 7 条带共 287.7 ms、Chip 4 张单图 23.7 ms。确认运行时不受影响：`.eachState` 策略下 `spriteScale(for:)`（`DesktopPet.swift:795-803`）只取当前状态的素材，换宠/换阶段只冷扫 1 张（Sprout 单条带约 41 ms，之后命中缓存），而扫描全宠的 `contentScale` 只在未启用的 `.perPet` 分支调用。41 ms 发生于用户主动点击/阶段切换瞬间，低于可感知卡顿阈值，故不做异步预热或离线表。
+
+## 2026-11-15 macOS 代码复查与修复（基线 `66e94e2`）
+
+用户要求按复查结果直接修改。9 条全部修复，未做原生窗口实机验收（仅编译 + 隔离测试）。
+
+- **已修复 · Unicode 样式键**：`RecordEditor.setStyle`（`View.swift:1063`）与 `FocusState.editRecord`（`State.swift:511`）统一走 `FocusRecord.styleStorageKey` 写入、`sameTag` 匹配删除；重置时先清掉所有同 identity 的旧拼写（如 `straße`/`strasse` 并存），否则「恢复全部自动」会静默无效。回归见 `Tests/main.swift` 的 `staleAlias` 断言。
+- **已修复 · 主窗口行按钮失步**：父视图仍只观察 `history`（P5 分层不变），`FocusHistory.Session`（`Timer.swift:9-30`）新增粗粒度 `phase/paused/storageError`，`persist()`/`reload()` 只在值变化时发布；`TodoRowView.isBlocked` 改由父视图从 `history.session` 计算。`BridgeReview` 断言启动/结束专注会发布、普通 tick 不发布。
+- **已修复 · 事件名归属**：`setEventName` 改为与 `state.displayName(for:)`（含项目前缀）比较，回声自动填充值不再误清任务选择；`renameTodo` 只跟随 `currentTodoID`，series 任务改名不再覆盖已切换的当前任务名；`init`/`reload()` 恢复选择时无条件回填事件名。桥接回归覆盖三种路径。
+- **已修复 · 过滤选中态**：`MainWindowView.summaryPanel` 的高亮、`accessibilityValue` 与再次点击取消均改用 `FocusRecord.sameTag`（`isSelected`），与 `clearStaleFilter`/图表筛选一致。
+- **已修复 · 项目历史归属收紧**：`focusSeconds(forProject:)`（`State.swift:470`）不再回退任务的当前项目；无 `projectID` 的记录不计入任何项目，修掉「独立任务迁入项目后历史时长追溯归属」。**语义变更**：真正缺少 `projectID` 的旧记录不再跟随任务归属；`Tests/main.swift` 的 moved/legacy 断言已同步更新。
+- **已修复 · 桌宠初始呈现**：`DesktopPetView.onAppear` 不再无条件用 `showDesktopPet` 覆盖，改读 `DesktopPetController.isPresenting`（与 `register()` 同一判定）；隐藏/睡眠期间挂载不再启动帧动画。
+- **已修复 · 汇总缓存驱逐**：`FocusHistory.summary` 满 2 项时只清过滤项、保留未过滤汇总（`Timer.swift:53`），切换分类不再在同一渲染里重建整表汇总；桥接断言「切分类不驱逐未过滤汇总」。
+- **已修复 · 其余标签比较**：`CategoryMenuButton` 勾选、草稿自定义标签去重、`unusedSuggestions`、`ExpandedTimer` 显示名分别改用 `sameTag`/`displayName(for:)`。
+- **检查**：295 领域 + 127 桥接 + 49 动画 + 8 合成启动全部通过；`scripts/build.sh` Release 成功，并已按用户要求替换安装到 `/Applications`（universal、严格签名、已启动，真实 `sessions.json` 未变；旧副本备份在桌面）。原生窗口内容、真实计时与桌宠生命周期仍未实机验收。
+
 ## 2026-10-11 macOS 修复（基线 `e1cbda5`）
 
 用户在复查后明确授权修复。实施与原生检查边界见 [`macOS修复与简化-2026-10-11.md`](macOS修复与简化-2026-10-11.md)。

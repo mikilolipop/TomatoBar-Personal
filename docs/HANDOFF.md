@@ -2,7 +2,20 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-10-11，by Codex · macOS 修复与简化：
+最后更新：2026-11-15，by Claude Code · 桌宠四人组 A+B+C 改善（基线 `66e94e2` + 上节复查修复）：
+- 用户明确要求 A（止血）+B（统一规格）+C（贴图）+“尽你所能改善”。**A**：码小黑工作/完成态不再轮播四张互不相干的构图（显示器换边、朝向翻转、末帧凭空多一只猫），改为工作固定 `pet_chip_work_0`、完成固定两只猫庆祝图 `pet_chip_work_3`；陶土团/码小黑的单帧状态不再空转帧定时器；两只没有逐帧素材的宠物改为 4.2 s 正弦呼吸（`TimelineView` 按时间驱动，隐藏/拖动/减少动态时自动停），完成提醒改为一次 0.18 s 轻跳。
+- **B**：新增 `TomatoBar/PetSpriteMetrics.swift`，运行时扫描 alpha 包围盒并裁掉透明留白；旧桌宠统一按“每帧内容适配 104 pt 内容框 + 底边对齐”绘制（`PetSpriteFit.policy = .eachState`），四只脚底线一致、换状态/换宠物不再忽大忽小；桥接断言锁定工作/完成帧与包围盒算法。状态胶囊提取为共用 `PetStatusModel`/`PetStatusPill`，紧凑番茄仔也显示同一胶囊（面板高度 +26 pt），悬停文案共用 `PetMotionState.label`。
+- **C**：实测坐姿精灵表主体 alpha 224–254（>97% 近不透明），只有约 1% 亚像素边缘噪点；黑底实际渲染无可见脏边，因此**未改素材**——避免无收益的像素手术。测量与结论记录在 [`BACKLOG.md`](BACKLOG.md)。
+- **验证**：隔离渲染 harness 用真实视图 + `Assets.car` 输出 40 张截图（4 只 × 7 状态 + 0.8/1.2 缩放 + 黑底），所有状态的内容底边落在同一像素基线（349 px @2x）；呼吸通过相隔 2.1 s 的两张快照 12,270 像素差异证实。**未做**真实拖动/点击穿透/睡眠/多屏/点击穿透的人工交互验收。
+- **检查**：295 领域 + 145 桥接 + 49 动画 + 8 合成启动全部通过；`scripts/build.sh` universal Release + 严格签名成功（21:06 构建，含最终 `accessibilityName` 修改）。首帧冷扫描实测：Sprout 全 7 条带 287.7 ms，但运行时 `.eachState` 只扫当前状态 1 条带（约 41 ms，缓存后为 0），全量扫描仅存在于未启用的 `.perPet` 分支，见 [`BACKLOG.md`](BACKLOG.md)。安装副本未替换（当前运行仍是 17:05 构建）。
+
+历史更新：2026-11-15，by Claude Code · macOS 复查修复（基线 `66e94e2`）：
+- 用户要求“根据 code review 的结果进行更改”。9 条复查项全部修复：样式覆盖键的 Unicode identity 一致化与重置清理、主窗口行按钮在专注启停时失步（`FocusHistory.Session`，父视图仍只观察 history）、事件名归属（前缀显示名比较、series 改名不覆盖当前选择、init/reload 回填）、分类筛选选中态 `sameTag`、项目历史归属收紧（无 `projectID` 不再追溯当前项目）、桌宠 `onAppear` 不再覆盖真实呈现、汇总缓存只驱逐过滤项、其余标签比较统一。逐条细节见 [`BACKLOG.md`](BACKLOG.md) 顶部。
+- **语义变更**：`focusSeconds(forProject:)` 不再让缺少 `projectID` 的旧记录跟随任务当前项目；`Tests/main.swift` 对应断言已更新为“不追溯”。
+- **检查**：295 领域 + 127 桥接 + 49 动画 + 8 合成启动全部通过；`scripts/build.sh` Release（universal、严格签名）成功。
+- **安装（2026-11-15 17:05）**：用户明确要求更新安装副本。已将当前源码构建的 Release 替换到 `/Applications/TomatoBar Personal.app`（3.10.0/build 7，x86_64+arm64，可执行文件 SHA-256 `274d1b84…e0d9bab`），`codesign --verify --deep --strict` 通过并已启动，进程稳定、无崩溃报告。旧副本备份在 `~/Desktop/TomatoBar Personal 3.10.0-build7 backup 2026-11-15.app`（SHA-256 `299f4bf6…a85a7ba8`，签名校验通过）。安装/启动前后真实 `sessions.json` 字节与修改时间未变（`70cdd746…14f97f`），未开始、结束、编辑或删除任何真实计时/记录。版本号未 bump，二进制内容为 2026-11-15 源码。原生窗口内容、桌宠真实睡眠与多屏呈现仍未实机验收。
+
+历史更新：2026-10-11，by Codex · macOS 修复与简化：
 - 用户在复查后明确要求“该修复修复”。基于 `e1cbda5` 实施 P29/P30/P31；详情见 [`macOS修复与简化-2026-10-11.md`](macOS修复与简化-2026-10-11.md)。原审查文档保留修改前证据。
 - 项目统计优先使用记录保存的项目，只有旧记录缺少projectID才跟随任务；分类聚合/筛选/去重/自动颜色与图标使用同一Unicode大小写折叠身份；旧桌宠补系统减少动态效果、显示与拖动策略。
 - 主窗口父视图观察history，按记录内容缓存最多两个汇总；任务/项目/样式/跨日/时区改变会刷新，普通tick不会刷新统计父视图。清理preparedTodoID/prepareTodo，统一当前任务显示名，并抽取共用任务与标签菜单。

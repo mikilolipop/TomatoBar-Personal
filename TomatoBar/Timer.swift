@@ -5,14 +5,24 @@ final class FocusHistory: ObservableObject {
     @Published var records: [FocusRecord] = [] {
         didSet { if records != oldValue { summaries.removeAll(keepingCapacity: true) } }
     }
-    // The main window needs task/style changes, but never the ticking deadline.
+    /// Coarse session state the main window's row controls gate on. The deadline itself
+    /// stays out: a per-second tick must not publish to the statistics parent.
+    struct Session: Equatable {
+        var phase: FocusPhase = .idle
+        var paused = false
+        var storageError: String?
+        var isTiming: Bool { phase == .work || phase == .rest }
+        var needsAttention: Bool { phase == .workFinished || phase == .restFinished }
+    }
     private struct Context: Equatable {
         var todos: [FocusTodo] = []
         var projects: [FocusProject] = []
         var currentTodoID: UUID?
         var draftTags: [String] = []
         var styles: [String: String] = [:]
+        var session = Session()
     }
+    @Published private(set) var session = Session()
     @Published private var context = Context()
     private struct CalendarContext: Equatable {
         let day: Date
@@ -32,11 +42,16 @@ final class FocusHistory: ObservableObject {
     private var summaries: [SummaryKey: FocusSummary] = [:]
     private(set) var summaryBuildCount = 0
 
-    func update(from state: FocusState) {
+    func update(from state: FocusState, storageError: String? = nil) {
         if records != state.records { records = state.records }
+        // The main window needs task/style changes, but never the ticking deadline. Phase,
+        // pause and storage failure do belong here: row controls gate on them, and they
+        // change on transitions, not every tick.
+        let live = Session(phase: state.phase, paused: state.paused, storageError: storageError)
+        if live != session { session = live }
         let next = Context(todos: state.todos, projects: state.projects,
                            currentTodoID: state.currentTodoID, draftTags: state.draftTags,
-                           styles: state.categoryStyles)
+                           styles: state.categoryStyles, session: live)
         if context != next { context = next }
     }
 
@@ -50,9 +65,13 @@ final class FocusHistory: ObservableObject {
         let key = SummaryKey(period: period.rawValue, interval: period.interval(containing: date, calendar: calendar),
                              category: category.map(FocusRecord.tagIdentity), calendar: calendar)
         if let cached = summaries[key] { return cached }
-        // The overview only needs its full and selected-category summaries. Keep
-        // navigation bounded, and invalidate on content changes rather than count.
-        if summaries.count >= 2 { summaries.removeAll(keepingCapacity: true) }
+        // Bound the cache by evicting old filtered summaries only. The unfiltered summary
+        // is read by several panels in one body evaluation (heading, sidebar, record list)
+        // while the chart reads the filtered one, so clearing the whole map on every
+        // category switch forced a second full aggregation in the same render pass.
+        if summaries.count >= 2 {
+            summaries = summaries.filter { $0.key.category == nil }
+        }
         let result = FocusSummary(records: records, period: period, date: date, category: category, calendar: calendar)
         summaries[key] = result
         summaryBuildCount += 1
@@ -100,10 +119,10 @@ final class TBTimer: ObservableObject {
             loadFailed = true
             storageError = "无法读取专注记录，已保留原文件未覆盖。可打开记录文件夹检查，修复后点「重新读取」。"
         }
-        history.update(from: state)
-        if let current = state.currentTodo, eventName.isEmpty {
-            eventName = state.displayName(for: current)
-        }
+        history.update(from: state, storageError: storageError)
+        // Keep the event field in step with the loaded selection. A leftover name from an
+        // earlier session would otherwise be recorded for a task whose UI hides the field.
+        if let current = state.currentTodo { eventName = state.displayName(for: current) }
         sanitizeSettings()
         KeyboardShortcuts.onKeyUp(for: .startStopTimer) { [weak self] in
             DispatchQueue.main.async { self?.primaryAction() }
@@ -150,10 +169,18 @@ final class TBTimer: ObservableObject {
         return state.rounds % groupSize == 0 ? long : short
     }
 
+    /// The event field mirrors the selected task's *display* name, which carries the
+    /// project prefix. Comparing it against the raw title would treat the field's own
+    /// auto-filled value as a manual edit and drop the task selection.
+    private func eventNameMatches(_ todo: FocusTodo) -> Bool {
+        FocusRecord.sameTag(eventName, state.displayName(for: todo))
+    }
+
     func setEventName(_ value: String) {
         eventName = value
         if let id = state.currentTodoID,
-           state.todos.first(where: { $0.id == id })?.title != value {
+           let todo = state.todos.first(where: { $0.id == id }),
+           !eventNameMatches(todo) {
             change { state, _ in
                 state.selectCurrentTodo(nil)
             }
@@ -163,7 +190,8 @@ final class TBTimer: ObservableObject {
         // next round cannot be attributed to the previous Todo by accident.
         if state.phase == .restFinished,
            let id = state.seriesTodoID,
-           state.todos.first(where: { $0.id == id })?.title != value {
+           let todo = state.todos.first(where: { $0.id == id }),
+           !eventNameMatches(todo) {
             change { state, _ in
                 if state.seriesTodoID == id { state.seriesTodoID = nil }
             }
@@ -246,8 +274,13 @@ final class TBTimer: ObservableObject {
     func renameTodo(id: UUID, title: String) {
         guard storageError == nil else { return }
         change { state, _ in state.renameTodo(id: id, title: title) }
-        if (state.seriesTodoID == id || state.currentTodoID == id),
-           let todo = state.todos.first(where: { $0.id == id }) {
+        guard let todo = state.todos.first(where: { $0.id == id }) else { return }
+        // The current selection owns the event field: selectCurrentTodo/setEventName only
+        // ever leave it holding the current task's display name, so a rename must follow.
+        // The series task is NOT the field's owner — after an explicit switch to another
+        // current task it can differ, and rewriting the field there recorded the freshly
+        // chosen task under the old task's name.
+        if state.currentTodoID == id {
             eventName = state.displayName(for: todo)
         }
     }
@@ -329,7 +362,7 @@ final class TBTimer: ObservableObject {
             updated.checkpoint = Date()
             try store.save(updated)
             state = updated
-            history.update(from: updated)
+            history.update(from: updated, storageError: storageError)
             lastSave = updated.checkpoint
             lastFailedSave = .distantPast
             storageError = nil
@@ -356,7 +389,7 @@ final class TBTimer: ObservableObject {
             updated.checkpoint = Date()
             try store.save(updated)
             state = updated
-            history.update(from: updated)
+            history.update(from: updated, storageError: storageError)
             lastSave = updated.checkpoint
             lastFailedSave = .distantPast
             storageError = nil
@@ -392,13 +425,17 @@ final class TBTimer: ObservableObject {
             var loaded = try store.load()
             loaded.recover()
             state = loaded
-            history.update(from: loaded)
+            // Same rule as init: a recovered selection owns the event field, so a name
+            // left from the failed-load period cannot be recorded for that task.
+            if let current = state.currentTodo { eventName = state.displayName(for: current) }
             loadFailed = false
             storageError = nil
             lastSave = Date()
+            history.update(from: state, storageError: storageError)
             updateStatus()
         } catch {
             storageError = "仍然无法读取专注记录，原文件已保留。请修复文件后重试，或重启应用。"
+            history.update(from: state, storageError: storageError)
         }
     }
     func openRecordsFolder() {
@@ -443,11 +480,19 @@ final class TBTimer: ObservableObject {
     }
 
     private func persist() {
-        guard !loadFailed else { return }
-        history.update(from: state)
+        guard !loadFailed else {
+            // The session's storage-error gate lives in the history context too, so a
+            // failed load must reach the main window's row controls. Only an actual
+            // change publishes; the per-tick persist below stays silent.
+            if history.session.storageError != storageError { history.update(from: state, storageError: storageError) }
+            return
+        }
         state.checkpoint = now
         do { try store.save(state); storageError = nil; lastSave = now; lastFailedSave = .distantPast }
         catch { storageError = "记录保存失败，请检查磁盘空间。当前记录仍保留在内存中。"; lastFailedSave = now }
+        // Publish a failure (and its recovery) even when every other context field is
+        // unchanged, so the row controls disable and re-enable with the save state.
+        history.update(from: state, storageError: storageError)
     }
     /// Hidden visual easter egg. Kept outside FocusState because this is a UI preference,
     /// not persisted focus-domain data. Returns the new state so the settings surface can
