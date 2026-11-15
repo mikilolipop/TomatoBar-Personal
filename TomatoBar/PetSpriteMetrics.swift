@@ -125,7 +125,12 @@ final class PetSpriteMetrics {
                               frameCount: frameCount)
     }
 
-    private static func alphaBounds(_ cg: CGImage) -> CGRect? {
+    /// Scans a decoded image without a vertical flip. A bitmap context stores
+    /// row 0 at the top of the drawn image, which is the same top-left space
+    /// `CGImage.cropping(to:)` uses. Flipping here would make the scan bottom-up
+    /// and crop the wrong band for every vertically asymmetric asset.
+    /// Internal so the bridge suite can exercise this draw path directly.
+    static func alphaBounds(_ cg: CGImage) -> CGRect? {
         let width = cg.width
         let height = cg.height
         var pixels = [UInt8](repeating: 0, count: width * height * 4)
@@ -135,9 +140,6 @@ final class PetSpriteMetrics {
                                           bitsPerComponent: 8, bytesPerRow: width * 4,
                                           space: CGColorSpaceCreateDeviceRGB(),
                                           bitmapInfo: info) else { return }
-            // Top-left origin, matching CGImage.cropping's coordinate space.
-            context.translateBy(x: 0, y: CGFloat(height))
-            context.scaleBy(x: 1, y: -1)
             context.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
         }
         return PetAlphaBounds.bounds(in: pixels, width: width, height: height,

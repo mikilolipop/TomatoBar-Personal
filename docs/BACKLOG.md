@@ -13,6 +13,8 @@
 - **C 实测结论 · 不改素材**：坐姿精灵表（`pet_tomy_seated_work_v1/rest_v1`）alpha 直方图：>97% 的非透明像素落在 224–255，0 个 255（生成器上限 254），低于 224 的边缘噪点约 1%；实际 80 pt 高度下为亚像素。黑底真实渲染无可见暗晕/脏边。此前的“整体半透明”判断被测量推翻，故不做 alpha 提纯/重导出，避免无收益的像素手术。
 - **验证**：隔离 harness（独立 bundle、临时 FocusStore、真实 `Assets.car`）渲染 4 只 × 7 状态 + 0.8/1.2 缩放 + 黑底共 40 张；呼吸用相隔 2.1 s 的快照差异 12,270 px 证实。295 领域 + 145 桥接 + 49 动画 + 8 启动全部通过；Release 构建与严格签名通过。真实拖动、点击穿透、睡眠唤醒、多屏/Space 未交互验收。
 - **首帧扫描耗时实测**：隔离 harness 冷扫描 Sprout 全部 7 条带共 287.7 ms、Chip 4 张单图 23.7 ms。确认运行时不受影响：`.eachState` 策略下 `spriteScale(for:)`（`DesktopPet.swift:795-803`）只取当前状态的素材，换宠/换阶段只冷扫 1 张（Sprout 单条带约 41 ms，之后命中缓存），而扫描全宠的 `contentScale` 只在未启用的 `.perPet` 分支调用。41 ms 发生于用户主动点击/阶段切换瞬间，低于可感知卡顿阈值，故不做异步预热或离线表。
+- **已修复 · alpha 扫描 Y 轴翻转（对抗复查发现）**：`PetSpriteMetrics.alphaBounds`（`PetSpriteMetrics.swift:139`）原先把位图上下文上下翻转再扫描，扫描得到的 Y 是**自下而上**，而 `CGImage.cropping(to:)` 用**左上原点**；`makeAsset` 直接把 `bounds.minY` 喂给裁剪，于是非上下对称的素材会裁错条带。实测：`pet_chip_work_0` 真实内容行 58…217，翻转后得 38…197——顶部多 20 行空白、底部 20 行（桌腿/椅腿）被永久丢弃；`pet_chip_work_3` 丢 23 行；`pet_sprout_rest_paused_v3` 裁掉顶部 10 行、底部留 10 行空白，暂停休息态浮离基线。修复：删掉翻转、直接 `context.draw`（位图第 0 行即图像顶行），并改正注释。**回归**：桥接新增“顶部内容合成图扫描 = (0,0,8,2)”与三张真实非对称素材“紧裁剪首行/末行必须有内容”断言；重渲染 28 状态后四只旧宠内容底边统一为 349 px @2x（修复前 Sprout 暂停 347），码小黑工作内容高度 191→217 px、完成 182→213 px，桌腿恢复完整。
+- **已修复 · 展示截图脚本漏文件**：`scripts/generate-showcase-screenshot.sh:27` 的 swiftc 文件表未加入 `TomatoBar/PetSpriteMetrics.swift`，导致 `DesktopPet.swift` 引用新类型后脚本无法编译。已补入并 `swiftc -typecheck` 通过。
 
 ## 2026-11-15 macOS 代码复查与修复（基线 `66e94e2`）
 

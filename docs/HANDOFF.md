@@ -7,7 +7,8 @@
 - **B**：新增 `TomatoBar/PetSpriteMetrics.swift`，运行时扫描 alpha 包围盒并裁掉透明留白；旧桌宠统一按“每帧内容适配 104 pt 内容框 + 底边对齐”绘制（`PetSpriteFit.policy = .eachState`），四只脚底线一致、换状态/换宠物不再忽大忽小；桥接断言锁定工作/完成帧与包围盒算法。状态胶囊提取为共用 `PetStatusModel`/`PetStatusPill`，紧凑番茄仔也显示同一胶囊（面板高度 +26 pt），悬停文案共用 `PetMotionState.label`。
 - **C**：实测坐姿精灵表主体 alpha 224–254（>97% 近不透明），只有约 1% 亚像素边缘噪点；黑底实际渲染无可见脏边，因此**未改素材**——避免无收益的像素手术。测量与结论记录在 [`BACKLOG.md`](BACKLOG.md)。
 - **验证**：隔离渲染 harness 用真实视图 + `Assets.car` 输出 40 张截图（4 只 × 7 状态 + 0.8/1.2 缩放 + 黑底），所有状态的内容底边落在同一像素基线（349 px @2x）；呼吸通过相隔 2.1 s 的两张快照 12,270 像素差异证实。**未做**真实拖动/点击穿透/睡眠/多屏/点击穿透的人工交互验收。
-- **检查**：295 领域 + 145 桥接 + 49 动画 + 8 合成启动全部通过；`scripts/build.sh` universal Release + 严格签名成功（21:06 构建，含最终 `accessibilityName` 修改）。首帧冷扫描实测：Sprout 全 7 条带 287.7 ms，但运行时 `.eachState` 只扫当前状态 1 条带（约 41 ms，缓存后为 0），全量扫描仅存在于未启用的 `.perPet` 分支，见 [`BACKLOG.md`](BACKLOG.md)。安装副本未替换（当前运行仍是 17:05 构建）。
+- **复查修复（同日）**：对抗复查发现我引入的 alpha 扫描 Y 轴翻转——扫描自下而上、`CGImage.cropping` 左上原点，非对称素材会裁错条带（码小黑工作图被切掉 20 行桌腿）。已删除翻转；桥接补三条真实素材裁剪断言 + 顶部内容合成图断言（145→151 项）。修复后重渲染 28 个状态：四只旧宠内容底边全部 349 px @2x（修复前 Sprout 暂停态 347），码小黑工作内容高度 191→217 px、完成 182→213 px。同时补上 `generate-showcase-screenshot.sh` 缺失的源文件。复查另报告 13 条候选，其余为低优先级测试覆盖/窗口位移问题，未改运行行为。
+- **检查**：295 领域 + 151 桥接 + 49 动画 + 8 合成启动全部通过；`scripts/build.sh` universal Release + 严格签名成功（含最终修改）。首帧冷扫描实测：Sprout 全 7 条带 287.7 ms，但运行时 `.eachState` 只扫当前状态 1 条带（约 41 ms，缓存后为 0），全量扫描仅存在于未启用的 `.perPet` 分支，见 [`BACKLOG.md`](BACKLOG.md)。安装副本未替换（当前运行仍是 17:05 构建）。
 
 历史更新：2026-11-15，by Claude Code · macOS 复查修复（基线 `66e94e2`）：
 - 用户要求“根据 code review 的结果进行更改”。9 条复查项全部修复：样式覆盖键的 Unicode identity 一致化与重置清理、主窗口行按钮在专注启停时失步（`FocusHistory.Session`，父视图仍只观察 history）、事件名归属（前缀显示名比较、series 改名不覆盖当前选择、init/reload 回填）、分类筛选选中态 `sameTag`、项目历史归属收紧（无 `projectID` 不再追溯当前项目）、桌宠 `onAppear` 不再覆盖真实呈现、汇总缓存只驱逐过滤项、其余标签比较统一。逐条细节见 [`BACKLOG.md`](BACKLOG.md) 顶部。

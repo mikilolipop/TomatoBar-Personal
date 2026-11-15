@@ -426,6 +426,70 @@ let assetRoot = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).a
 func seatedAsset(_ clip: SeatedPetClip) -> URL {
     assetRoot.appendingPathComponent("\(clip.assetName).imageset/\(clip.assetName).png")
 }
+
+// The alpha scan must hand CGImage.cropping a top-left rect. A synthetic image
+// with content only in its top rows pins the draw orientation; symmetric real
+// assets would pass even if the scan were vertically mirrored.
+func makeProbeImage(width: Int, height: Int, alphaRows: Range<Int>) -> CGImage? {
+    var bytes = [UInt8](repeating: 0, count: width * height * 4)
+    for y in alphaRows {
+        for x in 0..<width {
+            let i = (y * width + x) * 4
+            bytes[i] = 255
+            bytes[i + 3] = 255
+        }
+    }
+    guard let provider = CGDataProvider(data: Data(bytes) as CFData) else { return nil }
+    let info = CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
+    return CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
+                   bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                   bitmapInfo: CGBitmapInfo(rawValue: info), provider: provider,
+                   decode: nil, shouldInterpolate: false, intent: .defaultIntent)
+}
+func imageRowHasContent(_ image: CGImage, row: Int) -> Bool {
+    let width = image.width, height = image.height
+    guard row >= 0, row < height, width > 0 else { return false }
+    var pixels = [UInt8](repeating: 0, count: width * height * 4)
+    var drew = false
+    pixels.withUnsafeMutableBytes { buffer in
+        guard let context = CGContext(data: buffer.baseAddress, width: width, height: height,
+                                      bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue) else { return }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        drew = true
+    }
+    guard drew else { return false }
+    for x in 0..<width where pixels[(row * width + x) * 4 + 3] > 8 { return true }
+    return false
+}
+let topHeavy = makeProbeImage(width: 8, height: 8, alphaRows: 0..<2)
+check(topHeavy.flatMap { PetSpriteMetrics.alphaBounds($0) } == CGRect(x: 0, y: 0, width: 8, height: 2),
+      "alpha scan reports top-left bounds for top-heavy content")
+if let topHeavy = topHeavy, let bounds = PetSpriteMetrics.alphaBounds(topHeavy),
+   let crop = topHeavy.cropping(to: bounds) {
+    check(imageRowHasContent(crop, row: 0), "top-heavy crop retains its content row")
+} else {
+    check(false, "top-heavy crop retains its content row")
+}
+// Asymmetric real assets prove the scan/crop agree end to end: the first and
+// last rows of a tight crop must contain pixels, or the wrong band was taken.
+for name in ["pet_chip_work_0", "pet_chip_work_3", "pet_sprout_rest_paused_v3"] {
+    let url = assetRoot.appendingPathComponent("\(name).imageset/\(name).png")
+    let source = NSImage(contentsOf: url)
+    var proposed = CGRect(origin: .zero, size: source?.size ?? .zero)
+    if let cg = source?.cgImage(forProposedRect: &proposed, context: nil, hints: nil),
+       let bounds = PetSpriteMetrics.alphaBounds(cg),
+       let crop = cg.cropping(to: bounds) {
+        check(imageRowHasContent(crop, row: 0) && imageRowHasContent(crop, row: crop.height - 1),
+              "\(name) crop keeps the first and last content rows")
+    } else {
+        check(false, "\(name) crop keeps the first and last content rows")
+    }
+}
+check(PetSpriteFit.scale(cellSize: CGSize(width: 100, height: 200),
+                         box: CGSize(width: 100, height: 100)) == 0.5,
+      "fit scale honors a height-limited cell")
 let compactAtlas = CompactTomyAtlas(image: NSImage(contentsOf: atlasURL),
     workImage: NSImage(contentsOf: seatedAsset(.work)), restImage: NSImage(contentsOf: seatedAsset(.rest)))
 struct PreviewClip: Decodable {

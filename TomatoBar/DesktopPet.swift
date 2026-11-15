@@ -598,6 +598,7 @@ struct DesktopPetView: View {
     @State private var presented = false
     @State private var dragging = false
     @State private var hop = false
+    @State private var breathAnchor = Date()
 
     init(timer: TBTimer, reducedMotion: Bool = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) {
         self.timer = timer
@@ -749,11 +750,11 @@ struct DesktopPetView: View {
         }
     }
 
-    /// Smooth 0…1 breath over a 4.2 s cycle; starts at rest so appearing never
-    /// pops.
+    /// Smooth 0…1 breath over a 4.2 s cycle, anchored to this view's lifetime so
+    /// the first frame is at rest and reinsertion does not snap to a random phase.
     private func breathScale(at date: Date) -> CGFloat {
         let cycle = 4.2
-        let phase = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: cycle) / cycle
+        let phase = date.timeIntervalSince(breathAnchor).truncatingRemainder(dividingBy: cycle) / cycle
         let wave = 0.5 - 0.5 * cos(phase * 2 * .pi)
         return 1 + 0.014 * wave
     }
