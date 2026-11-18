@@ -9,8 +9,9 @@ trap 'rm -rf "$probe_dir"' EXIT
 sed '/^@main$/d' TomatoBar/App.swift > "$probe_dir/App.swift"
 xcrun swiftc -I "$products" \
   TomatoBar/State.swift TomatoBar/Log.swift TomatoBar/Analytics.swift \
+  TomatoBar/TomyPetModel.swift TomatoBar/TomyDesktopPet.swift \
   TomatoBar/Timer.swift TomatoBar/View.swift TomatoBar/MainWindow.swift \
-  TomatoBar/FocusCharts.swift TomatoBar/DesktopPet.swift TomatoBar/PetSpriteMetrics.swift TomatoBar/PetMotion.swift TomatoBar/CompactDesktopPet.swift TomatoBar/Notifications.swift TomatoBar/LaunchContext.swift \
+  TomatoBar/FocusCharts.swift TomatoBar/Notifications.swift TomatoBar/LaunchContext.swift \
   "$probe_dir/App.swift" Tests/BridgeReview/main.swift \
   "$products/KeyboardShortcuts.o" "$products/LaunchAtLogin.o" -o "$probe_dir/probe"
 "$probe_dir/probe"

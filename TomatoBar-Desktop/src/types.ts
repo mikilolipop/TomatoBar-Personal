@@ -139,11 +139,3 @@ export function parseInputWithTags(raw: string): {
     tags: normalizeTags(tags),
   };
 }
-
-export type PetKind = "tomy" | "sprout";
-
-export interface PetConfig {
-  kind: PetKind;
-  visible: boolean;
-  scale: number;
-}

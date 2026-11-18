@@ -283,336 +283,10 @@ check(Garden.palette.contains { $0.symbol == "gearshape" && $0.label == "齿轮"
 check(Garden.symbol("机械") == "gearshape" && Garden.symbol("工程") == "gearshape",
       "Garden.symbol maps 机械 and 工程 to gearshape")
 
-// Desktop Pet V7 Tomy deterministic animation assertions:
-let tomyWork = PetKind.tomy.stripAnimation(for: .work, paused: false)
-check(tomyWork != nil && tomyWork?.assetName == "pet_tomy_work_v2" && tomyWork?.frameCount == 10 && tomyWork?.durations.count == 10 && tomyWork?.loopMode == .loop,
-      "Tomy work animation has 10 frames, 10 durations, loops")
-
-let tomyIdle = PetKind.tomy.stripAnimation(for: .idle, paused: false)
-check(tomyIdle != nil && tomyIdle?.assetName == "pet_tomy_idle_v2" && tomyIdle?.frameCount == 8 && tomyIdle?.durations.count == 8 && tomyIdle?.loopMode == .loop,
-      "Tomy idle animation has 8 frames, 8 durations, loops")
-
-let tomyRest = PetKind.tomy.stripAnimation(for: .rest, paused: false)
-check(tomyRest != nil && tomyRest?.assetName == "pet_tomy_rest_v2" && tomyRest?.frameCount == 8 && tomyRest?.durations.count == 8 && tomyRest?.loopMode == .loop,
-      "Tomy rest animation has 8 frames, 8 durations, loops")
-
-let tomyWorkFinished = PetKind.tomy.stripAnimation(for: .workFinished, paused: false)
-check(tomyWorkFinished != nil && tomyWorkFinished?.assetName == "pet_tomy_work_finished_v2" && tomyWorkFinished?.frameCount == 8 && tomyWorkFinished?.durations.count == 8 && tomyWorkFinished?.loopMode == .onceHold,
-      "Tomy workFinished animation has 8 frames, 8 durations, onceHold (not loop)")
-
-let tomyRestFinished = PetKind.tomy.stripAnimation(for: .restFinished, paused: false)
-check(tomyRestFinished != nil && tomyRestFinished?.assetName == "pet_tomy_rest_finished_v2" && tomyRestFinished?.frameCount == 8 && tomyRestFinished?.durations.count == 8 && tomyRestFinished?.loopMode == .onceHold,
-      "Tomy restFinished animation has 8 frames, 8 durations, onceHold (not loop)")
-
-let tomyPausedWork = PetKind.tomy.stripAnimation(for: .work, paused: true)
-let tomyPausedRest = PetKind.tomy.stripAnimation(for: .rest, paused: true)
-check(tomyPausedWork != nil && tomyPausedWork?.assetName == "pet_tomy_paused_v2" && tomyPausedWork?.frameCount == 4 && tomyPausedWork?.durations.count == 4 && tomyPausedWork?.loopMode == .loop,
-      "Tomy paused state has dedicated 4-frame animation strip and loops")
-check(tomyPausedRest == tomyPausedWork,
-      "Tomy paused animation is consistent across phases")
-
-// Desktop Pet V3 Sprout deterministic animation assertions:
-let sproutWork = PetKind.sprout.stripAnimation(for: .work, paused: false)
-check(sproutWork != nil && sproutWork?.assetName == "pet_sprout_work_v3" && sproutWork?.frameCount == 10 && sproutWork?.durations.count == 10 && sproutWork?.loopMode == .loop,
-      "Sprout work animation has 10 frames, 10 durations, loops")
-
-let sproutIdle = PetKind.sprout.stripAnimation(for: .idle, paused: false)
-check(sproutIdle != nil && sproutIdle?.assetName == "pet_sprout_idle_v3" && sproutIdle?.frameCount == 8 && sproutIdle?.durations.count == 8 && sproutIdle?.loopMode == .loop,
-      "Sprout idle animation has 8 frames, 8 durations, loops")
-
-let sproutRest = PetKind.sprout.stripAnimation(for: .rest, paused: false)
-check(sproutRest != nil && sproutRest?.assetName == "pet_sprout_rest_v3" && sproutRest?.frameCount == 8 && sproutRest?.durations.count == 8 && sproutRest?.loopMode == .loop,
-      "Sprout rest animation has 8 frames, 8 durations, loops")
-
-let sproutWorkFinished = PetKind.sprout.stripAnimation(for: .workFinished, paused: false)
-check(sproutWorkFinished != nil && sproutWorkFinished?.assetName == "pet_sprout_work_finished_v3" && sproutWorkFinished?.frameCount == 8 && sproutWorkFinished?.durations.count == 8 && sproutWorkFinished?.loopMode == .onceHold,
-      "Sprout workFinished animation has 8 frames, 8 durations, onceHold")
-
-let sproutRestFinished = PetKind.sprout.stripAnimation(for: .restFinished, paused: false)
-check(sproutRestFinished != nil && sproutRestFinished?.assetName == "pet_sprout_rest_finished_v3" && sproutRestFinished?.frameCount == 8 && sproutRestFinished?.durations.count == 8 && sproutRestFinished?.loopMode == .onceHold,
-      "Sprout restFinished animation has 8 frames, 8 durations, onceHold")
-
-// Phase-aware paused states: work and rest must use dedicated silhouettes
-let sproutPausedWork = PetKind.sprout.stripAnimation(for: .work, paused: true)
-let sproutPausedRest = PetKind.sprout.stripAnimation(for: .rest, paused: true)
-check(sproutPausedWork != nil && sproutPausedWork?.assetName == "pet_sprout_work_paused_v3" && sproutPausedWork?.frameCount == 4 && sproutPausedWork?.durations.count == 4 && sproutPausedWork?.loopMode == .loop,
-      "Sprout work paused animation uses pet_sprout_work_paused_v3, 4 frames, loops")
-check(sproutPausedRest != nil && sproutPausedRest?.assetName == "pet_sprout_rest_paused_v3" && sproutPausedRest?.frameCount == 4 && sproutPausedRest?.durations.count == 4 && sproutPausedRest?.loopMode == .loop,
-      "Sprout rest paused animation uses pet_sprout_rest_paused_v3, 4 frames, loops")
-check(sproutPausedWork?.assetName != sproutPausedRest?.assetName,
-      "Sprout paused animation is phase-aware (work paused != rest paused)")
-
-// Chip and Clay legacy pets continue to return nil for strip animations
-check(PetKind.chip.stripAnimation(for: .work, paused: false) == nil,
-      "Chip uses frame sequence rather than sprite strip")
-check(PetKind.clay.stripAnimation(for: .work, paused: false) == nil,
-      "Clay uses frame sequence rather than sprite strip")
-
-// Desktop pet lineup normalization (2026-11-15): the four generated Chip work
-// drawings are unrelated scenes (monitor sides swap, facing flips, a second cat
-// appears), so the pet must hold a single frame instead of flickering.
-check(PetKind.chip.frameNames(for: .work) == ["pet_chip_work_0"],
-      "Chip work holds one authored scene instead of cycling unrelated drawings")
-check(PetKind.chip.frameNames(for: .workFinished) == ["pet_chip_work_3"] &&
-      PetKind.chip.frameNames(for: .restFinished) == ["pet_chip_work_3"],
-      "Chip completion holds the two-cat celebration drawing")
-check(PetKind.chip.frameNames(for: .idle) == ["pet_chip_idle"] &&
-      PetKind.chip.frameNames(for: .rest) == ["pet_chip_rest"],
-      "Chip idle/rest no longer re-draw identical frames on a timer")
-check(PetKind.clay.frameNames(for: .work) == ["pet_clay_focus"] &&
-      PetKind.clay.frameNames(for: .idle) == ["pet_clay_idle"] &&
-      PetKind.clay.frameNames(for: .rest) == ["pet_clay_rest"],
-      "Clay phases each resolve to one asset")
-let chipAssets = PetKind.chip.legacyDisplayAssets
-check(chipAssets.count == 4 && Set(chipAssets.map(\.name)) ==
-      ["pet_chip_idle", "pet_chip_work_0", "pet_chip_rest", "pet_chip_work_3"],
-      "Chip size normalization covers exactly the four displayed assets")
-let sproutAssets = PetKind.sprout.legacyDisplayAssets
-check(sproutAssets.count == 7 && Set(sproutAssets.map(\.name)).contains("pet_sprout_work_paused_v3"),
-      "Sprout size normalization covers every strip including paused variants")
-check(PetKind.tomy.legacyDisplayAssets.isEmpty,
-      "Tomy is normalized by the compact atlas, not legacy assets")
-
-// Shared status capsule: all four pets use the same text/indicator rules.
-let idlePill = PetStatusModel(kind: .chip, phase: .idle, paused: false, timeLeft: "25:00")
-check(idlePill.style == .name && idlePill.text == "码小黑" && idlePill.indicator == .none,
-      "idle capsule shows the pet name badge")
-let workPill = PetStatusModel(kind: .clay, phase: .work, paused: false, timeLeft: "24:59")
-check(workPill.style == .timer && workPill.text == "24:59" && workPill.indicator == .red,
-      "work capsule shows the red timer")
-let restPill = PetStatusModel(kind: .sprout, phase: .rest, paused: false, timeLeft: "04:00")
-check(restPill.style == .timer && restPill.indicator == .green,
-      "rest capsule shows the green timer")
-let pausedPill = PetStatusModel(kind: .tomy, phase: .work, paused: true, timeLeft: "12:34")
-check(pausedPill.style == .paused && pausedPill.text == "⏸ 12:34" && pausedPill.indicator == .muted,
-      "paused capsule shows the muted pause marker")
-let donePill = PetStatusModel(kind: .tomy, phase: .workFinished, paused: false, timeLeft: "00:00")
-let restDonePill = PetStatusModel(kind: .tomy, phase: .restFinished, paused: false, timeLeft: "00:00")
-check(donePill.style == .attention && donePill.text == "🎉 达成" && donePill.indicator == .orange &&
-      restDonePill.text == "☕️ 结束",
-      "completion capsule announces 达成 / 结束 with an orange indicator")
-
-// Content normalization primitives.
-var alphaPixels = [UInt8](repeating: 0, count: 8 * 8 * 4)
-alphaPixels[(3 * 8 + 2) * 4 + 3] = 200
-alphaPixels[(5 * 8 + 6) * 4 + 3] = 100
-check(PetAlphaBounds.bounds(in: alphaPixels, width: 8, height: 8) ==
-      CGRect(x: 2, y: 3, width: 5, height: 3),
-      "alpha bounds use top-left pixel coordinates")
-var faintPixels = [UInt8](repeating: 0, count: 4 * 4 * 4)
-faintPixels[(1 * 4 + 1) * 4 + 3] = 8
-check(PetAlphaBounds.bounds(in: faintPixels, width: 4, height: 4) == nil &&
-      PetAlphaBounds.bounds(in: faintPixels, width: 4, height: 4, threshold: 4) ==
-      CGRect(x: 1, y: 1, width: 1, height: 1),
-      "alpha threshold ignores sub-threshold noise")
-check(PetAlphaBounds.bounds(in: [UInt8](repeating: 0, count: 16), width: 2, height: 2) == nil,
-      "fully transparent buffer has no bounds")
-check(PetSpriteFit.scale(cellSize: CGSize(width: 200, height: 100),
-                         box: CGSize(width: 100, height: 100)) == 0.5,
-      "fit scale uses the limiting dimension")
-check(PetSpriteFit.scale(cellSize: .zero, box: CGSize(width: 100, height: 100)) == 1,
-      "fit scale is safe for empty cells")
-check(PetSpriteFit.petScale(cellSizes: [CGSize(width: 100, height: 100),
-                                        CGSize(width: 200, height: 100)],
-                            box: CGSize(width: 100, height: 100)) == 0.5 &&
-      PetSpriteFit.petScale(cellSizes: [], box: CGSize(width: 100, height: 100)) == nil,
-      "per-pet scale is the tightest state and optional when empty")
-
-
-// Compact Tomy uses the approved neutral body and authored eye patches, not the legacy strip.
-let atlasURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-    .appendingPathComponent("TomatoBar/Assets.xcassets/pet_tomy_compact_v1.imageset/pet_tomy_compact_v1.png")
-let assetRoot = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("TomatoBar/Assets.xcassets")
-func seatedAsset(_ clip: SeatedPetClip) -> URL {
-    assetRoot.appendingPathComponent("\(clip.assetName).imageset/\(clip.assetName).png")
-}
-
-// The alpha scan must hand CGImage.cropping a top-left rect. A synthetic image
-// with content only in its top rows pins the draw orientation; symmetric real
-// assets would pass even if the scan were vertically mirrored.
-func makeProbeImage(width: Int, height: Int, alphaRows: Range<Int>) -> CGImage? {
-    var bytes = [UInt8](repeating: 0, count: width * height * 4)
-    for y in alphaRows {
-        for x in 0..<width {
-            let i = (y * width + x) * 4
-            bytes[i] = 255
-            bytes[i + 3] = 255
-        }
-    }
-    guard let provider = CGDataProvider(data: Data(bytes) as CFData) else { return nil }
-    let info = CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
-    return CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
-                   bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
-                   bitmapInfo: CGBitmapInfo(rawValue: info), provider: provider,
-                   decode: nil, shouldInterpolate: false, intent: .defaultIntent)
-}
-func imageRowHasContent(_ image: CGImage, row: Int) -> Bool {
-    let width = image.width, height = image.height
-    guard row >= 0, row < height, width > 0 else { return false }
-    var pixels = [UInt8](repeating: 0, count: width * height * 4)
-    var drew = false
-    pixels.withUnsafeMutableBytes { buffer in
-        guard let context = CGContext(data: buffer.baseAddress, width: width, height: height,
-                                      bitsPerComponent: 8, bytesPerRow: width * 4,
-                                      space: CGColorSpaceCreateDeviceRGB(),
-                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue) else { return }
-        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        drew = true
-    }
-    guard drew else { return false }
-    for x in 0..<width where pixels[(row * width + x) * 4 + 3] > 8 { return true }
-    return false
-}
-let topHeavy = makeProbeImage(width: 8, height: 8, alphaRows: 0..<2)
-check(topHeavy.flatMap { PetSpriteMetrics.alphaBounds($0) } == CGRect(x: 0, y: 0, width: 8, height: 2),
-      "alpha scan reports top-left bounds for top-heavy content")
-if let topHeavy = topHeavy, let bounds = PetSpriteMetrics.alphaBounds(topHeavy),
-   let crop = topHeavy.cropping(to: bounds) {
-    check(imageRowHasContent(crop, row: 0), "top-heavy crop retains its content row")
-} else {
-    check(false, "top-heavy crop retains its content row")
-}
-// Asymmetric real assets prove the scan/crop agree end to end: the first and
-// last rows of a tight crop must contain pixels, or the wrong band was taken.
-for name in ["pet_chip_work_0", "pet_chip_work_3", "pet_sprout_rest_paused_v3"] {
-    let url = assetRoot.appendingPathComponent("\(name).imageset/\(name).png")
-    let source = NSImage(contentsOf: url)
-    var proposed = CGRect(origin: .zero, size: source?.size ?? .zero)
-    if let cg = source?.cgImage(forProposedRect: &proposed, context: nil, hints: nil),
-       let bounds = PetSpriteMetrics.alphaBounds(cg),
-       let crop = cg.cropping(to: bounds) {
-        check(imageRowHasContent(crop, row: 0) && imageRowHasContent(crop, row: crop.height - 1),
-              "\(name) crop keeps the first and last content rows")
-    } else {
-        check(false, "\(name) crop keeps the first and last content rows")
-    }
-}
-check(PetSpriteFit.scale(cellSize: CGSize(width: 100, height: 200),
-                         box: CGSize(width: 100, height: 100)) == 0.5,
-      "fit scale honors a height-limited cell")
-let compactAtlas = CompactTomyAtlas(image: NSImage(contentsOf: atlasURL),
-    workImage: NSImage(contentsOf: seatedAsset(.work)), restImage: NSImage(contentsOf: seatedAsset(.rest)))
-struct PreviewClip: Decodable {
-    let cell: Int, columns: Int, frames: Int
-    let offsets: [[Double]], bounds: [Double], timeline: [SeatedPetClip.Step]
-}
-let previewRoot = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("docs/desktop-pet-vnext")
-let previewClips = try JSONDecoder().decode([String: PreviewClip].self,
-    from: Data(contentsOf: previewRoot.appendingPathComponent("assets/tomy-seated-motion-v1.json")))
-for clip in SeatedPetClip.allCases {
-    let reference = previewClips[clip.rawValue]!
-    check(reference.cell == 512 && reference.columns == 3 && reference.frames == 6 &&
-          reference.offsets == clip.offsets && reference.bounds == clip.bounds && reference.timeline == clip.timeline,
-          "native camera and timeline exactly match browser sample: \(clip)")
-    let nativeData = try Data(contentsOf: seatedAsset(clip))
-    let previewData = try Data(contentsOf: previewRoot.appendingPathComponent("assets/tomy-seated-\(clip.rawValue)-v1.png"))
-    check(nativeData == previewData,
-          "native sprite sheet is byte-identical to delivered sample: \(clip)")
-    check(compactAtlas.seatedFrames[clip]?.count == 6, "all six complete authored poses load: \(clip)")
-}
-check(compactAtlas.body?.width == 724 && compactAtlas.body?.height == 724, "compact neutral cell loads from real asset")
-check(compactAtlas.eyePatches.count == 3 && compactAtlas.eyePatches.allSatisfy { $0.count == 2 }, "all authored eye poses load")
-check(compactAtlas.contains(CGPoint(x: 48, y: 48), size: CGSize(width: 96, height: 96), pose: PetPose()), "opaque torso accepts pointer")
-check(!compactAtlas.contains(CGPoint(x: 2, y: 2), size: CGSize(width: 96, height: 96), pose: PetPose()) &&
-      !compactAtlas.contains(CGPoint(x: 10, y: 88), size: CGSize(width: 96, height: 96), pose: PetPose()), "transparent corners do not capture pointer")
-check(CompactTomyAtlas(image: nil).body == nil && !CompactTomyAtlas(image: nil).contains(.zero, size: CGSize(width: 96, height: 96), pose: PetPose()), "missing asset never creates an invisible click blocker")
-// Raster rendering and the inverse mouse mask must agree for rotated/stretched poses.
-// Render outside the 96-point slot to detect clipping rather than hiding it.
-var maskMatches = true, staysInsideSlot = true, coveredSamples = 0
-var sceneSamples: [PetPose] = []
-for scene in [PetMotionState.work, .rest] {
-    for frame in 0..<6 { sceneSamples.append(PetPose(scene: scene, frame: frame)) }
-}
-for state in PetMotionState.allCases {
-    for time in [0.9, 1.35, 3.9] {
-        sceneSamples.append(PetMotionDriver(state: state, now: 0).pose(at: time))
-    }
-    for next in PetMotionState.allCases where next != state {
-        var driver = PetMotionDriver(state: state, now: 0)
-        driver.configure(state: next, hovered: false, dragging: false, enabled: true, reduced: false, now: 4)
-        for t in [0.0, 0.08, 0.17, 0.26, 0.4] { sceneSamples.append(driver.pose(at: 4 + t)) }
-    }
-}
-for pose in sceneSamples {
-        let canvas = 144, inset = 24
-        var pixels = [UInt8](repeating: 0, count: canvas * canvas * 4)
-        pixels.withUnsafeMutableBytes { bytes in
-            let info = CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
-            let context = CGContext(data: bytes.baseAddress, width: canvas, height: canvas,
-                bitsPerComponent: 8, bytesPerRow: canvas * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: info)!
-            context.translateBy(x: 0, y: CGFloat(canvas)); context.scaleBy(x: 1, y: -1)
-            context.translateBy(x: CGFloat(inset), y: CGFloat(inset))
-            compactAtlas.draw(in: context, size: CGSize(width: 96, height: 96), pose: pose)
-        }
-        for y in 0..<canvas {
-            for x in 0..<canvas where pixels[(y * canvas + x) * 4 + 3] > 96 {
-                staysInsideSlot = staysInsideSlot && (inset..<(inset + 96)).contains(x) && (inset..<(inset + 96)).contains(y)
-            }
-        }
-        for y in stride(from: 2, to: 94, by: 4) {
-            for x in stride(from: 2, to: 94, by: 4) {
-                let alpha = pixels[((y + inset) * canvas + x + inset) * 4 + 3]
-                if alpha < 24 || alpha > 200 {
-                    let hit = compactAtlas.contains(CGPoint(x: Double(x) + 0.5, y: Double(y) + 0.5),
-                                                    size: CGSize(width: 96, height: 96), pose: pose)
-                    maskMatches = maskMatches && hit == (alpha > 200)
-                    if hit { coveredSamples += 1 }
-                }
-            }
-        }
-}
-check(staysInsideSlot, "all authored states fit in the real 96-point slot without clipping")
-check(maskMatches && coveredSamples > 100, "mouse mask matches complete poses in every authored frame, state and transition")
-check(compactAtlas.contains(CGPoint(x: 48, y: 74), size: CGSize(width: 96, height: 96), pose: PetPose(scene: .work)),
-      "laptop in the complete seated pose is clickable")
-check(CompactPetLayout.scale(.nan) == 1 && CompactPetLayout.scale(-1) == 1 &&
-      CompactPetLayout.scale(0.8) == 0.8 && CompactPetLayout.scale(9) == 1.2, "compact scale is finite and bounded")
-let screenArea = NSRect(x: -1920, y: 40, width: 1920, height: 1040)
-let edge = DesktopPetController.clamped(NSRect(x: -20, y: 1060, width: 115.2, height: 115.2), to: screenArea)
-check(screenArea.contains(edge) && edge.maxX <= -4 && edge.maxY <= 1076, "resize and negative display coordinates stay on screen")
-let farOff = DesktopPetController.clamped(NSRect(x: -4000, y: -3000, width: 96, height: 96), to: NSRect(x: 0, y: 0, width: 1512, height: 950))
-check(farOff.origin == CGPoint(x: 4, y: 4), "removed-screen position clamps to a reachable corner")
-func drainPetEvents(_ seconds: TimeInterval) {
+func drainRunLoop(_ seconds: TimeInterval) {
     let deadline = Date().addingTimeInterval(seconds)
     while Date() < deadline { RunLoop.main.run(until: min(deadline, Date().addingTimeInterval(0.01))) }
 }
-func petMouse(_ type: NSEvent.EventType, count: Int = 1) -> NSEvent {
-    NSEvent.mouseEvent(with: type, location: CGPoint(x: 48, y: 48), modifierFlags: [], timestamp: 0,
-                       windowNumber: 0, context: nil, eventNumber: 0, clickCount: count, pressure: 1)!
-}
-let petEvents = DesktopPetEventView(frame: NSRect(x: 0, y: 0, width: 96, height: 96))
-var singles = 0, doubles = 0, dragStarts = 0, dragEnds = 0
-petEvents.onSingleClick = { singles += 1 }; petEvents.onDoubleClick = { doubles += 1 }
-petEvents.onDragBegan = { dragStarts += 1 }; petEvents.onDragEnded = { dragEnds += 1 }
-petEvents.mouseDown(with: petMouse(.leftMouseDown))
-petEvents.mouseUp(with: petMouse(.leftMouseUp))
-petEvents.mouseDown(with: petMouse(.leftMouseDown, count: 2))
-petEvents.mouseUp(with: petMouse(.leftMouseUp, count: 2))
-drainPetEvents(NSEvent.doubleClickInterval + 0.05)
-check(singles == 0 && doubles == 1, "double click never starts or pauses a timer first")
-petEvents.mouseDown(with: petMouse(.leftMouseDown)); petEvents.mouseUp(with: petMouse(.leftMouseUp))
-drainPetEvents(NSEvent.doubleClickInterval + 0.05)
-check(singles == 1, "single click fires once after the double-click interval")
-petEvents.mouseDown(with: petMouse(.leftMouseDown)); petEvents.mouseDragged(with: petMouse(.leftMouseDragged))
-petEvents.mouseUp(with: petMouse(.leftMouseUp))
-drainPetEvents(NSEvent.doubleClickInterval + 0.05)
-check(singles == 1 && dragStarts == 1 && dragEnds == 1, "drag cannot also trigger a click")
-petEvents.mouseDown(with: petMouse(.leftMouseDown)); petEvents.mouseUp(with: petMouse(.leftMouseUp))
-petEvents.cancelPendingClick(); drainPetEvents(NSEvent.doubleClickInterval + 0.05)
-check(singles == 1, "hiding or dismantling cancels queued timer actions")
-let petAnimator = DesktopPetAnimator()
-petAnimator.configure(state: .work, hovered: false, dragging: false, enabled: true, reduced: false)
-petAnimator.setPresented(true)
-check(petAnimator.isTicking, "visible animation starts a real frame timer")
-petAnimator.setPresented(false)
-check(!petAnimator.isTicking, "hidden animation releases its frame timer")
-petAnimator.setPresented(true)
-petAnimator.configure(state: .work, hovered: false, dragging: false, enabled: true, reduced: true)
-check(!petAnimator.isTicking, "reduced motion releases the real frame timer")
-petAnimator.configure(state: .workFinished, hovered: false, dragging: false, enabled: true, reduced: false)
-drainPetEvents(2.3)
-check(!petAnimator.isTicking, "completed celebration releases the real frame timer")
-petAnimator.stop()
 
 // Main-window summaries reuse a bounded snapshot, but edits with unchanged record
 // count invalidate it. Task/style updates refresh the parent independently of ticks.
@@ -661,7 +335,7 @@ snapshotTimer.startWork()
 workspaceChanges = 0
 var clockChanges = 0
 let clockObservation = snapshotTimer.objectWillChange.sink { clockChanges += 1 }
-drainPetEvents(2.2)
+drainRunLoop(2.2)
 check(clockChanges >= 2 && workspaceChanges == 0,
       "running seconds publish to the timer without invalidating main-window history/context")
 snapshotTimer.cancel()
@@ -781,6 +455,224 @@ reviewCalendar.timeZone = TimeZone(secondsFromGMT: 8 * 3600)!
 calendarHistory.updateCalendar(at: now.addingTimeInterval(86_400), calendar: reviewCalendar)
 check(calendarChanges == 2, "calendar/time-zone changes refresh the parent independently of records")
 withExtendedLifetime(calendarObservation) {}
+
+// Status bar title stability & trailing-anchor geometry checks:
+let savedShowTimer = UserDefaults.standard.object(forKey: "showTimerInMenuBar")
+let savedWorkLen = UserDefaults.standard.object(forKey: "workIntervalLength")
+defer {
+    if let v = savedShowTimer { UserDefaults.standard.set(v, forKey: "showTimerInMenuBar") }
+    else { UserDefaults.standard.removeObject(forKey: "showTimerInMenuBar") }
+    if let v = savedWorkLen { UserDefaults.standard.set(v, forKey: "workIntervalLength") }
+    else { UserDefaults.standard.removeObject(forKey: "workIntervalLength") }
+}
+let statusDir = scratch.appendingPathComponent("status-title")
+let statusStore = FocusStore(url: statusDir.appendingPathComponent("sessions.json"))
+try statusStore.save(FocusState())
+let statusTimer = TBTimer(store: statusStore)
+statusTimer.showTimerInMenuBar = true
+statusTimer.workIntervalLength = 25
+check(statusTimer.statusTitle == nil && !statusTimer.isStatusPaused, "idle status item has no title and is not paused")
+statusTimer.startWork()
+let runningTitle = statusTimer.statusTitle
+check(runningTitle == statusTimer.timeLeft && !(runningTitle?.contains("Ⅱ") ?? true) && !statusTimer.isStatusPaused,
+      "running status title omits pause prefix")
+statusTimer.pause()
+let pausedTitle = statusTimer.statusTitle
+check(pausedTitle == runningTitle && !(pausedTitle?.contains("Ⅱ") ?? true) && statusTimer.isStatusPaused,
+      "paused status title keeps identical text without Ⅱ prefix while marking paused")
+statusTimer.showTimerInMenuBar = false
+check(statusTimer.statusTitle == nil && statusTimer.isStatusPaused,
+      "hiding menu bar timer clears title while preserving paused state for icon feedback")
+statusTimer.togglePause()
+check(statusTimer.statusTitle == nil && !statusTimer.isStatusPaused, "resuming clears paused state even when timer text is hidden")
+statusTimer.stop()
+
+var attentionSeed = FocusState()
+attentionSeed.phase = .workFinished
+try statusStore.save(attentionSeed)
+let attentionTimer = TBTimer(store: statusStore)
+attentionTimer.showTimerInMenuBar = false
+check(attentionTimer.statusTitle == "请确认" && !attentionTimer.isStatusPaused,
+      "attention state always shows 请确认 even when timer text is hidden")
+
+check(TBStatusItem.trailingAnchorRect(for: NSRect(x: 0, y: 0, width: 32, height: 22)) == NSRect(x: 0, y: 0, width: 32, height: 22),
+      "idle bounds anchor to full 32pt width")
+check(TBStatusItem.trailingAnchorRect(for: NSRect(x: 0, y: 0, width: 78, height: 22)) == NSRect(x: 46, y: 0, width: 32, height: 22),
+      "running bounds anchor to trailing 32pt region")
+check(TBStatusItem.trailingAnchorRect(for: NSRect(x: 0, y: 0, width: 86, height: 22)) == NSRect(x: 54, y: 0, width: 32, height: 22),
+      "three-digit timer bounds anchor to trailing 32pt region")
+check(TBStatusItem.trailingAnchorRect(for: NSRect(x: 0, y: 0, width: 18, height: 22)) == NSRect(x: 0, y: 0, width: 18, height: 22),
+      "narrow bounds clamp trailing anchor width cleanly")
+
+let emptyAttr = TBStatusItem.titleAttributedString(title: nil)
+check(emptyAttr.string.isEmpty, "nil status title produces empty attributed string")
+let activeAttr = TBStatusItem.titleAttributedString(title: "25:00")
+let zeroAttr = TBStatusItem.titleAttributedString(title: "00:00")
+let maxTwoDigitAttr = TBStatusItem.titleAttributedString(title: "99:59")
+let maxThreeDigitAttr = TBStatusItem.titleAttributedString(title: "180:00")
+let attentionAttr = TBStatusItem.titleAttributedString(title: "请确认")
+check(activeAttr.string == " 25:00" && zeroAttr.string == " 00:00" && maxThreeDigitAttr.string == " 180:00",
+      "attributed title keeps expected leading space and digits")
+check(abs(activeAttr.size().width - zeroAttr.size().width) < 0.001 &&
+      abs(activeAttr.size().width - maxTwoDigitAttr.size().width) < 0.001,
+      "monospaced digit title width stays constant across running, paused, and digit ticks")
+check(maxThreeDigitAttr.size().width > activeAttr.size().width && attentionAttr.size().width > 0,
+      "three-digit timer and attention titles measure cleanly")
+let titleColor = activeAttr.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
+check(titleColor == NSColor.labelColor,
+      "status title preserves dynamic NSColor.labelColor for menu-bar vibrancy")
+var darkLuma: CGFloat = 0
+var lightLuma: CGFloat = 1
+NSAppearance(named: .vibrantDark)?.performAsCurrentDrawingAppearance {
+    darkLuma = titleColor?.usingColorSpace(.sRGB)?.redComponent ?? 0
+}
+NSAppearance(named: .vibrantLight)?.performAsCurrentDrawingAppearance {
+    lightLuma = titleColor?.usingColorSpace(.sRGB)?.redComponent ?? 1
+}
+check(darkLuma > 0.8 && lightLuma < 0.2,
+      "status title color adapts dynamically between VibrantDark and VibrantLight")
+check(abs(TBStatusItem.pausedButtonAlpha - 0.45) < 0.001,
+      "paused state uses 0.45 button alpha without breaking template vibrancy")
+
+statusTimer.workIntervalLength = 180
+statusTimer.showTimerInMenuBar = true
+statusTimer.startWork()
+check(statusTimer.statusTitle == "180:00" && !statusTimer.isStatusPaused,
+      "180-minute work interval formats cleanly in menu bar title")
+statusTimer.cancel()
+
+let headlessStatusItem = TBStatusItem()
+headlessStatusItem.setStatus(icon: .asset(.idle), title: nil, paused: false, phaseLabel: "准备开始")
+headlessStatusItem.setStatus(icon: .emoji("🚬"), title: "05:00", paused: true, phaseLabel: "休息已暂停")
+headlessStatusItem.setStatus(icon: .emoji("🚬"), title: "05:00", paused: true, phaseLabel: "休息已暂停")
+headlessStatusItem.showPopover(nil)
+headlessStatusItem.closePopover(nil)
+check(TBStatusItem.StatusIcon.asset(.work) != TBStatusItem.StatusIcon.emoji("🚬"),
+      "TBStatusItem.StatusIcon distinguishes asset and emoji representations")
+let headlessButton = NSStatusBarButton()
+check(TBStatusItem.trailingAnchorScreenRect(for: headlessButton) == nil,
+      "trailingAnchorScreenRect returns nil before the status button has a window")
+
+// Tomy Desktop Pet native Retina atlas, O(1) hit-mask orientation, drawing & cancel-hook bridge checks
+do {
+    let atlas = TomySpriteAtlas.shared
+    check(atlas.isLoaded && atlas.cellPixelWidth == 192 && atlas.cellPixelHeight == 208,
+          "TomySpriteAtlas loads native @2x 192x208 Retina cells")
+    for row in TomyAtlasRow.allCases {
+        for col in 0..<row.frameCount {
+            check(atlas.cellImage(row: row, col: col) != nil,
+                  "TomySpriteAtlas crops non-nil CGImage for \(row) frame \(col)")
+        }
+    }
+
+    let box = CGSize(width: 80, height: 87)
+    let idlePose = TomyPose(row: .idle, col: 0)
+    check(atlas.contains(point: CGPoint(x: 40, y: 50), in: box, pose: idlePose),
+          "opaque torso center hits Tomy hit-mask")
+    check(!atlas.contains(point: CGPoint(x: 3, y: 3), in: box, pose: idlePose) &&
+          !atlas.contains(point: CGPoint(x: 77, y: 3), in: box, pose: idlePose) &&
+          !atlas.contains(point: CGPoint(x: 3, y: 84), in: box, pose: idlePose),
+          "transparent corners inside 80x87 panel pass mouse events through")
+    // Orientation proof: grounded idle hits near feet (y=74), whereas apex celebrate col=4 clears y=74!
+    let jumpPose = TomyPose(row: .celebrate, col: 4)
+    check(atlas.contains(point: CGPoint(x: 34, y: 74), in: box, pose: idlePose) &&
+          !atlas.contains(point: CGPoint(x: 40, y: 74), in: box, pose: jumpPose),
+          "hit-mask Y axis is upright: grounded feet hit at y=74 while airborne jump apex clears y=74")
+
+    // Verify actual CoreGraphics drawing via TomyCanvasView hosted in TomyPetPanel across all 9 rows
+    _ = NSApplication.shared
+    let testPanel = TomyPetPanel(contentRect: NSRect(x: 100, y: 100, width: 96, height: 104))
+    let canvas = TomyCanvasView(frame: NSRect(x: 0, y: 0, width: 96, height: 104))
+    testPanel.contentView = canvas
+    for row in TomyAtlasRow.allCases {
+        canvas.pose = TomyPose(row: row, col: row.staticFrame)
+        guard let rep = canvas.bitmapImageRepForCachingDisplay(in: canvas.bounds) else {
+            check(false, "allocates bitmap rep for TomyCanvasView \(row)")
+            continue
+        }
+        canvas.cacheDisplay(in: canvas.bounds, to: rep)
+        let cx = rep.pixelsWide / 2
+        let cy = (rep.pixelsHigh * 56) / 104
+        let centerAlpha = rep.colorAt(x: cx, y: cy)?.alphaComponent ?? 0
+        let cornerAlpha = rep.colorAt(x: 1, y: 1)?.alphaComponent ?? 1
+        check(centerAlpha > 0.9 && cornerAlpha == 0,
+              "TomyCanvasView renders opaque sprite center and transparent background for \(row)")
+    }
+
+    // Verify stem-pivot drag tilt agrees between rendered bitmap and hit-mask inverse transform
+    let tiltedPose = TomyPose(row: .drag, col: 0, tiltDegrees: 10.0)
+    canvas.pose = tiltedPose
+    if let tiltedRep = canvas.bitmapImageRepForCachingDisplay(in: canvas.bounds) {
+        canvas.cacheDisplay(in: canvas.bounds, to: tiltedRep)
+        let probePt = CGPoint(x: 38, y: 73)
+        let px = (tiltedRep.pixelsWide * Int(probePt.x)) / 96
+        let py = (tiltedRep.pixelsHigh * Int(probePt.y)) / 104
+        let probeAlpha = tiltedRep.colorAt(x: px, y: py)?.alphaComponent ?? 0
+        let cornerAlpha = tiltedRep.colorAt(x: 1, y: 1)?.alphaComponent ?? 1
+        check(probeAlpha > 0.85 && cornerAlpha == 0 &&
+              atlas.contains(point: probePt, in: CGSize(width: 96, height: 104), pose: tiltedPose),
+              "tilted pendulum draw (+10 deg swings body left) matches hit-mask inverse rotation without edge clipping")
+    } else {
+        check(false, "allocates bitmap rep for tilted TomyCanvasView")
+    }
+    testPanel.contentView = nil
+
+    // Verify TBTimer.onWorkCancelled fires strictly on active work cancellation
+    var cancelFiredCount = 0
+    statusTimer.onWorkCancelled = { cancelFiredCount += 1 }
+    statusTimer.cancel()
+    check(cancelFiredCount == 0, "cancelling while idle does not fire onWorkCancelled")
+    statusTimer.startWork()
+    _ = statusTimer.freezeForCancel()
+    statusTimer.cancel()
+    check(cancelFiredCount == 1 && statusTimer.state.phase == .idle,
+          "cancelling frozen work fires onWorkCancelled exactly once")
+    statusTimer.onWorkCancelled = nil
+
+    // Verify TomyPetController.applyCancelWorkDecision preserves pre-modal running/paused state
+    let petCancelController = TomyPetController(timer: statusTimer)
+    statusTimer.startWork()
+    let wasPausedRunning = statusTimer.state.paused
+    check(!wasPausedRunning && statusTimer.freezeForCancel() && statusTimer.state.paused,
+          "freezeForCancel pauses active work before cancel alert opens")
+    petCancelController.applyCancelWorkDecision(confirmedCancel: false, wasPaused: wasPausedRunning)
+    check(statusTimer.state.phase == .work && !statusTimer.state.paused,
+          "choosing continue on cancel prompt resumes work when timer was previously running")
+
+    statusTimer.pause()
+    let wasPausedBeforeModal = statusTimer.state.paused
+    check(wasPausedBeforeModal && statusTimer.freezeForCancel() && statusTimer.state.paused,
+          "freezeForCancel preserves paused state when work was already paused")
+    petCancelController.applyCancelWorkDecision(confirmedCancel: false, wasPaused: wasPausedBeforeModal)
+    check(statusTimer.state.phase == .work && statusTimer.state.paused,
+          "choosing continue on cancel prompt keeps work paused if it was already paused")
+
+    var menuCancelFired = 0
+    statusTimer.onWorkCancelled = { menuCancelFired += 1 }
+    petCancelController.applyCancelWorkDecision(confirmedCancel: true, wasPaused: wasPausedBeforeModal)
+    check(menuCancelFired == 1 && statusTimer.state.phase == .idle,
+          "confirming cancel via applyCancelWorkDecision discards work and fires onWorkCancelled")
+    statusTimer.onWorkCancelled = nil
+    petCancelController.shutdown()
+
+    // Verify TBReminder auto-dismisses when needsAttention is confirmed externally via Tomy
+    let reminderStore = FocusStore(url: scratch.appendingPathComponent("tomy-reminder/sessions.json"))
+    var reminderSeed = FocusState()
+    reminderSeed.phase = .workFinished
+    try reminderStore.save(reminderSeed)
+    let reminderTimer = TBTimer(store: reminderStore)
+    let reminderController = TomyPetController(timer: reminderTimer)
+    let reminder = TBReminder()
+    reminder.show(timer: reminderTimer)
+    check(reminder.isVisible && reminderTimer.state.needsAttention,
+          "TBReminder opens visibly when focus completion awaits attention")
+    reminderController.confirmAttentionFromClick()
+    RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+    check(!reminder.isVisible && reminderTimer.state.phase == .rest && !reminderTimer.state.needsAttention,
+          "confirming attention from Tomy automatically dismisses TBReminder and starts rest")
+    reminder.dismiss()
+    reminderController.shutdown()
+}
 
 print("PASS: \(checks) actual TBTimer bridge checks; isolated QA13 IO, no UI interaction")
 withExtendedLifetime(observation) {}

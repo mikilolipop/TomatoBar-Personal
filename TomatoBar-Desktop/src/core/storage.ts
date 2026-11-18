@@ -64,20 +64,9 @@ export class BrowserStorageTransport implements StorageTransport {
     this.storage = storage;
   }
   async read(file: "sessions" | "settings") {
-    const raw = this.storage.getItem(
+    return this.storage.getItem(
       file === "sessions" ? STORAGE_KEY : SETTINGS_KEY,
     );
-    if (file === "settings" && raw === null) {
-      const kind = this.storage.getItem("TomatoBar_petKind");
-      const visible = this.storage.getItem("TomatoBar_showPet");
-      if (kind !== null || visible !== null)
-        return JSON.stringify({
-          ...defaultSettings,
-          petKind: kind === "sprout" ? "sprout" : "tomy",
-          showPet: visible !== "false",
-        });
-    }
-    return raw;
   }
   async write(file: "sessions" | "settings", json: string, preserve = false) {
     const key = file === "sessions" ? STORAGE_KEY : SETTINGS_KEY;

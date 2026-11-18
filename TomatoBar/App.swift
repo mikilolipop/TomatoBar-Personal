@@ -14,16 +14,36 @@ struct TBApp: App {
     var body: some Scene { Settings {} }
 }
 
-class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
+class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPopoverDelegate {
+    enum StatusIcon: Equatable {
+        case asset(NSImage.Name)
+        case emoji(String)
+    }
+
     private var mainWindow: NSWindow?
     private var popover = NSPopover()
+    private var anchorWindow: NSWindow?
     private var statusBarItem: NSStatusItem?
     private var model: TBTimer!
     private let reminder = TBReminder()
     private var launchContext = LaunchContext()
-    private(set) var petController: DesktopPetController?
+    private(set) var petController: TomyPetController?
     static var shared: TBStatusItem?
     private static let mainWindowMinContent = NSSize(width: 960, height: 620)
+    private static let trailingAnchorWidth: CGFloat = 32
+    static let pausedButtonAlpha: CGFloat = 0.45
+    private static let smokeEmojiImage: NSImage = makeEmojiImage("🚬")
+    private var statusWindowObservers: [NSObjectProtocol] = []
+    private var suppressNextStatusButtonToggle = false
+    private var isProgrammaticClose = false
+    private var lastAppliedStatus: (icon: StatusIcon, title: String?, paused: Bool, toolTip: String)?
+
+    deinit {
+        stopObservingStatusWindow()
+        petController?.shutdown()
+        anchorWindow?.orderOut(nil)
+        anchorWindow?.close()
+    }
 
     func applicationWillFinishLaunching(_: Notification) {
         launchContext.observe(NSAppleEventManager.shared().currentAppleEvent)
@@ -33,9 +53,12 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
         Self.shared = self
         LaunchAtLogin.migrateIfNeeded()
         model = TBTimer()
-        petController = DesktopPetController(timer: model)
-        petController?.setup()
+        let pet = TomyPetController(timer: model)
+        pet.setup()
+        petController = pet
         popover.behavior = .transient
+        popover.animates = false
+        popover.delegate = self
         popover.contentViewController = NSHostingController(rootView: TBPopoverView(timer: model))
         statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusBarItem?.button?.imagePosition = .imageLeft
@@ -43,7 +66,7 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
         statusBarItem?.button?.action = #selector(togglePopover(_:))
         model.onAttention = { [weak self] in
             guard let self = self else { return }
-            self.popover.performClose(nil)
+            self.closePopover(nil)
             self.reminder.show(timer: self.model)
         }
         model.updateStatus()
@@ -67,6 +90,9 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
         alert.runModal()
         return .terminateCancel
     }
+    func applicationWillTerminate(_ notification: Notification) {
+        petController?.shutdown()
+    }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         showMainWindow()
         if model.state.needsAttention { reminder.show(timer: model) }
@@ -78,7 +104,7 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
     func showMainWindow() {
-        popover.performClose(nil)
+        closePopover(nil)
         if mainWindow == nil {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1180, height: 760),
                 styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
@@ -144,15 +170,36 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
             NSLog("TomatoBar: failed to hide the running Dock icon")
         }
     }
-    func setTitle(title: String?) {
-        statusBarItem?.button?.attributedTitle = NSAttributedString(string: title.map { " \($0)" } ?? "",
-            attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)])
-        statusBarItem?.button?.toolTip = "番茄钟 · \(model.phaseLabel)"
+    static func trailingAnchorRect(for bounds: NSRect) -> NSRect {
+        let width = min(trailingAnchorWidth, bounds.width)
+        return NSRect(x: bounds.maxX - width, y: bounds.minY, width: width, height: bounds.height)
     }
-    func setIcon(name: NSImage.Name) { statusBarItem?.button?.image = NSImage(named: name) }
+
+    static func trailingAnchorScreenRect(for button: NSStatusBarButton) -> NSRect? {
+        guard let buttonWindow = button.window else { return nil }
+        let anchorRect = trailingAnchorRect(for: button.bounds)
+        let screenRect = buttonWindow.convertToScreen(button.convert(anchorRect, to: nil))
+        return NSRect(
+            x: screenRect.minX,
+            y: buttonWindow.frame.minY,
+            width: max(1, screenRect.width),
+            height: max(1, buttonWindow.frame.height)
+        )
+    }
+
+    static func titleAttributedString(title: String?) -> NSAttributedString {
+        NSAttributedString(
+            string: title.map { " \($0)" } ?? "",
+            attributes: [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
+                .foregroundColor: NSColor.labelColor
+            ]
+        )
+    }
+
     /// Render the easter-egg emoji as a real status-item image so the normal timer title
     /// can remain beside it. Keep it non-template to preserve the native color emoji.
-    func setEmojiIcon(_ emoji: String) {
+    private static func makeEmojiImage(_ emoji: String) -> NSImage {
         let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
             let text = NSAttributedString(string: emoji, attributes: [
                 .font: NSFont.systemFont(ofSize: 13.5)
@@ -163,15 +210,174 @@ class TBStatusItem: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return true
         }
         image.isTemplate = false
-        statusBarItem?.button?.image = image
+        return image
     }
-    func showPopover(_ sender: AnyObject?) {
+
+    func setStatus(icon: StatusIcon, title: String?, paused: Bool = false, phaseLabel: String? = nil) {
         guard let button = statusBarItem?.button else { return }
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        popover.contentViewController?.view.window?.makeKey()
+        let label = phaseLabel ?? model?.phaseLabel ?? ""
+        let toolTip = label.isEmpty ? "番茄钟" : "番茄钟 · \(label)"
+        if let last = lastAppliedStatus,
+           last.icon == icon,
+           last.title == title,
+           last.paused == paused,
+           last.toolTip == toolTip {
+            return
+        }
+        let image: NSImage?
+        switch icon {
+        case .asset(let name):
+            image = NSImage(named: name)
+        case .emoji(let emoji):
+            image = emoji == "🚬" ? Self.smokeEmojiImage : Self.makeEmojiImage(emoji)
+        }
+        button.contentTintColor = nil
+        button.image = image
+        button.attributedTitle = Self.titleAttributedString(title: title)
+        button.alphaValue = paused ? Self.pausedButtonAlpha : 1.0
+        button.toolTip = toolTip
+        lastAppliedStatus = (icon, title, paused, toolTip)
     }
-    func closePopover(_ sender: AnyObject?) { popover.performClose(sender) }
+
+    func showPopover(_ sender: AnyObject?) {
+        guard let button = statusBarItem?.button,
+              let anchor = syncAnchorWindow(for: button),
+              let anchorView = anchor.contentView else { return }
+        suppressNextStatusButtonToggle = false
+        if popover.isShown {
+            anchor.orderFrontRegardless()
+            popover.contentViewController?.view.window?.makeKey()
+            return
+        }
+        stopObservingStatusWindow()
+        if let contentView = popover.contentViewController?.view {
+            contentView.layoutSubtreeIfNeeded()
+            let fitting = contentView.fittingSize
+            if fitting.width > 0 && fitting.height > 0 {
+                popover.contentSize = fitting
+            }
+        }
+        anchor.orderFrontRegardless()
+        popover.show(relativeTo: anchorView.bounds, of: anchorView, preferredEdge: .minY)
+        popover.contentViewController?.view.window?.makeKey()
+        if let buttonWindow = button.window {
+            startObservingStatusWindow(buttonWindow, button: button)
+        }
+    }
+
+    func closePopover(_ sender: AnyObject?) {
+        suppressNextStatusButtonToggle = false
+        isProgrammaticClose = true
+        defer { isProgrammaticClose = false }
+        popover.performClose(sender)
+    }
+
+    func popoverWillClose(_ notification: Notification) {
+        if !isProgrammaticClose && isClosingDueToStatusButtonClick() {
+            // Transient popovers close on leftMouseDown before NSStatusBarButton triggers its action.
+            // Suppress only that click's toggle so the popover closes instead of reopening immediately.
+            suppressNextStatusButtonToggle = true
+            RunLoop.main.perform(inModes: [.default]) { [weak self] in
+                self?.suppressNextStatusButtonToggle = false
+            }
+        }
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        stopObservingStatusWindow()
+        anchorWindow?.orderOut(nil)
+    }
+
     @objc func togglePopover(_ sender: AnyObject?) {
+        if suppressNextStatusButtonToggle {
+            suppressNextStatusButtonToggle = false
+            return
+        }
         if popover.isShown { closePopover(sender) } else { showPopover(sender) }
+    }
+
+    private func ensureAnchorWindow() -> NSWindow {
+        if let anchorWindow { return anchorWindow }
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: Self.trailingAnchorWidth, height: 22),
+            styleMask: .borderless,
+            backing: .buffered,
+            defer: false
+        )
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.hasShadow = false
+        window.ignoresMouseEvents = true
+        window.isReleasedWhenClosed = false
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle, .stationary]
+        anchorWindow = window
+        return window
+    }
+
+    @discardableResult
+    private func syncAnchorWindow(for button: NSStatusBarButton) -> NSWindow? {
+        guard let buttonWindow = button.window,
+              let screenRect = Self.trailingAnchorScreenRect(for: button) else { return nil }
+        let window = ensureAnchorWindow()
+        if window.level != buttonWindow.level {
+            window.level = buttonWindow.level
+        }
+        if abs(window.frame.minX - screenRect.minX) > 0.5
+            || abs(window.frame.minY - screenRect.minY) > 0.5
+            || abs(window.frame.width - screenRect.width) > 0.5
+            || abs(window.frame.height - screenRect.height) > 0.5 {
+            window.setFrame(screenRect, display: false)
+        }
+        return window
+    }
+
+    private func isClosingDueToStatusButtonClick() -> Bool {
+        guard let button = statusBarItem?.button,
+              let buttonWindow = button.window,
+              let event = NSApp.currentEvent else { return false }
+        guard event.type == .leftMouseDown || event.type == .rightMouseDown else { return false }
+        let buttonScreenRect = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        return buttonScreenRect.contains(NSEvent.mouseLocation)
+    }
+
+    private func startObservingStatusWindow(_ window: NSWindow, button: NSStatusBarButton) {
+        let center = NotificationCenter.default
+        let syncIfShown: () -> Void = { [weak self, weak window, weak button] in
+            guard let self = self,
+                  let window = window,
+                  let button = button,
+                  self.popover.isShown,
+                  button.window === window else { return }
+            _ = self.syncAnchorWindow(for: button)
+        }
+        let watched: [(Notification.Name, Any?)] = [
+            (NSWindow.didMoveNotification, window),
+            (NSWindow.didChangeScreenNotification, window),
+            (NSApplication.didChangeScreenParametersNotification, nil),
+        ]
+        statusWindowObservers = watched.map { name, sender in
+            center.addObserver(forName: name, object: sender, queue: .main) { _ in
+                syncIfShown()
+            }
+        }
+        // Sync asynchronously on resize so normal status-bar relayout (didResize before didMove
+        // in the same pass) settles first, while notch-pinned resizes without didMove still sync.
+        let resizeObserver = center.addObserver(
+            forName: NSWindow.didResizeNotification,
+            object: window,
+            queue: .main
+        ) { _ in
+            DispatchQueue.main.async {
+                syncIfShown()
+            }
+        }
+        statusWindowObservers.append(resizeObserver)
+    }
+
+    private func stopObservingStatusWindow() {
+        for observer in statusWindowObservers {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        statusWindowObservers.removeAll()
     }
 }

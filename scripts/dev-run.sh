@@ -90,7 +90,6 @@ echo "4/5 桥接 + 启动上下文回归检查..."
 if [ "${SKIP_TESTS:-0}" = "1" ]; then
   echo "  （SKIP_TESTS=1,已跳过）"
 else
-  run_check scripts/test-pet-motion.sh
   run_check scripts/test-bridge.sh
   run_check scripts/test-launch-context.sh
 fi

@@ -977,3 +977,203 @@ check(FocusRecord.togglingTag("STRASSE", in: ["Straße", "阅读"]) == ["阅读"
 check(FocusRecord.togglingTag("  学习  ", in: ["阅读"]) == ["阅读", "学习"],
       "tag toggle trims a new selection and keeps the primary tag order")
 print("PASS: \(checks) total checks including project moves and Unicode category identity")
+
+// MARK: - Tomy Desktop Pet Pure Engine & Ergonomics Checks
+
+do {
+    // 1. Click semantics: never accidentally pause/start timer; confirm only when awaiting attention
+    check(TomyClickAction.singleClick(for: .idle) == .wave &&
+          TomyClickAction.singleClick(for: .work) == .wave &&
+          TomyClickAction.singleClick(for: .rest) == .wave,
+          "single click waves during idle/work/rest without mutating timer")
+    check(TomyClickAction.singleClick(for: .workFinished) == .confirmAttention &&
+          TomyClickAction.singleClick(for: .restFinished) == .confirmAttention,
+          "single click confirms transition when phase awaits attention")
+
+    // 2. Auto-Ghost lock & Option-override rules
+    let lockedGhost = TomyGhostPolicy.resolve(locked: true, optionPressed: false, hitOpaquePixel: true, pointerInsideBounds: true)
+    check(lockedGhost.ignoresMouseEvents && abs(lockedGhost.opacity - TomyGhostPolicy.ghostOpacity) < 0.001,
+          "locked pet passes clicks through and ghosts to 28% opacity when pointer enters bounds")
+    let lockedAway = TomyGhostPolicy.resolve(locked: true, optionPressed: false, hitOpaquePixel: false, pointerInsideBounds: false)
+    check(lockedAway.ignoresMouseEvents && lockedAway.opacity == 1.0,
+          "locked pet restores full opacity when pointer leaves bounds")
+    let optionOverride = TomyGhostPolicy.resolve(locked: true, optionPressed: true, hitOpaquePixel: true, pointerInsideBounds: true)
+    check(!optionOverride.ignoresMouseEvents && optionOverride.opacity == 1.0,
+          "holding Option temporarily unlocks hit-testing and restores 100% opacity")
+    let unlockedClear = TomyGhostPolicy.resolve(locked: false, optionPressed: false, hitOpaquePixel: false, pointerInsideBounds: true)
+    check(unlockedClear.ignoresMouseEvents && unlockedClear.opacity == 1.0,
+          "transparent pixels inside unlocked window pass clicks through")
+
+    // 3. Size presets & magnetic Dock/edge snapping
+    check(TomyPetSize.resolved(80).pointSize == CGSize(width: 80, height: 87) &&
+          TomyPetSize.resolved(96).pointSize == CGSize(width: 96, height: 104) &&
+          TomyPetSize.resolved(64).pointSize == CGSize(width: 64, height: 69) &&
+          TomyPetSize.resolved(999) == .medium,
+          "Tomy size presets preserve 96:104 cell aspect ratio and default safely to 80pt")
+
+    let screen = CGRect(x: 0, y: 52, width: 1440, height: 848)
+    let nearDock = TomyPetPlacement.clampAndSnap(origin: CGPoint(x: 500, y: 61), size: CGSize(width: 80, height: 87), visibleFrame: screen)
+    check(nearDock == CGPoint(x: 500, y: 52), "dropping within 14pt of Dock magnetically snaps to visibleFrame.minY")
+    let offRight = TomyPetPlacement.clampAndSnap(origin: CGPoint(x: 1900, y: 200), size: CGSize(width: 80, height: 87), visibleFrame: screen)
+    check(offRight.x == 1440 - 80 - TomyPetPlacement.edgeMargin && offRight.y == 200,
+          "off-screen origin clamps cleanly inside visibleFrame")
+
+    // 4. Codex 8x9 atlas dimensions & micro-life engine: idle breath+blink, 4-way cursor glance, hover perk, work/rest/cancel/celebrate
+    check(TomyAtlasRow.columns == 8 && TomyAtlasRow.rows == 9 &&
+          TomyAtlasRow.allCases.count == 9 &&
+          TomyAtlasRow.allCases.allSatisfy { $0.frameCount == 8 },
+          "Tomy v11 atlas exposes 9 rows of 8 frames each")
+
+    var engine = TomyPetEngine(seed: 42, now: 100.0)
+    let p0 = engine.advance(to: 100.0)
+    check(p0.row == .idle && p0.col == 0, "engine starts in neutral idle breath frame 0")
+    if let wake = engine.nextWakeDelay(at: 100.0, isVisible: true) {
+        check(wake >= 0.11 && wake <= 0.15, "visible animated idle schedules 8-frame breath ticks (~0.135s)")
+    } else {
+        check(false, "visible animated idle returns finite wake delay")
+    }
+    check(engine.nextWakeDelay(at: 100.0, isVisible: false) == nil,
+          "hidden pet suspends wake scheduling completely")
+
+    var seenIdleCols = Set<Int>()
+    var seenBlinkCols = Set<Int>()
+    var tIdle = 100.0
+    while tIdle < 103.0 {
+        let p = engine.advance(to: tIdle)
+        if p.row == .idle { seenIdleCols.insert(p.col) }
+        if p.row == .react { seenBlinkCols.insert(p.col) }
+        tIdle += 0.03
+    }
+    check(seenIdleCols == Set(0..<8) && seenBlinkCols.isSuperset(of: [0, 1]),
+          "idle cycles all 8 grounded breathing frames followed by 3-stage soft React blink [0, 1]")
+
+    // 4b. 4-direction cursor glance resolution & idle engine override
+    let petCenter = CGPoint(x: 500, y: 500)
+    check(TomyGlanceDirection.resolve(petCenter: petCenter, mousePoint: CGPoint(x: 420, y: 510))?.colIndex == 2 &&
+          TomyGlanceDirection.resolve(petCenter: petCenter, mousePoint: CGPoint(x: 580, y: 505))?.colIndex == 3 &&
+          TomyGlanceDirection.resolve(petCenter: petCenter, mousePoint: CGPoint(x: 440, y: 560))?.colIndex == 4 &&
+          TomyGlanceDirection.resolve(petCenter: petCenter, mousePoint: CGPoint(x: 560, y: 560))?.colIndex == 5 &&
+          TomyGlanceDirection.resolve(petCenter: petCenter, mousePoint: CGPoint(x: 505, y: 505)) == nil &&
+          TomyGlanceDirection.resolve(petCenter: petCenter, mousePoint: CGPoint(x: 750, y: 500)) == nil,
+          "TomyGlanceDirection resolves 4 directional glances inside 18-175pt annulus with Y-up coordinates")
+
+    engine.sync(phase: .work, paused: false, at: 102.9)
+    engine.sync(phase: .idle, paused: false, at: 103.0)
+    engine.setCursorGlance(.upRight, at: 103.01)
+    let glancePose0 = engine.advance(to: 103.02)
+    let glancePosePeak = engine.advance(to: 103.30)
+    check(glancePose0.row == .react && glancePose0.col == 5 &&
+          glancePosePeak.row == .react && glancePosePeak.col == 5 &&
+          glancePosePeak.scaleY > 1.005 && glancePosePeak.scaleX < 0.995,
+          "idle cursor glance overrides neutral open-eye idle with React col 5 and breathes subtly across idle cycle")
+    engine.setCursorGlance(nil, at: 103.4)
+
+    // 4c. Hover perk & 12s cooldown
+    engine.triggerHoverPerk(at: 103.5)
+    var seenPerkReact = Set<Int>()
+    var seenPerkWave = Set<Int>()
+    var tPerk = 103.5
+    while tPerk < 104.35 {
+        let p = engine.advance(to: tPerk)
+        if p.row == .react { seenPerkReact.insert(p.col) }
+        if p.row == .wave { seenPerkWave.insert(p.col) }
+        tPerk += 0.04
+    }
+    _ = engine.advance(to: 104.5)
+    check(seenPerkReact == Set([6, 7]) && seenPerkWave == Set(0..<8),
+          "hover perk plays React [6, 7] crouch+hop followed by full 8-frame Wave")
+    engine.triggerHoverPerk(at: 105.0) // inside 12s cooldown
+    check(engine.advance(to: 105.02).row == .idle,
+          "hover perk respects 12.0s cooldown")
+    engine.triggerHoverPerk(at: 115.6) // >= 12.0s later
+    check(engine.advance(to: 115.62) == TomyPose(row: .react, col: 6),
+          "hover perk triggers again after 12.0s cooldown expires")
+    _ = engine.advance(to: 116.7)
+
+    // Click wave plays all 8 smooth shoulder-pivot wave poses and returns to idle
+    engine.triggerWave(at: 117.0)
+    var seenWaveCols = Set<Int>()
+    var t = 117.0
+    while t < 118.4 {
+        let wp = engine.advance(to: t)
+        if wp.row == .wave { seenWaveCols.insert(wp.col) }
+        t += 0.04
+    }
+    check(seenWaveCols == Set(0..<8), "click wave visits all 8 smooth arm poses [0..7]")
+    let afterWave = engine.advance(to: 118.5)
+    check(afterWave.row == .idle, "wave returns cleanly to underlying idle state")
+
+    // Work 6-phase typing + blinks, Rest steam + 5-step sip, Paused, and Cancel -> Sad -> Idle
+    engine.sync(phase: .work, paused: false, timeLeftSeconds: 1200, at: 120.0)
+    check(engine.cursorGlance == nil, "entering work clears idle cursor glance")
+    var seenWorkCols = Set<Int>()
+    var tWork = 120.0
+    while tWork < 126.0 {
+        let wp = engine.advance(to: tWork)
+        if wp.row == .work { seenWorkCols.insert(wp.col) }
+        tWork += 0.03
+    }
+    check(seenWorkCols == Set(0..<8), "work cycles all 6 typing poses plus half/full blinks [6, 7]")
+
+    engine.sync(phase: .rest, paused: false, timeLeftSeconds: 300, at: 127.0)
+    var seenRestCols = Set<Int>()
+    var tRest = 127.0
+    while tRest < 131.5 {
+        let rp = engine.advance(to: tRest)
+        if rp.row == .rest { seenRestCols.insert(rp.col) }
+        tRest += 0.05
+    }
+    check(seenRestCols == Set(0..<8), "rest cycles rising-steam breaths and 5-step cup sip [0..7]")
+
+    engine.sync(phase: .work, paused: true, timeLeftSeconds: 1180, at: 132.0)
+    check(engine.advance(to: 132.1).row == .paused, "pausing work enters snoozing paused row")
+
+    engine.triggerCancelSad(at: 135.0)
+    engine.sync(phase: .idle, paused: false, at: 135.0)
+    check(engine.advance(to: 135.2).row == .sad && engine.advance(to: 136.7).row == .sad,
+          "cancelling focus holds Sad reaction across phase reset to idle")
+    check(engine.advance(to: 137.0).row == .idle,
+          "Sad reaction settles back into calm idle after ~1.84s")
+
+    // Completion -> Celebrate (2x 8-frame = 1.58s) -> AttentionWait (2x 8-frame idle breath = 2.16s -> wave)
+    engine.sync(phase: .work, paused: false, timeLeftSeconds: 10, at: 140.0)
+    engine.sync(phase: .workFinished, paused: false, at: 145.0)
+    check(engine.advance(to: 145.1).row == .celebrate, "completing focus immediately triggers Celebrate jump")
+    let waitIdle = engine.advance(to: 146.8)
+    let waitWave = engine.advance(to: 148.9)
+    check(waitIdle.row == .idle && waitWave.row == .wave,
+          "unconfirmed completion transitions from Celebrate to AttentionWait breathing then gentle Wave")
+
+    // Drag & landing squash physics + tiltDegrees equality
+    engine.sync(phase: .idle, paused: false, at: 150.0)
+    engine.setDragging(true, at: 151.0)
+    check(engine.advance(to: 151.05).row == .drag, "dragging enters airborne kicking row")
+    check(TomyPose(row: .drag, col: 0, tiltDegrees: 8.5) != TomyPose(row: .drag, col: 0),
+          "TomyPose includes drag pendulum tiltDegrees in equality comparison")
+    engine.setDragging(false, dropDistancePt: 22.0, at: 152.0)
+    check(engine.isLandingActive, "dropping from height activates landing spring")
+    let falling = engine.advance(to: 152.04)
+    let squashing = engine.advance(to: 152.14)
+    let settled = engine.advance(to: 152.30)
+    check(falling.offsetY > 5.0 && squashing.offsetY == 0 && squashing.scaleX > 1.01 && squashing.scaleY < 0.99,
+          "dropping from height applies parabolic fall followed by foot-anchored squash")
+    check(settled.offsetY == 0 && settled.scaleX == 1.0 && settled.scaleY == 1.0 && !engine.isLandingActive,
+          "landing spring settles cleanly to exact neutral geometry")
+
+    // Reduce Motion compliance
+    engine.sync(phase: .work, paused: false, animationsEnabled: true, reducedMotion: true, at: 160.0)
+    check(engine.advance(to: 160.0) == TomyPose(row: .work, col: 0) &&
+          engine.nextWakeDelay(at: 160.0, isVisible: true) == nil,
+          "Reduce Motion freezes representative frame and stops all wake timers")
+
+    // Hover HUD model
+    let hudWork = TomyHoverHUDModel(phase: .work, paused: false, taskTitle: "重构桌面宠物渲染管线与单测",
+                                    timeLeft: "19:42", progress: 0.21, todayCompletedCount: 3, workIntervalsInSet: 4)
+    check(hudWork.tone == .work && hudWork.detail == "19:42" && hudWork.title.hasSuffix("…") && hudWork.progress == 0.21,
+          "hover HUD truncates long task title and preserves monospaced countdown + progress")
+    let hudDone = TomyHoverHUDModel(phase: .workFinished, paused: false, taskTitle: "",
+                                    timeLeft: "00:00", todayCompletedCount: 4, workIntervalsInSet: 4)
+    check(hudDone.tone == .attention && hudDone.badge == "🍅×4",
+          "hover HUD surfaces set-completion tomato badge on workFinished")
+}
+print("PASS: \(checks) total checks including Tomy desktop pet engine and ergonomics")

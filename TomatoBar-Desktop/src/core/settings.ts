@@ -1,19 +1,14 @@
-import type { PetKind } from "../types";
 export interface AppSettings {
   workMinutes: number;
   shortRestMinutes: number;
   longRestMinutes: number;
   longRestEvery: number;
-  petKind: PetKind;
-  showPet: boolean;
 }
 export const defaultSettings: AppSettings = {
   workMinutes: 25,
   shortRestMinutes: 5,
   longRestMinutes: 15,
   longRestEvery: 4,
-  petKind: "tomy",
-  showPet: true,
 };
 export function decodeSettings(raw: string): AppSettings {
   const o: unknown = JSON.parse(raw);
@@ -33,9 +28,12 @@ export function decodeSettings(raw: string): AppSettings {
     )
       throw new Error("偏好设置时长超出范围。");
   }
-  if (!["tomy", "sprout"].includes(s.petKind) || typeof s.showPet !== "boolean")
-    throw new Error("桌宠设置格式无效。");
-  return s;
+  return {
+    workMinutes: s.workMinutes,
+    shortRestMinutes: s.shortRestMinutes,
+    longRestMinutes: s.longRestMinutes,
+    longRestEvery: s.longRestEvery,
+  };
 }
 export function restSeconds(rounds: number, s: AppSettings): number {
   return (

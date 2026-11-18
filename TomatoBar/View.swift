@@ -169,8 +169,9 @@ struct TBPopoverView: View {
     @ObservedObject var timer: TBTimer
     @State private var tab = 0
     @AppStorage("popoverTabsCollapsed") private var isTabsCollapsed = true
-    @AppStorage("showDesktopPet") private var showDesktopPet = true
-    @AppStorage("desktopPetKind") private var desktopPetKind = PetKind.tomy.rawValue
+    @AppStorage(TomyPetController.showKey) private var showDesktopPet = true
+    @AppStorage(TomyPetController.sizeKey) private var tomyPetSize = TomyPetSize.medium.rawValue
+    @AppStorage(TomyPetController.lockedKey) private var tomyPetLocked = false
     @State private var editingRecord: FocusRecord?
     @State private var selectedTag: String?
     @State private var showCancelConfirm = false
@@ -868,19 +869,25 @@ struct TBPopoverView: View {
             KeyboardShortcuts.Recorder("开始 / 暂停 / 继续", name: .startStopTimer)
             Toggle("菜单栏显示倒计时", isOn: $timer.showTimerInMenuBar)
                 .onChange(of: timer.showTimerInMenuBar) { _ in timer.updateStatus() }
-            Toggle("桌面伴侣（Codex 桌宠）", isOn: $showDesktopPet)
+            Toggle("桌面伴侣 · 番茄仔 Tomy", isOn: $showDesktopPet)
             if showDesktopPet {
-                HStack {
-                    Text("形象选择")
-                        .font(.system(size: 13))
-                    Spacer()
-                    Picker("", selection: $desktopPetKind) {
-                        ForEach(PetKind.allCases) { kind in
-                            Text(kind.displayName).tag(kind.rawValue)
+                HStack(spacing: 8) {
+                    Picker("尺寸", selection: $tomyPetSize) {
+                        ForEach(TomyPetSize.allCases, id: \.rawValue) { preset in
+                            Text(preset.shortTitle).tag(preset.rawValue)
                         }
                     }
-                    .pickerStyle(.menu)
+                    .pickerStyle(.segmented)
                     .labelsHidden()
+                    .frame(width: 138)
+                    Toggle("锁定穿透", isOn: $tomyPetLocked)
+                        .font(.system(size: 12))
+                    Spacer(minLength: 0)
+                    Button("复位") { TomyPetController.shared?.resetToDefaultCorner() }
+                        .font(.system(size: 11.5))
+                        .buttonStyle(.borderless)
+                        .foregroundColor(Garden.muted)
+                        .help("将番茄仔贴回屏幕右下角")
                 }
             }
             LaunchAtLogin.Toggle("登录时启动")

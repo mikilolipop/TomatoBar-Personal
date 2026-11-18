@@ -14,7 +14,6 @@ import { SettingsModal } from "./components/SettingsModal";
 import { ReminderModal } from "./components/ReminderModal";
 import { HistoryList } from "./components/HistoryList";
 import { WindowHeader } from "./components/WindowHeader";
-import { DesktopPet } from "./components/DesktopPet";
 
 const controller = new FocusController(createRepository());
 export default function App() {
@@ -199,24 +198,9 @@ export default function App() {
           )}
         </div>
       </main>
-      {ready &&
-        settings.showPet &&
-        !showTimer &&
-        !showSettings &&
-        !editingRecord &&
-        !reminder && (
-          <DesktopPet
-            kind={settings.petKind}
-            phase={state.phase}
-            paused={state.paused}
-            size={80}
-            floating
-          />
-        )}
       {showTimer && (
         <ExpandedTimerModal
           state={displayState}
-          petKind={settings.petKind}
           restMinutes={restMinutes}
           busy={blocked}
           onStartWork={startWork}

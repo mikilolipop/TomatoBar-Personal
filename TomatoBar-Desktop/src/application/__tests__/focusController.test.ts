@@ -187,13 +187,12 @@ describe("Single timer owner and durable transactions", () => {
     await c.updateSettings({
       workMinutes: 45,
       longRestMinutes: 20,
-      showPet: false,
     });
     const restarted = new FocusController(r, () => startDate);
     await restarted.initialize();
     await restarted.startWork();
     expect(restarted.getSnapshot().state.planned).toBe(2700);
-    expect(restarted.getSnapshot().settings.showPet).toBe(false);
+    expect(restarted.getSnapshot().settings.longRestMinutes).toBe(20);
   });
   it("import parses before writing and refuses replacement during a live timer", async () => {
     const { controller: c, repository: r } = await setup();
@@ -312,15 +311,5 @@ describe("Browser data protection", () => {
     await expect(repository.load()).rejects.toThrow();
     expect(local.getItem(STORAGE_KEY)).toBe("{broken");
     expect(local.getItem(`${STORAGE_KEY}_backup`)).not.toBeNull();
-  });
-  it("migrates legacy pet preferences", async () => {
-    const local = new MemoryStorage();
-    local.setItem("TomatoBar_petKind", "sprout");
-    local.setItem("TomatoBar_showPet", "false");
-    const s = await new FocusRepository(
-      new BrowserStorageTransport(local),
-    ).loadSettings();
-    expect(s.petKind).toBe("sprout");
-    expect(s.showPet).toBe(false);
   });
 });

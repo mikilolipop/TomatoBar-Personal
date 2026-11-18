@@ -1,8 +1,13 @@
+import Combine
 import SwiftUI
 
 /// A silent, persistent reminder independent of macOS notification permissions.
 final class TBReminder {
     private var panel: NSPanel?
+    private var stateCancellable: AnyCancellable?
+
+    var isVisible: Bool { panel?.isVisible == true }
+
     func show(timer: TBTimer) {
         guard timer.state.needsAttention else { return }
         if panel == nil {
@@ -22,8 +27,22 @@ final class TBReminder {
         NSApp.activate(ignoringOtherApps: true)
         panel?.makeKeyAndOrderFront(nil)
         panel?.orderFrontRegardless()
+
+        stateCancellable = timer.$state
+            .receive(on: RunLoop.main)
+            .sink { [weak self, weak timer] state in
+                guard let self = self, let timer = timer else { return }
+                if !state.needsAttention && !timer.state.needsAttention && timer.storageError == nil {
+                    self.dismiss()
+                }
+            }
     }
-    func dismiss() { panel?.orderOut(nil) }
+
+    func dismiss() {
+        stateCancellable?.cancel()
+        stateCancellable = nil
+        panel?.orderOut(nil)
+    }
 }
 
 private struct ReminderView: View {

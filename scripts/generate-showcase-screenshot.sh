@@ -23,8 +23,9 @@ sed '/^@main$/d' TomatoBar/App.swift > "$probe_dir/App.swift"
 
 xcrun swiftc -I "$products" \
   TomatoBar/State.swift TomatoBar/Log.swift TomatoBar/Analytics.swift \
+  TomatoBar/TomyPetModel.swift TomatoBar/TomyDesktopPet.swift \
   TomatoBar/Timer.swift TomatoBar/View.swift TomatoBar/MainWindow.swift \
-  TomatoBar/FocusCharts.swift TomatoBar/DesktopPet.swift TomatoBar/PetSpriteMetrics.swift TomatoBar/PetMotion.swift TomatoBar/CompactDesktopPet.swift TomatoBar/Notifications.swift TomatoBar/LaunchContext.swift \
+  TomatoBar/FocusCharts.swift TomatoBar/Notifications.swift TomatoBar/LaunchContext.swift \
   "$probe_dir/App.swift" scripts/capture-window.swift \
   "$products/KeyboardShortcuts.o" "$products/LaunchAtLogin.o" -o "$probe_dir/capture-host"
 

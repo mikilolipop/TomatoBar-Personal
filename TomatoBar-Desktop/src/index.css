@@ -938,12 +938,6 @@ body {
   color: var(--garden-ink);
 }
 
-.expanded-pet-wrapper {
-  margin: 12px 0 6px;
-  display: flex;
-  justify-content: center;
-}
-
 .expanded-phase-label {
   font-size: 14px;
   color: var(--garden-muted);
@@ -1276,23 +1270,10 @@ fieldset {
   gap: 8px;
   font-size: 14px;
 }
-.pet-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 0;
-  font-size: 13px;
-}
-.pet-choices,
 .settings-data-actions {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-}
-.pet-choices button[aria-pressed="true"] {
-  border-color: var(--garden-red);
-  color: var(--garden-red);
 }
 .settings-hint {
   font-size: 12px;
@@ -1396,15 +1377,6 @@ dialog::backdrop {
 .reminder-actions .btn-secondary {
   background: var(--garden-surface-muted);
   color: var(--garden-ink);
-}
-.pet-status-pill {
-  font-size: 11px;
-  text-align: center;
-  border-radius: 12px;
-  background: var(--garden-surface);
-  border: 1px solid var(--garden-line);
-  padding: 3px 6px;
-  pointer-events: none;
 }
 .visually-hidden {
   position: absolute;

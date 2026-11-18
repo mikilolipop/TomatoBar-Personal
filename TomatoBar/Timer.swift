@@ -109,6 +109,7 @@ final class TBTimer: ObservableObject {
     private(set) var lastFailedSave = Date.distantPast
     private var loadFailed = false
     var onAttention: (() -> Void)?
+    var onWorkCancelled: (() -> Void)?
 
     init(store: FocusStore = FocusStore()) {
         self.store = store
@@ -337,7 +338,13 @@ final class TBTimer: ObservableObject {
     func stop() { change { $0.stop(at: $1) } }
     // Not gated on storageError like startWork: cancelling only leaves the running state,
     // so it must work even when the disk is unwritable (persist() handles the failure).
-    func cancel() { change { $0.cancel(at: $1) } }
+    func cancel() {
+        let wasWork = (state.phase == .work)
+        change { $0.cancel(at: $1) }
+        if wasWork && state.phase == .idle {
+            onWorkCancelled?()
+        }
+    }
     /// Freezes the clock while the user decides in the 「取消专注」 dialog, and reports
     /// whether the session is still cancellable. `FocusState.pause()` ticks first, so
     /// clicking exactly at the deadline completes the focus instead of pausing it; the
@@ -504,15 +511,26 @@ final class TBTimer: ObservableObject {
         return smokeBreakEasterEgg
     }
 
+    var statusTitle: String? {
+        if state.needsAttention { return "请确认" }
+        if state.isTiming && showTimerInMenuBar { return timeLeft }
+        return nil
+    }
+
+    var isStatusPaused: Bool {
+        state.isTiming && state.paused
+    }
+
     func updateStatus() {
         if windowActivity.paused != state.paused { windowActivity.paused = state.paused }
-        if state.phase == .rest && smokeBreakEasterEgg {
-            TBStatusItem.shared?.setEmojiIcon("🚬")
-        } else {
-            let icon: NSImage.Name = state.phase == .work ? .work : (state.phase == .rest ? .shortRest : .idle)
-            TBStatusItem.shared?.setIcon(name: icon)
-        }
-        let title = state.needsAttention ? "请确认" : (state.isTiming && showTimerInMenuBar ? "\(state.paused ? "Ⅱ " : "")\(timeLeft)" : nil)
-        TBStatusItem.shared?.setTitle(title: title)
+        let icon: TBStatusItem.StatusIcon = (state.phase == .rest && smokeBreakEasterEgg)
+            ? .emoji("🚬")
+            : .asset(state.phase == .work ? .work : (state.phase == .rest ? .shortRest : .idle))
+        TBStatusItem.shared?.setStatus(
+            icon: icon,
+            title: statusTitle,
+            paused: isStatusPaused,
+            phaseLabel: phaseLabel
+        )
     }
 }

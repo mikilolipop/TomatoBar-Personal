@@ -223,6 +223,20 @@ describe("Settings and calendar", () => {
       decodeSettings(JSON.stringify({ ...defaultSettings, workMinutes: n })),
     ).toThrow();
   });
+  it("ignores removed legacy fields in saved settings", () => {
+    const decoded = decodeSettings(
+      JSON.stringify({
+        ...defaultSettings,
+        workMinutes: 30,
+        petKind: "tomy",
+        showPet: false,
+      }),
+    );
+    expect(decoded).toEqual({
+      ...defaultSettings,
+      workMinutes: 30,
+    });
+  });
   it("reads macOS symbol|palette styles", () => {
     expect(getCategoryColor("work", { work: "book|3" })).toBe(
       GardenPalette[3].hex,

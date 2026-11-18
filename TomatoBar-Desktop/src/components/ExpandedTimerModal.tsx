@@ -1,12 +1,10 @@
 import React, { useState } from "react";
-import type { FocusState, PetKind } from "../types";
+import type { FocusState } from "../types";
 import { Modal } from "./Modal";
-import { DesktopPet } from "./DesktopPet";
 import { X, Play, Pause, Square, FastForward } from "lucide-react";
 
 interface ExpandedTimerModalProps {
   state: FocusState;
-  petKind: PetKind;
   onStartWork: () => void;
   onPause: () => void;
   onResume: () => void;
@@ -21,7 +19,6 @@ interface ExpandedTimerModalProps {
 
 export const ExpandedTimerModal: React.FC<ExpandedTimerModalProps> = ({
   state,
-  petKind,
   onStartWork,
   onPause,
   onResume,
@@ -79,17 +76,6 @@ export const ExpandedTimerModal: React.FC<ExpandedTimerModalProps> = ({
           >
             <X size={16} /> 收起
           </button>
-        </div>
-
-        {/* Pixel Pet in the Center */}
-        <div className="expanded-pet-wrapper">
-          <DesktopPet
-            kind={petKind}
-            phase={phase}
-            paused={paused}
-            size={110}
-            floating={false}
-          />
         </div>
 
         {/* Phase Label */}

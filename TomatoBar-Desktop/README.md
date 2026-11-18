@@ -54,7 +54,6 @@ cargo clippy --locked --all-targets -- -D warnings
 - 使用系统原生标题栏。主窗口关闭按钮隐藏窗口，单一计时所有者继续运行。
 - 托盘左键打开窗口，右键提供打开、开始/暂停/继续、保存并退出。
 - 退出先暂停并保存；失败时留在应用中处理。到时显示主窗口及无声置顶提醒，关闭提醒恢复普通窗口层级。
-- 当前宠物是**应用窗口内可拖动的挂件**，不是独立跨应用桌宠窗口。保持现有 Tomy/Sprout 素材，本次不迁移 macOS 最新坐姿素材。
 - 浏览器流程、Mac 上 Rust 编译/存储检查不证明 Windows 原生实机表现。Windows 安装、托盘、关窗后台、真实睡眠、DPI/多屏与置顶提醒需按 [重构记录与验收清单](../docs/Windows重构-2026-10-11.md) 验收。
 
 原生 API 参考：[Tauri 系统托盘](https://v2.tauri.app/learn/system-tray/)、[单实例](https://v2.tauri.app/plugin/single-instance/)、[跨平台原子文件写入](https://docs.rs/atomic-write-file/latest/atomic_write_file/)。

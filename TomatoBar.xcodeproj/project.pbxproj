@@ -7,8 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		D14000000000000000000011 /* CompactDesktopPet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14000000000000000000001 /* CompactDesktopPet.swift */; };
-		D14000000000000000000010 /* PetMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = D14000000000000000000000 /* PetMotion.swift */; };
 		8A21B78C27EE31A20009E5DB /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A21B78B27EE31A20009E5DB /* App.swift */; };
 		8A21B78E27EE31A20009E5DB /* View.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A21B78D27EE31A20009E5DB /* View.swift */; };
 		8A21B79027EE31A30009E5DB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8A21B78F27EE31A30009E5DB /* Assets.xcassets */; };
@@ -23,8 +21,8 @@
 		D12000000000000000000011 /* MainWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12000000000000000000001 /* MainWindow.swift */; };
 		D12000000000000000000012 /* FocusCharts.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12000000000000000000002 /* FocusCharts.swift */; };
 		D13000000000000000000010 /* LaunchContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = D13000000000000000000000 /* LaunchContext.swift */; };
-		D12000000000000000000013 /* DesktopPet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12000000000000000000003 /* DesktopPet.swift */; };
-		D15000000000000000000010 /* PetSpriteMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D15000000000000000000000 /* PetSpriteMetrics.swift */; };
+		D16000000000000000000010 /* TomyPetModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D16000000000000000000000 /* TomyPetModel.swift */; };
+		D16000000000000000000011 /* TomyDesktopPet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D16000000000000000000001 /* TomyDesktopPet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -34,8 +32,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		D14000000000000000000001 /* CompactDesktopPet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompactDesktopPet.swift; sourceTree = "<group>"; };
-		D14000000000000000000000 /* PetMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetMotion.swift; sourceTree = "<group>"; };
 		4CC11A472B6A28500012E8EC /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/Localizable.strings; sourceTree = "<group>"; };
 		8A21B78827EE31A20009E5DB /* TomatoBar Personal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "TomatoBar Personal.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		8A21B78B27EE31A20009E5DB /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
@@ -52,8 +48,8 @@
 		D12000000000000000000001 /* MainWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindow.swift; sourceTree = "<group>"; };
 		D12000000000000000000002 /* FocusCharts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusCharts.swift; sourceTree = "<group>"; };
 		D13000000000000000000000 /* LaunchContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchContext.swift; sourceTree = "<group>"; };
-		D12000000000000000000003 /* DesktopPet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPet.swift; sourceTree = "<group>"; };
-		D15000000000000000000000 /* PetSpriteMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetSpriteMetrics.swift; sourceTree = "<group>"; };
+		D16000000000000000000000 /* TomyPetModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TomyPetModel.swift; sourceTree = "<group>"; };
+		D16000000000000000000001 /* TomyDesktopPet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TomyDesktopPet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -90,10 +86,8 @@
 			isa = PBXGroup;
 			children = (
 				8A21B78B27EE31A20009E5DB /* App.swift */,
-				D12000000000000000000003 /* DesktopPet.swift */,
-				D14000000000000000000001 /* CompactDesktopPet.swift */,
-				D15000000000000000000000 /* PetSpriteMetrics.swift */,
-				D14000000000000000000000 /* PetMotion.swift */,
+				D16000000000000000000000 /* TomyPetModel.swift */,
+				D16000000000000000000001 /* TomyDesktopPet.swift */,
 				D13000000000000000000000 /* LaunchContext.swift */,
 				D12000000000000000000002 /* FocusCharts.swift */,
 				D12000000000000000000001 /* MainWindow.swift */,
@@ -225,15 +219,13 @@
 				8A9F701927EE3DAF0012A1EC /* Timer.swift in Sources */,
 				8A21B78C27EE31A20009E5DB /* App.swift in Sources */,
 				D13000000000000000000010 /* LaunchContext.swift in Sources */,
-				D12000000000000000000013 /* DesktopPet.swift in Sources */,
-				D14000000000000000000011 /* CompactDesktopPet.swift in Sources */,
-				D15000000000000000000010 /* PetSpriteMetrics.swift in Sources */,
-				D14000000000000000000010 /* PetMotion.swift in Sources */,
 				D12000000000000000000012 /* FocusCharts.swift in Sources */,
 				D12000000000000000000011 /* MainWindow.swift in Sources */,
 				D12000000000000000000010 /* Analytics.swift in Sources */,
 				8AA5B3F22812A74600BE1A6C /* Notifications.swift in Sources */,
 				8A9F700927EE396E0012A1EC /* State.swift in Sources */,
+				D16000000000000000000010 /* TomyPetModel.swift in Sources */,
+				D16000000000000000000011 /* TomyDesktopPet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -3,7 +3,7 @@ import type { FocusState } from "../types";
 import type { AppSettings } from "../core/settings";
 import { decodeSessions } from "../core/sessionsCodec";
 import { Modal } from "./Modal";
-import { X, Download, Upload, Sliders, Sparkles, Database } from "lucide-react";
+import { X, Download, Upload, Sliders, Database } from "lucide-react";
 
 export function SettingsModal({
   settings,
@@ -104,40 +104,6 @@ export function SettingsModal({
               </label>
             ))}
           </div>
-          <div className="dialog-field">
-            <h4>
-              <Sparkles size={15} />
-              窗口宠物
-            </h4>
-            <label className="pet-toggle">
-              <span>在应用窗口中显示可拖动宠物</span>
-              <input
-                type="checkbox"
-                checked={settings.showPet}
-                onChange={(e) => {
-                  void onUpdateSettings({ showPet: e.target.checked });
-                }}
-              />
-            </label>
-            {settings.showPet && (
-              <div className="pet-choices">
-                {(["tomy", "sprout"] as const).map((kind) => (
-                  <button
-                    key={kind}
-                    className="garden-btn-secondary"
-                    aria-pressed={settings.petKind === kind}
-                    onClick={() => {
-                      void onUpdateSettings({ petKind: kind });
-                    }}
-                  >
-                    {kind === "tomy"
-                      ? "🍅 番茄仔 · Tomy"
-                      : "🌱 植小芽 · Sprout"}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
         </fieldset>
         <div className="dialog-field">
           <h4>
@@ -185,7 +151,7 @@ export function SettingsModal({
               onClick={async () => {
                 if (
                   window.confirm(
-                    "恢复默认时长和宠物偏好？原设置会保留备份，专注记录不修改。",
+                    "恢复默认时长偏好？原设置会保留备份，专注记录不修改。",
                   )
                 ) {
                   const restored = await onRestoreDefaults();

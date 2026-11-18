@@ -2,7 +2,27 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-11-15，by Claude Code · 桌宠四人组 A+B+C 改善（基线 `66e94e2` + 上节复查修复）：
+最后更新：2026-11-18，by Antigravity · 番茄仔 Tomy v11 对齐 Codex 级精细动画与物理微交互升级 + Code Review #1–#4 修复并重装正式版：
+- **美术与 `@2x` 8×9 图集（72 帧完整重建）**：`TomatoBar/Assets.xcassets/TomyAtlas.imageset` 升级为 `8 列 × 9 行`（`@1x` `768×936` / `@2x` `1536×1872`，单格 `96×104` / `192×208`，`edge_a == 0` 零裁边）；新增第 9 行 `.react`（空闲半眨/全眨、`18–175pt` 四向眼神跟随 `left`/`right`/`upLeft`/`upRight`、悬停微惊叹下蹲+轻跳）。其余 8 行全面补齐 8 帧连续过渡：`Idle` 接地呼吸+90°滞后叶冠摆动（`feet_y1={92}` 跨度 `0px`）、`Work` 6 相脆敲+屏幕呼吸微光+轻点头+半/全眨眼、`Paused` 睡眠呼吸+错落飘升淡出 `zZz`、`Rest` 连续升腾热气+5 段端杯轻抿、`Celebrate` 蓄力压扁→凌空星光→落地压扁回弹、`Wave` 肩轴旋转顺滑挥臂并锁定 `:D` 笑脸、`Drag` 8 帧无残影硬切踢腿、`Sad` 叶冠低垂+泪光闪烁。
+- **行为引擎、AppKit 宿主与 Code Review 修复**：
+  - `TomatoBar/Notifications.swift`：修复 #1 —— `TBReminder` 订阅 `timer.$state`（`RunLoop.main`），当从桌宠/外部路径确认完成退出待确认态且 `storageError == nil` 时自动关闭置顶提醒窗（保留 P27 存储失败不关闭闸门）。
+  - `TomatoBar/TomyPetModel.swift`：`TomyAtlasRow` 扩展为 `8×9`；新增 `TomyGlanceDirection`、`TomyPose.tiltDegrees` 与 `isLandingActive`；修复 #3c —— `cursorGlance` 注视期叠加轻柔正弦呼吸微缩（`±0.7%/+1.1%`），不再机械僵直；`TomyPetEngine` 新增 `triggerHoverPerk`（`12.0s` 冷却）及 9 行 8 帧连续/3 段自然眨眼节奏。
+  - `TomatoBar/TomyDesktopPet.swift` & `TomatoBar/View.swift`：
+    - 修复 #1 配套（Option A）：`confirmAttentionFromClick()` 与右键主操作 `menuPrimaryAction()` 在 `storageError == nil` 时直接按阶段触发 `startRest()` / `startWork()`（与悬停胶囊「点我进入休息/开启下一轮」一致），`workFinished` 右键菜单补全「跳过休息」，存储异常时仍回落唤醒 `TBReminder`。
+    - 修复 #2：`applyCancelWorkDecision(confirmedCancel:wasPaused:)` 与 `menuCancelWork()` 记录弹窗前暂停状态，点「继续专注」或按回车安全默认继续原运行态，不再被 `freezeForCancel()` 静默留在暂停态。
+    - 修复 #3a/#3b：`reconcilePreferences()` 对 `UserDefaults.didChangeNotification` 按 `(show, size, locked, animations)` 差量过滤，消除 `eventName` 敲字与保存坐标引发的重复重排；新增 `NSWorkspace.screensDidSleepNotification` / `screensDidWakeNotification` 显示器熄屏挂起，常规微动唤醒放宽 `timer.tolerance` 支持系统 Timer Coalescing（仅拖拽倾角与落地弹簧期保持 2ms）。
+    - 修复 #4a–#4d：`TomySpriteAtlas.bestCGImage` 显式用 `.ctm: AffineTransform(scale: 2.0)` 锁定 `@2x` 源图；单击待确认延时对齐系统完整 `NSEvent.doubleClickInterval` 且右键/⌃左键取消待触发单击；悬停胶囊先刷新模型并 `layoutSubtreeIfNeeded()` 再定位防首帧微偏；锁定穿透时立即清空残留 `cursorGlance`；Popover 设置行新增「复位」按钮且 `resetToDefaultCorner()` 在隐藏态也可落盘默认角落。
+- **验证边界**：`scripts/test.sh`（332 项）、`scripts/build.sh`（universal Release `arm64 + x86_64` clean build + `codesign --verify --deep --strict`）、`scripts/test-bridge.sh`（200 项，覆盖 `9×8` 72 帧裁剪、倾斜 `TomyCanvasView` 渲染与逆变换命中、`applyCancelWorkDecision` 及 `TBReminder` 自动关闭）、`scripts/test-launch-context.sh`（8 项）全部通过；真实 AppKit 渲染图与无头 Chrome v11 预览已目视核验。未改动真实用户 `sessions.json` 或工作区先前暂存改动。
+- **安装（2026-11-18 16:01，用户明确确认修复并更新正式版）**：安装前检测无活跃 `TomatoBar Personal` 进程；以通用架构（`x86_64 arm64`、`3.10.0` / build `7`）经 `ditto` 原子替换至 `/Applications/TomatoBar Personal.app`，可执行文件 SHA-256 `c8c5d2e2e540918b255127ddcd51743c134fc2bf5df5f0350322526eb4526c9f`、`Assets.car` SHA-256 `8078345efd7331fbc24236a338024fa350142d8b87d482a44b989263181b29e0`，与已验 Release 构建一致；`codesign --verify --deep --strict --verbose=1` 通过并已启动唯一运行实例（pid `98217`，无 `TomatoBar Personal` 崩溃报告）。pre-v11 旧正式版备份保留在 `../TomatoBarBuildBackups/TomatoBar Personal 3.10.0-build7 backup 2026-11-18.app`（可执行文件 SHA-256 `df137ab513e0d56c481da4fca93afc801fa5b814a2917ebeec344fcb4b222e0e`）。安装前后真实容器内 `sessions.json`（受 TCC 保护仅读 `stat`）大小恒为 `38062` 字节、mtime 维持 `Nov 18 15:23:11 2026`，未操作任何真实计时/记录。
+
+历史更新：2026-11-18，by Antigravity · 单宠极致版「番茄仔 Tomy v10」@2x 原生引擎落地：
+- **美术与 `@2x` Retina 图集**：新增 `TomatoBar/Assets.xcassets/TomyAtlas.imageset`（`@1x` `384×832` / `@2x` `768×1664`，单格 `96×104` / `192×208`，8 态完整动作：`Idle`、`Work`、`Paused`、`Rest`、`Celebrate`、`Wave`、`Drag`、`Sad`），全落地态脚底基线与柔和接地投影统一（`feet_y1` 跨度 `0px`，`torso_cx` 跨度 `1.50px`），彻底消除穿模、帧间漂移、脸部错位与挥手闪脸。
+- **两层高内聚实现**：
+  - `TomatoBar/TomyPetModel.swift`（纯值状态机与随机微动作调度器，零 UI 依赖，纳入 `scripts/test.sh`）：解耦固定 GIF 循环节拍（待机 `3.6–6.4s` 随机单/双眨眼与偶发轻招手；专注快敲簇 + 读屏停顿 + 自然眨眼、冲刺期提速；休息端杯冒热气呼吸 + 间歇轻抿）；支持拖拽松手重力下落 + 脚底微压扁回弹（`TomyPose`）、放弃专注触发 `Sad`、完成触发 `Celebrate -> AttentionWait` 间歇招手提醒，以及 `Reduce Motion` 静帧冻结。
+  - `TomatoBar/TomyDesktopPet.swift`（轻量 AppKit `NSPanel` 宿主与 CoreGraphics 精灵画布）：一次性预烘焙 `24×26` `O(1)` 像素透明穿透掩码，废除旧版 `12Hz` 全局轮询定时器，改用单次 `nextWakeDelay` 动态唤醒（待机睁眼驻留期 0 唤醒）；单击常规态仅触发 `Wave` 招手防误触（待确认态单击确认）、双击开主窗口；新增「锁定位置并穿透 + 鼠标移入 `28%` 自动半透明避让（Auto-Ghost，按住 `⌥` 临时恢复移动）」、Dock/屏幕边缘磁吸停靠、按需悬停微胶囊与原生右键菜单（含快捷切任务）。
+- **验证边界**：`scripts/test.sh`（321 项）、`scripts/build.sh`（universal Release `arm64 + x86_64` + `codesign --verify --deep --strict`）、`scripts/test-bridge.sh`（144 项，含 `@2x` 图集加载、`O(1)` 命中方向、全 8 态真实 `TomyCanvasView` 渲染与 `onWorkCancelled` 断言）、`scripts/test-launch-context.sh`（8 项）全部通过；真实 AppKit 渲染快照已目视核验。尚未覆盖 `/Applications` 正式版（等待用户运行 `scripts/dev-run.sh` 实机体验确认），未修改或读取任何真实用户专注数据；工作区先前存在的暂存旧桌宠清理及 `TomatoBar-Desktop` 改动保持原样未擅自提交。
+
+历史更新：2026-11-15，by Claude Code · 桌宠四人组 A+B+C 改善（基线 `66e94e2` + 上节复查修复）：
 - 用户明确要求 A（止血）+B（统一规格）+C（贴图）+“尽你所能改善”。**A**：码小黑工作/完成态不再轮播四张互不相干的构图（显示器换边、朝向翻转、末帧凭空多一只猫），改为工作固定 `pet_chip_work_0`、完成固定两只猫庆祝图 `pet_chip_work_3`；陶土团/码小黑的单帧状态不再空转帧定时器；两只没有逐帧素材的宠物改为 4.2 s 正弦呼吸（`TimelineView` 按时间驱动，隐藏/拖动/减少动态时自动停），完成提醒改为一次 0.18 s 轻跳。
 - **B**：新增 `TomatoBar/PetSpriteMetrics.swift`，运行时扫描 alpha 包围盒并裁掉透明留白；旧桌宠统一按“每帧内容适配 104 pt 内容框 + 底边对齐”绘制（`PetSpriteFit.policy = .eachState`），四只脚底线一致、换状态/换宠物不再忽大忽小；桥接断言锁定工作/完成帧与包围盒算法。状态胶囊提取为共用 `PetStatusModel`/`PetStatusPill`，紧凑番茄仔也显示同一胶囊（面板高度 +26 pt），悬停文案共用 `PetMotionState.label`。
 - **C**：实测坐姿精灵表主体 alpha 224–254（>97% 近不透明），只有约 1% 亚像素边缘噪点；黑底实际渲染无可见脏边，因此**未改素材**——避免无收益的像素手术。测量与结论记录在 [`BACKLOG.md`](BACKLOG.md)。
