@@ -16,7 +16,7 @@ macOS 菜单栏番茄钟，是 [ivoronin/TomatoBar](https://github.com/ivoronin/
 |---|---|
 | 产品名 | TomatoBar Personal |
 | Bundle ID | `com.dilyar.TomatoBarPersonal`（与上游共存，不迁移原版数据） |
-| 当前版本 | 3.10.0（对外称 V1.4.1，build 7） |
+| 当前版本 | 3.11.0（对外称 V1.5.0，build 8） |
 | 默认分支 | `feature/personal-focus` |
 | `main` 分支 | 上游基线 `90a77d6`，仅用于对比 diff，**不要在上面开发** |
 | `origin` | `mikilolipop/TomatoBar-Personal`（**public**，2026-09-29 GitHub API 实测确认） |
@@ -38,12 +38,14 @@ macOS 菜单栏番茄钟，是 [ivoronin/TomatoBar](https://github.com/ivoronin/
 | `TomatoBar/State.swift` | `FocusPhase` 五态机、`FocusRecord`、`FocusSegment`、`FocusState`。纯值类型 |
 | `TomatoBar/Log.swift` | `FocusStore`：sessions.json 读写、原子写入、旧格式迁移备份 |
 | `TomatoBar/Analytics.swift` | `FocusPeriod`、`FocusSummary`、`CategoryTotal`、`FocusDay`、`focusDuration()` |
+| `TomatoBar/TomyPetModel.swift` | `TomyAtlasRow`、`TomyPetEngine`、`TomyGlanceDirection`、`TomyHoverHUDModel` 等桌宠纯值状态机（纳入 `test.sh` 编译范围） |
 
 ### UI / 桥接层（不在测试编译范围内）
 
 | 文件 | 职责 |
 |---|---|
 | `TomatoBar/Timer.swift` | `TBTimer`（ObservableObject 桥接）、`FocusHistory`、`WindowActivity`。依赖 SwiftUI + KeyboardShortcuts；默认领域测试不编译，另有 `scripts/test-bridge.sh` 链接真实依赖检查 |
+| `TomatoBar/TomyDesktopPet.swift` | `TomySpriteAtlas`、`TomyPetPanel`、`TomyCanvasView`、`TomyPetController`、`TomyHoverCapsuleView` 原生 AppKit 桌宠宿主与物理交互 |
 | `TomatoBar/LaunchContext.swift` | AppKit 启动事件分类；两个启动回调采样，不修改计时或登录注册 |
 | `TomatoBar/App.swift` | `TBStatusItem`（NSApplicationDelegate）：菜单栏、popover、主窗口、睡眠暂停、退出保护、URL scheme |
 | `TomatoBar/View.swift` | 菜单栏 popover（350pt）、`RecordEditor` |

@@ -2,7 +2,12 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-11-18，by Antigravity · 番茄仔 Tomy v11 对齐 Codex 级精细动画与物理微交互升级 + Code Review #1–#4 修复并重装正式版：
+最后更新：2026-11-18，by Antigravity · **V1.5.0（3.11.0 / build 8）**：发布新版 GitHub Release、更新 `/Applications` 正式版并同步更新 README 与 GitHub Pages 官网桌宠互动展示：
+- **版本与正式安装（2026-11-18 16:55，用户确认 A+B）**：`TomatoBar.xcodeproj` 升至 `3.11.0` / build `8`；运行全部验证闸门（`332` 领域 + `200` 桥接 + `8` 合成启动）与 universal Release 构建严格签名通过后，优雅退出旧实例并经 `ditto` 替换更新 `/Applications/TomatoBar Personal.app`（可执行文件 SHA-256 `062e80e8a47e984cbc2e1ee841e8983cefb10a64b84cffc4a340c3e806eb0ee0`、`Assets.car` SHA-256 `8078345efd7331fbc24236a338024fa350142d8b87d482a44b989263181b29e0`），`codesign --verify --deep --strict` 通过，唯一运行实例 PID `1309`，无崩溃报告；`sessions.json`（受 TCC 保护仅读 `stat`）大小恒为 `38398` 字节（mtime 维持退出时刻 `Nov 18 16:55:21 2026`）。
+- **公开下载包与 GitHub Release（tag `v3.11.0`）**：在 `../Release-3.11.0-20261118/` 制作脱离开发 Team 的 ad-hoc 重签双架构分发包并验证解压与只读 DMG 挂载签名——`TomatoBarPersonal-3.11.0.dmg`（`6,871,572` 字节，SHA-256 `c8a60bd6be2646a98799730ff26311b880d75989cf0413451ab77b402e9f105c`）与 `TomatoBarPersonal-3.11.0.zip`（`6,264,991` 字节，SHA-256 `04ed2adbbfcfadaaf65bb205058ac6cef198f4716dccb862abaa4cf42686d14b`），连同 Windows CI 产物 `TomatoBar.Personal_1.0.0_x64-setup.exe`（`2,422,030` 字节，SHA-256 `e1f138d74fce7be9f4009cd93ef0d30d47830242b19956866a6603e7d8b99ef2`）一并上传发布至 `v3.11.0` Release，附 [`V1.5.0更新说明.md`](V1.5.0更新说明.md)。
+- **文档与官网（`site/` + `gh-pages`）**：更新 `README.md` 与 `AGENTS.md` 版本/模块映射；`site/assets/` 导出 `tomy-atlas-2x.webp`（无损）与 `tomy-atlas-1x.png`，`site/` 新增「桌面伴侣 · 番茄仔 Tomy」互动展区（支持 6 态切换、点击招手、待机 `18–175pt` 四向眼神跟随、`content-visibility: auto` + 离屏/标签页隐藏暂停渲染、WCAG 2.2.2 暂停键及 `prefers-reduced-motion` 兼容），更新全站 `v3.11.0` 下载链接并通过 `1440`/`768`/`390`/`320` 四个视口 Chrome 零溢出零报错核验后经 `scripts/deploy-site.sh` 发布。
+
+历史更新：2026-11-18，by Antigravity · 番茄仔 Tomy v11 对齐 Codex 级精细动画与物理微交互升级 + Code Review #1–#4 修复并重装正式版：
 - **美术与 `@2x` 8×9 图集（72 帧完整重建）**：`TomatoBar/Assets.xcassets/TomyAtlas.imageset` 升级为 `8 列 × 9 行`（`@1x` `768×936` / `@2x` `1536×1872`，单格 `96×104` / `192×208`，`edge_a == 0` 零裁边）；新增第 9 行 `.react`（空闲半眨/全眨、`18–175pt` 四向眼神跟随 `left`/`right`/`upLeft`/`upRight`、悬停微惊叹下蹲+轻跳）。其余 8 行全面补齐 8 帧连续过渡：`Idle` 接地呼吸+90°滞后叶冠摆动（`feet_y1={92}` 跨度 `0px`）、`Work` 6 相脆敲+屏幕呼吸微光+轻点头+半/全眨眼、`Paused` 睡眠呼吸+错落飘升淡出 `zZz`、`Rest` 连续升腾热气+5 段端杯轻抿、`Celebrate` 蓄力压扁→凌空星光→落地压扁回弹、`Wave` 肩轴旋转顺滑挥臂并锁定 `:D` 笑脸、`Drag` 8 帧无残影硬切踢腿、`Sad` 叶冠低垂+泪光闪烁。
 - **行为引擎、AppKit 宿主与 Code Review 修复**：
   - `TomatoBar/Notifications.swift`：修复 #1 —— `TBReminder` 订阅 `timer.$state`（`RunLoop.main`），当从桌宠/外部路径确认完成退出待确认态且 `storageError == nil` 时自动关闭置顶提醒窗（保留 P27 存储失败不关闭闸门）。

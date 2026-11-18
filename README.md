@@ -6,10 +6,10 @@
 
 macOS 菜单栏番茄钟 · [TomatoBar](https://github.com/ivoronin/TomatoBar) 的个人定制 fork
 
-完全无声 · 事件记录 · 日／周／月复盘
+完全无声 · 事件记录 · 日／周／月复盘 · 原生桌面伴侣
 
 [![tests](https://github.com/mikilolipop/TomatoBar-Personal/actions/workflows/main.yml/badge.svg?branch=feature/personal-focus)](https://github.com/mikilolipop/TomatoBar-Personal/actions/workflows/main.yml)
-[![download](https://img.shields.io/badge/下载-V1.4.1-orange)](https://github.com/mikilolipop/TomatoBar-Personal/releases/latest)
+[![download](https://img.shields.io/badge/下载-V1.5.0-orange)](https://github.com/mikilolipop/TomatoBar-Personal/releases/latest)
 [![website](https://img.shields.io/badge/官网-mikilolipop.github.io-8a6d3b)](https://mikilolipop.github.io/TomatoBar-Personal/)
 ![macOS](https://img.shields.io/badge/macOS-12.3%2B-blue)
 ![Swift](https://img.shields.io/badge/Swift-SwiftUI%20%2B%20AppKit-orange)
@@ -33,6 +33,7 @@ macOS 菜单栏番茄钟 · [TomatoBar](https://github.com/ivoronin/TomatoBar) �
 - **本地持久化** — 历史记录原子写入 `~/Library/Application Support/TomatoBarPersonal/sessions.json`，
   无网络请求、无遥测，数据不出这台 Mac
 - **原生主窗口** — 日／周／月三种视图复盘：色块流、堆叠柱、热力日历，像素风动画
+- **桌面伴侣 · 番茄仔 Tomy** — 原生 `@2x` Retina 悬浮桌宠（9 组 72 帧精细微动作：呼吸、敲键盘、捧杯喝茶、庆祝跃起、四向眼神跟随、拖拽钟摆惯性与锁定半透明自动避让穿透）
 - **可与原版共存** — 独立 Bundle ID（`com.dilyar.TomatoBarPersonal`）与独立数据目录
 
 界面文案目前为硬编码中文。
@@ -41,6 +42,7 @@ macOS 菜单栏番茄钟 · [TomatoBar](https://github.com/ivoronin/TomatoBar) �
 
 | 版本 | 内容 |
 |---|---|
+| V1.5.0（3.11.0） | Codex 级 8×9 @2x 桌面伴侣「番茄仔 Tomy」、四向眼神跟随、拖拽钟摆与碰撞逆变换、Auto-Ghost 自动避让、零轮询节能唤醒与提醒窗联动修复。[更新说明](docs/V1.5.0更新说明.md) |
 | V1.4.1（3.10.0） | 待办去拥挤重排、Hover Actions、大任务标签继承合并、齿轮图标。[更新说明](docs/V1.4.1更新说明.md) |
 | V1.4.0（3.10.0） | Bluebird 风格专注任务流、大任务体系、跳过休息、输入前选标签、Popover 面板折叠。[更新说明](docs/V1.4更新说明.md) |
 | V1.3.2（3.9.2） | 修复记录编辑器主分类下拉箭头点击无响应。[更新说明](docs/V1.3.2更新说明.md) |
