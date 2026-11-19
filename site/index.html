@@ -24,16 +24,15 @@
 <main id="main">
   <section class="hero container" aria-labelledby="hero-title">
     <div class="hero-copy">
-      <p class="eyebrow">现已支持 macOS &amp; Windows · V1.5.0</p>
+      <p class="eyebrow">专为 macOS 打造 · V1.5.0</p>
       <h1 id="hero-title"><span>给眼前的事，</span><span>一段安静的</span><span class="accent">专注时间。</span></h1>
       <p class="hero-description">无声计时，随时暂停。<br>大任务层级拆解，还有桌宠番茄仔陪你专注。</p>
       <div class="actions" id="download">
         <a class="button button-primary" id="btn-dmg" data-download="dmg" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.11.0/TomatoBarPersonal-3.11.0.dmg">下载 macOS 版<img class="ui-icon" src="assets/download.svg" alt="" width="20" height="20"></a>
-        <a class="button button-windows" id="btn-win" data-download="exe" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.11.0/TomatoBar.Personal_1.0.0_x64-setup.exe">下载 Windows 版 (.exe)<img class="ui-icon" src="assets/download.svg" alt="" width="20" height="20"></a>
         <a class="button button-secondary" href="#install">安装指南<img class="ui-icon" src="assets/arrow-right.svg" alt="" width="18" height="18"></a>
       </div>
-      <p class="compatibility">macOS 12.3+ (Apple Silicon / Intel) · Windows 10/11 (x64)<br><span data-release-version>v3.11.0</span> · MIT 开源 · 纯本地存储</p>
-      <p class="download-alternatives"><a id="btn-zip" data-download="zip" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.11.0/TomatoBarPersonal-3.11.0.zip">下载 macOS ZIP</a><span aria-hidden="true">·</span><a href="https://github.com/mikilolipop/TomatoBar-Personal/actions/runs/44266123716">Windows 免安装 CI 产物</a><span aria-hidden="true">·</span><a href="https://github.com/mikilolipop/TomatoBar-Personal/releases/latest">查看更新</a></p>
+      <p class="compatibility">macOS 12.3+ (Apple Silicon / Intel)<br><span data-release-version>v3.11.0</span> · MIT 开源 · 纯本地存储</p>
+      <p class="download-alternatives"><a id="btn-zip" data-download="zip" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.11.0/TomatoBarPersonal-3.11.0.zip">下载 macOS ZIP</a><span aria-hidden="true">·</span><a href="https://github.com/mikilolipop/TomatoBar-Personal/releases/latest">查看更新</a></p>
     </div>
     <figure class="hero-preview">
       <button class="screenshot-button" type="button" data-preview aria-label="查看 TomatoBar Personal 主窗口大图"><img class="app-screenshot" src="hero-day.png?v=3.10.0-showcase" alt="TomatoBar Personal 完整主窗口：大任务层级管理、分类、待办与记录（示例数据）" width="1920" height="1410" fetchpriority="high"></button>
@@ -91,19 +90,18 @@
     <div class="closing-download">
       <div class="actions">
         <a class="button button-primary" data-download="dmg" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.11.0/TomatoBarPersonal-3.11.0.dmg">下载 macOS 版<img class="ui-icon" src="assets/download.svg" alt="" width="20" height="20"></a>
-        <a class="button button-windows" data-download="exe" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.11.0/TomatoBar.Personal_1.0.0_x64-setup.exe">下载 Windows 版 (.exe)<img class="ui-icon" src="assets/download.svg" alt="" width="20" height="20"></a>
         <a class="button button-secondary" href="#install">安装指南<img class="ui-icon" src="assets/arrow-right.svg" alt="" width="18" height="18"></a>
       </div>
-      <p class="compatibility">macOS 12.3+ · Windows 10/11 · <span data-release-version>v3.11.0</span></p>
+      <p class="compatibility">macOS 12.3+ (Apple Silicon / Intel) · <span data-release-version>v3.11.0</span></p>
     </div>
     <img class="closing-tomato pixel-art" src="assets/pixel-tomato.png" alt="" width="120" height="120" loading="lazy">
   </section>
   <section class="installation container" id="install" aria-label="安装指南">
     <details id="install-details"><summary><span>首次安装？从这里开始。</span><span class="summary-hint">展开安装指南</span></summary>
       <ol class="installation-steps">
-        <li><h3>下载对应版本</h3><p>macOS 用户推荐下载 DMG；Windows 用户直接下载 <code>.exe</code> 安装包即可。</p><a class="text-link" data-download="zip" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.11.0/TomatoBarPersonal-3.11.0.zip">下载 macOS ZIP · <span data-download-size="zip">6.0 MB</span></a> <span aria-hidden="true">·</span> <a class="text-link" data-download="exe" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.11.0/TomatoBar.Personal_1.0.0_x64-setup.exe">下载 Windows 安装包 · <span data-download-size="exe">2.3 MB</span></a></li>
-        <li><h3>安装与运行</h3><p><strong>macOS</strong>：打开 DMG，把应用拖入 Applications 文件夹即可。<br><strong>Windows</strong>：运行 <code>setup.exe</code> 安装向导，安装后打开即可。</p></li>
-        <li><h3>首次打开与权限</h3><p>两端均采用开源透明构建，数据完全保存在本机。如果 macOS 拦截 ad-hoc 首次打开，请参照下方的安全属性清除命令。</p></li>
+        <li><h3>下载 DMG 或 ZIP</h3><p>推荐下载 DMG 磁盘映像；也可以下载 ZIP 压缩包，两者均包含 Apple Silicon 与 Intel 双架构。</p><a class="text-link" data-download="zip" href="https://github.com/mikilolipop/TomatoBar-Personal/releases/download/v3.11.0/TomatoBarPersonal-3.11.0.zip">下载 macOS ZIP · <span data-download-size="zip">6.0 MB</span></a></li>
+        <li><h3>安装到 Applications</h3><p>打开下载的 DMG，将 <code>TomatoBar Personal.app</code> 拖入 Applications 文件夹；若使用 ZIP，解压后拖入 Applications 即可。</p></li>
+        <li><h3>首次打开与安全提示</h3><p>应用采用 ad-hoc 签名并完全在本地运行，未做付费公证。如果 macOS 拦截首次打开，请运行下方的终端命令。</p></li>
       </ol>
       <div class="first-open"><h3>如果 macOS 提示无法打开</h3><p>确认安装包来自本页的 GitHub 发布链接，并已放入 Applications。在终端执行以下命令后重新打开：</p><div class="command-row"><code id="install-command">xattr -dr com.apple.quarantine "/Applications/TomatoBar Personal.app"</code><button class="copy-button" id="copy-command" type="button">复制命令</button></div><p class="copy-feedback" id="copy-feedback" role="status" aria-live="polite"></p></div>
     </details>
