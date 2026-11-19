@@ -51,10 +51,6 @@
             packages[match[1]] = asset;
           }
         }
-        var exeMatch = /^(TomatoBar.*\.exe|.*-setup\.exe)$/i.exec(asset.name);
-        if (exeMatch && typeof asset.browser_download_url === "string") {
-          packages.exe = asset;
-        }
       });
       // Keep the version and package types consistent.
       if (packages.dmg && packages.zip) {
@@ -64,12 +60,6 @@
             document.querySelectorAll('[data-download-size="' + type + '"]').forEach(function (label) { label.textContent = (packages[type].size / 1048576).toFixed(1) + " MB"; });
           }
         });
-      }
-      if (packages.exe) {
-        document.querySelectorAll('[data-download="exe"]').forEach(function (link) { link.href = packages.exe.browser_download_url; });
-        if (Number.isFinite(packages.exe.size) && packages.exe.size > 0) {
-          document.querySelectorAll('[data-download-size="exe"]').forEach(function (label) { label.textContent = (packages.exe.size / 1048576).toFixed(1) + " MB"; });
-        }
       }
       document.querySelectorAll("[data-release-version]").forEach(function (label) { label.textContent = release.tag_name; });
     })
