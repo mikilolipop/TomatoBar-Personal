@@ -57,8 +57,6 @@ private struct ReminderView: View {
                  ? "「\(timer.state.name)」已完成。\n站起来活动一下，让眼睛休息一会儿。"
                  : "休息结束了。\n准备好后，再开始下一轮专注。")
                 .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
-            Text("等待你确认后，才会开始下一段计时。")
-                .font(.caption).foregroundColor(Garden.muted)
             HStack(spacing: 12) {
                 Button("结束本组") {
                     timer.stop()

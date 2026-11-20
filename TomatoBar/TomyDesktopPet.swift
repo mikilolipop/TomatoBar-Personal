@@ -1132,13 +1132,13 @@ final class TomyPetController: NSObject, NSWindowDelegate {
         }
 
         // 2. Quick Task Switcher
-        let activeTodos = timer.state.todos.filter { !$0.isCompleted }
+        let activeTodos = timer.state.pendingTodos
         if !activeTodos.isEmpty {
             let taskRoot = NSMenuItem(title: "🎯 当前专注任务", action: nil, keyEquivalent: "")
             let taskSub = NSMenu()
             taskSub.autoenablesItems = false
 
-            let freeItem = NSMenuItem(title: "自由专注（不绑定待办）", action: #selector(menuSelectTodo(_:)), keyEquivalent: "")
+            let freeItem = NSMenuItem(title: "自由专注", action: #selector(menuSelectTodo(_:)), keyEquivalent: "")
             freeItem.target = self
             freeItem.state = (timer.state.currentTodoID == nil) ? .on : .off
             freeItem.isEnabled = !timer.state.isTiming && !timer.state.needsAttention

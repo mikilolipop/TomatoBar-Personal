@@ -165,7 +165,7 @@ struct FocusChart: View {
                 Text(period == .day ? "专注足迹" : period == .week ? "这一周，慢慢积累" : "这个月的专注日历")
                     .font(.system(size: 17, weight: .semibold))
                 Spacer()
-                Text(period == .day ? "\(summary.records.count) 段" : "点击日期查看").font(.caption).foregroundColor(Garden.muted)
+                Text("\(summary.records.count) 段").font(.caption).foregroundColor(Garden.muted)
             }
             if period == .day { dayChart }
             else if period == .week { weekChart }
@@ -185,11 +185,11 @@ struct FocusChart: View {
         return result
     }
     private func tileWidth(_ record: FocusRecord, available: CGFloat) -> CGFloat {
-        min(max(1, available), max(64, min(200, CGFloat(record.seconds(in: summary.interval) / 60) * 4.0)))
+        min(max(1, available), max(74, min(200, CGFloat(record.seconds(in: summary.interval) / 60) * 4.2)))
     }
     private var dayChart: some View {
-        VStack(alignment: .leading, spacing: 8) {
         GeometryReader { geometry in
+            let available = max(1, geometry.size.width - 8)
             ScrollView {
                 VStack(alignment: .leading, spacing: 9) {
                     if summary.records.isEmpty {
@@ -197,25 +197,54 @@ struct FocusChart: View {
                             .font(.system(size: 13)).foregroundColor(Garden.muted)
                             .frame(maxWidth: .infinity, minHeight: geometry.size.height, alignment: .center)
                     }
-                    ForEach(Array(rows(width: geometry.size.width - 8).enumerated()), id: \.offset) { _, row in
+                    ForEach(Array(rows(width: available).enumerated()), id: \.offset) { _, row in
                         HStack(spacing: 8) {
                             ForEach(row) { record in
+                                let width = tileWidth(record, available: available)
+                                let shortDur = focusDuration(record.seconds(in: summary.interval))
+                                let symbol = FocusState.styleSymbol(in: styles, forCategory: record.category) ?? Garden.symbol(record.category)
                                 Button { onRecord(record) } label: {
-                                    Image(systemName: FocusState.styleSymbol(in: styles, forCategory: record.category) ?? Garden.symbol(record.category)).font(.system(size: 22, weight: .medium))
-                                        .foregroundColor(Garden.paper)
-                                        .frame(width: tileWidth(record, available: geometry.size.width - 8), height: 64)
-                                        .background(Garden.color(record.category, styles: styles).opacity(0.85))
-                                        .cornerRadius(5)
-                                }.buttonStyle(.plain).help("\(record.name) · \(record.category) · \(focusDuration(record.seconds(in: summary.interval)))")
+                                    Group {
+                                        if width >= 122 {
+                                            HStack(spacing: 7) {
+                                                Image(systemName: symbol)
+                                                    .font(.system(size: 18, weight: .medium))
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text(record.category)
+                                                        .font(.system(size: 12, weight: .semibold))
+                                                        .lineLimit(1)
+                                                    Text(shortDur)
+                                                        .font(.system(size: 10))
+                                                        .opacity(0.88)
+                                                        .lineLimit(1)
+                                                }
+                                            }
+                                        } else {
+                                            VStack(spacing: 2) {
+                                                Image(systemName: symbol)
+                                                    .font(.system(size: 16, weight: .medium))
+                                                Text(record.category)
+                                                    .font(.system(size: 10.5, weight: .semibold))
+                                                    .lineLimit(1)
+                                                Text(shortDur)
+                                                    .font(.system(size: 9.5))
+                                                    .opacity(0.86)
+                                                    .lineLimit(1)
+                                            }
+                                        }
+                                    }
+                                    .foregroundColor(Garden.paper)
+                                    .padding(.horizontal, 5)
+                                    .frame(width: width, height: 64)
+                                    .background(Garden.color(record.category, styles: styles).opacity(0.85))
+                                    .cornerRadius(5)
+                                }.buttonStyle(.plain).help("\(record.name) · \(record.category) · \(shortDur)")
                                     .accessibilityLabel("编辑专注：\(record.name)")
                             }
                         }
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(.trailing, 8)
             }
-        }
-        Text("每一块是一段专注，按时间排列。点击色块，编辑名称、分类和标签。")
-            .font(.caption).foregroundColor(Garden.muted)
         }
     }
     private var weekChart: some View {

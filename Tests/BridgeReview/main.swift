@@ -674,5 +674,79 @@ do {
     reminderController.shutdown()
 }
 
+do {
+    let uxStore = FocusStore(url: scratch.appendingPathComponent("ux-bridge/sessions.json"))
+    try uxStore.save(FocusState())
+    let uxTimer = TBTimer(store: uxStore)
+
+    // 1. Free focus #tag parsing + draftTags merge/dedupe
+    uxTimer.setEventName("复习高数 #数学 #期中")
+    uxTimer.setDraftTags(["考研", "数学"])
+    uxTimer.startWork()
+    check(uxTimer.state.name == "复习高数" &&
+          uxTimer.state.activeTags == ["考研", "数学", "期中"] &&
+          uxTimer.state.activeTodoID == nil,
+          "free focus startWork parses inline #tags and merges with draftTags")
+    uxTimer.stop()
+    check(uxTimer.state.records.first?.name == "复习高数" &&
+          uxTimer.state.records.first?.tags == ["考研", "数学", "期中"],
+          "recorded free focus session retains parsed title and merged tags")
+
+    uxTimer.setDraftTags([])
+    uxTimer.setEventName("背单词 #英语 #高频")
+    uxTimer.startWork()
+    uxTimer.stop()
+    check(uxTimer.state.records.first?.name == "背单词" &&
+          uxTimer.state.records.first?.tags == ["英语", "高频"] &&
+          uxTimer.state.records.first?.category == "英语",
+          "free focus without draftTags uses first inline #tag as primary category")
+
+    // 2. Clearing auto-filled eventName when deselecting, completing, deleting, or completing project
+    uxTimer.addProject(name: "课程", tags: ["学习"])
+    let proj1 = uxTimer.state.projects.first!.id
+    uxTimer.addProject(name: "新课程", tags: ["编程"])
+    let proj2 = uxTimer.state.projects.last!.id
+    uxTimer.addTodo("第一章", projectID: proj1)
+    let t1 = uxTimer.state.todos[0].id
+    uxTimer.addTodo("第二章", projectID: proj1)
+    let t2 = uxTimer.state.todos[1].id
+    uxTimer.addTodo("第三章", projectID: proj1)
+    let t3 = uxTimer.state.todos[2].id
+
+    uxTimer.selectCurrentTodo(t1)
+    check(uxTimer.eventName == "[课程] · 第一章", "selecting project subtask fills prefixed title")
+    uxTimer.selectCurrentTodo(nil)
+    check(uxTimer.eventName == "", "returning to free focus clears stale auto-filled eventName")
+
+    uxTimer.selectCurrentTodo(t1)
+    uxTimer.toggleTodo(id: t1)
+    check(uxTimer.state.currentTodoID == nil && uxTimer.eventName == "",
+          "completing the current todo clears its auto-filled eventName")
+
+    uxTimer.selectCurrentTodo(t2)
+    uxTimer.deleteTodo(id: t2)
+    check(uxTimer.state.currentTodoID == nil && uxTimer.eventName == "",
+          "deleting the current todo clears its auto-filled eventName")
+
+    uxTimer.selectCurrentTodo(t3)
+    uxTimer.toggleProjectCompleted(id: proj1)
+    check(uxTimer.state.currentTodoID == nil && uxTimer.eventName == "" && uxTimer.state.pendingTodos.isEmpty,
+          "completing parent project clears selection, hides subtasks, and clears auto-filled eventName")
+
+    uxTimer.toggleProjectCompleted(id: proj1)
+    check(uxTimer.state.pendingTodos.map(\.id) == [t3],
+          "reopening project via bridge restores unfinished subtask visibility")
+
+    uxTimer.selectCurrentTodo(t3)
+    uxTimer.setEventName("手动自定义")
+    check(uxTimer.state.currentTodoID == nil && uxTimer.eventName == "手动自定义",
+          "manual typing preserves user eventName while dropping task link")
+
+    uxTimer.selectCurrentTodo(t3)
+    uxTimer.relocateTodo(id: t3, toProject: proj2)
+    check(uxTimer.eventName == "[新课程] · 第三章" && uxTimer.state.todos.first { $0.id == t3 }?.projectID == proj2,
+          "relocating current task updates project ownership and refreshes eventName prefix")
+}
+
 print("PASS: \(checks) actual TBTimer bridge checks; isolated QA13 IO, no UI interaction")
 withExtendedLifetime(observation) {}

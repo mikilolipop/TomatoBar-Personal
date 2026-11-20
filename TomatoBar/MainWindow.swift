@@ -29,14 +29,18 @@ struct MainWindowView: View {
     @State private var customTagInput = ""
     @State private var showingNewProjectSheet = false
     @State private var editingProject: FocusProject?
-    @State private var collapsedProjectIDs: Set<UUID> = []
+    @AppStorage("mainCollapsedProjectIDs") private var collapsedProjectIDsRaw = ""
     @State private var inlineSubtaskTitles: [UUID: String] = [:]
-    @State private var isLooseTodosCollapsed = false
-    @State private var isArchivedCollapsed = true
+    @SwiftUI.FocusState private var focusedSubtaskProjectID: UUID?
+    @AppStorage("mainLooseTodosCollapsed") private var isLooseTodosCollapsed = false
+    @AppStorage("mainLooseCompletedCollapsed") private var isLooseCompletedCollapsed = true
+    @AppStorage("mainCompletedProjectsCollapsed") private var isCompletedProjectsCollapsed = true
+    @State private var dropTargetProjectID: UUID?
+    @State private var isDropTargetLoose = false
     private var summary: FocusSummary { history.summary(period: period, date: date) }
     private var filtered: FocusSummary { history.summary(period: period, date: date, category: selectedCategory) }
     private var visibleRecords: [FocusRecord] {
-        let records = historyTab ? history.records.sorted { $0.startedAt < $1.startedAt } : filtered.records
+        let records = historyTab ? history.records.sorted { $0.startedAt > $1.startedAt } : filtered.records
         return records.filter { record in
             (search.isEmpty || record.name.localizedCaseInsensitiveContains(search) || record.tags.contains { $0.localizedCaseInsensitiveContains(search) })
                 && (!historyTab || selectedCategory == nil || record.hasTag(selectedCategory!))
@@ -164,8 +168,6 @@ struct MainWindowView: View {
                     customTagInput = ""
                     customTagTargetTodoID = nil
                 }
-            } message: {
-                Text("输入新标签后将赋给当前待办，并在已有标签列表中保存。")
             }
             // Row-level delete needs its own confirmation because the editor sheet is not
             // open on that path. The wording comes from RecordEditor.confirmationMessage so
@@ -269,7 +271,7 @@ struct MainWindowView: View {
     }
     private var summaryPanel: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("\(period == .day ? "当日" : period == .week ? "本周" : "本月")累计专注（不含进行中）")
+            Text(period == .day ? (Calendar.current.isDateInToday(date) ? "今日专注" : "当日专注") : period == .week ? "本周专注" : "本月专注")
                 .font(.system(size: 12))
                 .foregroundColor(Garden.muted)
             Text(focusDuration(summary.seconds))
@@ -363,11 +365,11 @@ struct MainWindowView: View {
                     )
                 }
                 .buttonStyle(.plain)
-                .help("创建长周期大任务/项目，并在其下拆解子任务")
+                .help("新建大任务")
             }
 
             HStack(spacing: 8) {
-                TextField("添加待办，例如：阅读章节 #学习", text: $newTodoTitle)
+                TextField("添加待办...", text: $newTodoTitle)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
                     .padding(.horizontal, 10)
@@ -399,16 +401,14 @@ struct MainWindowView: View {
                         .frame(width: 46, height: 35)
                     Text("把下一件想做的事写在这里")
                         .font(.system(size: 14, weight: .medium))
-                    Text("支持拆解大任务与子任务，点一下就会带到下一段专注。")
-                        .font(.caption).foregroundColor(Garden.muted)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 10) {
-                        let activeProjects = timer.state.projects.filter { !$0.isArchived }
+                        let activeProjects = timer.state.projects.filter { !$0.isCompleted }
                         let looseTodos = timer.state.todos.filter { $0.projectID == nil }
-                        let archivedProjects = timer.state.projects.filter { $0.isArchived }
+                        let completedProjects = timer.state.projects.filter { $0.isCompleted }
 
                         ForEach(activeProjects) { project in
                             projectCard(project)
@@ -418,8 +418,8 @@ struct MainWindowView: View {
                             looseTodosSection(looseTodos: looseTodos, hasProjects: !activeProjects.isEmpty)
                         }
 
-                        if !archivedProjects.isEmpty {
-                            archivedProjectsSection(archivedProjects: archivedProjects)
+                        if !completedProjects.isEmpty {
+                            completedProjectsSection(completedProjects: completedProjects)
                         }
                     }
                     .padding(.trailing, 6)
@@ -428,23 +428,58 @@ struct MainWindowView: View {
         }
     }
 
+    private func isProjectCollapsed(_ id: UUID) -> Bool {
+        collapsedProjectIDsRaw.split(separator: ",").contains { String($0) == id.uuidString }
+    }
+
+    private func setProjectCollapsed(_ id: UUID, collapsed: Bool) {
+        var ids = collapsedProjectIDsRaw.split(separator: ",").map(String.init).filter { !$0.isEmpty }
+        let target = id.uuidString
+        if collapsed {
+            if !ids.contains(target) { ids.append(target) }
+        } else {
+            ids.removeAll { $0 == target }
+        }
+        collapsedProjectIDsRaw = ids.joined(separator: ",")
+    }
+
+    private func projectDropBinding(for id: UUID) -> Binding<Bool> {
+        Binding(
+            get: { dropTargetProjectID == id },
+            set: { targeted in
+                if targeted { dropTargetProjectID = id }
+                else if dropTargetProjectID == id { dropTargetProjectID = nil }
+            }
+        )
+    }
+
+    private func handleTodoDrop(providers: [NSItemProvider], targetProjectID: UUID?, before targetTodoID: UUID?) -> Bool {
+        guard let provider = providers.first else { return false }
+        provider.loadObject(ofClass: NSString.self) { object, _ in
+            guard let raw = object as? NSString,
+                  let sourceID = UUID(uuidString: raw as String),
+                  sourceID != targetTodoID else { return }
+            DispatchQueue.main.async {
+                timer.relocateTodo(id: sourceID, toProject: targetProjectID, before: targetTodoID)
+            }
+        }
+        return true
+    }
+
     @ViewBuilder
     private func projectCard(_ project: FocusProject) -> some View {
-        let isCollapsed = collapsedProjectIDs.contains(project.id)
+        let isCollapsed = isProjectCollapsed(project.id)
         let subtasks = timer.state.todos.filter { $0.projectID == project.id }
         let completedCount = subtasks.filter(\.isCompleted).count
         let totalCount = subtasks.count
         let projSecs = timer.state.focusSeconds(forProject: project.id)
+        let isDropTarget = dropTargetProjectID == project.id
 
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
                 Button {
                     withAnimation(.easeInOut(duration: 0.15)) {
-                        if isCollapsed {
-                            collapsedProjectIDs.remove(project.id)
-                        } else {
-                            collapsedProjectIDs.insert(project.id)
-                        }
+                        setProjectCollapsed(project.id, collapsed: !isCollapsed)
                     }
                 } label: {
                     Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
@@ -495,20 +530,38 @@ struct MainWindowView: View {
 
                 Spacer()
 
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        timer.toggleProjectCompleted(id: project.id)
+                    }
+                } label: {
+                    GardenActionIcon(name: "circle", pointSize: 14, color: Garden.muted, targetSize: 22)
+                }
+                .buttonStyle(.plain)
+                .help("完成大任务")
+                .accessibilityLabel("完成大任务：\(project.name)")
+
                 Menu {
-                    Button("为此大任务添加子任务...") {
-                        collapsedProjectIDs.remove(project.id)
-                        inlineSubtaskTitles[project.id] = ""
+                    Button("添加子任务") {
+                        setProjectCollapsed(project.id, collapsed: false)
+                        if inlineSubtaskTitles[project.id] == nil {
+                            inlineSubtaskTitles[project.id] = ""
+                        }
+                        DispatchQueue.main.async {
+                            focusedSubtaskProjectID = project.id
+                        }
                     }
                     Divider()
-                    Button("编辑大任务 (名称与标签)") {
+                    Button("编辑大任务") {
                         editingProject = project
                     }
-                    Button(project.isArchived ? "取消归档" : "归档大任务") {
-                        timer.toggleProjectArchived(id: project.id)
+                    Button("标记完成") {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            timer.toggleProjectCompleted(id: project.id)
+                        }
                     }
                     Divider()
-                    Button("删除大任务 (子任务保留为独立待办)", role: .destructive) {
+                    Button("删除大任务", role: .destructive) {
                         timer.deleteProject(id: project.id)
                     }
                 } label: {
@@ -526,7 +579,7 @@ struct MainWindowView: View {
             if !isCollapsed {
                 VStack(alignment: .leading, spacing: 3) {
                     if subtasks.isEmpty {
-                        Text("暂无子任务，在下方添加拆解步骤")
+                        Text("暂无子任务")
                             .font(.caption)
                             .foregroundColor(Garden.muted)
                             .padding(.leading, 28)
@@ -538,16 +591,7 @@ struct MainWindowView: View {
                                     NSItemProvider(object: subtask.id.uuidString as NSString)
                                 }
                                 .onDrop(of: [UTType.text], isTargeted: nil) { providers in
-                                    guard let provider = providers.first else { return false }
-                                    provider.loadObject(ofClass: NSString.self) { object, _ in
-                                        guard let raw = object as? NSString,
-                                              let sourceID = UUID(uuidString: raw as String),
-                                              sourceID != subtask.id else { return }
-                                        DispatchQueue.main.async {
-                                            timer.moveTodo(id: sourceID, before: subtask.id)
-                                        }
-                                    }
-                                    return true
+                                    handleTodoDrop(providers: providers, targetProjectID: project.id, before: subtask.id)
                                 }
                         }
                     }
@@ -557,13 +601,13 @@ struct MainWindowView: View {
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundColor(Garden.muted)
                             .frame(width: 14)
-                        let placeholder = project.tags.first.map { "为此大任务添加子任务 (继承 #\($0))..." } ?? "为此大任务添加子任务..."
-                        TextField(placeholder, text: Binding(
+                        TextField("添加子任务...", text: Binding(
                             get: { inlineSubtaskTitles[project.id] ?? "" },
                             set: { inlineSubtaskTitles[project.id] = $0 }
                         ))
                         .textFieldStyle(.plain)
                         .font(.system(size: 12))
+                        .focused($focusedSubtaskProjectID, equals: project.id)
                         .onSubmit {
                             commitInlineSubtask(for: project.id)
                         }
@@ -590,8 +634,11 @@ struct MainWindowView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: Garden.cornerMedium)
-                .stroke(Garden.line.opacity(0.40), lineWidth: 1)
+                .stroke(isDropTarget ? Garden.red.opacity(0.55) : Garden.line.opacity(0.40), lineWidth: isDropTarget ? 1.5 : 1)
         )
+        .onDrop(of: [UTType.text], isTargeted: projectDropBinding(for: project.id)) { providers in
+            handleTodoDrop(providers: providers, targetProjectID: project.id, before: nil)
+        }
     }
 
     private func commitInlineSubtask(for projectID: UUID) {
@@ -604,6 +651,9 @@ struct MainWindowView: View {
 
     @ViewBuilder
     private func looseTodosSection(looseTodos: [FocusTodo], hasProjects: Bool) -> some View {
+        let activeLoose = looseTodos.filter { !$0.isCompleted }
+        let completedLoose = looseTodos.filter { $0.isCompleted }
+
         if hasProjects {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
@@ -623,11 +673,11 @@ struct MainWindowView: View {
                         .font(.system(size: 12))
                         .foregroundColor(Garden.muted)
 
-                    Text("独立待办 / 收集箱")
+                    Text("独立待办")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(Garden.ink)
 
-                    Text("\(looseTodos.count)")
+                    Text("\(activeLoose.count)")
                         .font(.caption2.monospacedDigit())
                         .foregroundColor(Garden.muted)
                         .padding(.horizontal, 5)
@@ -641,30 +691,24 @@ struct MainWindowView: View {
                 .padding(.vertical, 6)
 
                 if !isLooseTodosCollapsed {
-                    if looseTodos.isEmpty {
-                        Text("无独立待办")
+                    if activeLoose.isEmpty && completedLoose.isEmpty {
+                        Text("暂无待办")
                             .font(.caption)
                             .foregroundColor(Garden.muted)
                             .padding(.leading, 28)
                             .padding(.vertical, 4)
                     } else {
-                        ForEach(looseTodos) { todo in
+                        ForEach(activeLoose) { todo in
                             todoRow(todo, isSubtask: false)
                                 .onDrag {
                                     NSItemProvider(object: todo.id.uuidString as NSString)
                                 }
                                 .onDrop(of: [UTType.text], isTargeted: nil) { providers in
-                                    guard let provider = providers.first else { return false }
-                                    provider.loadObject(ofClass: NSString.self) { object, _ in
-                                        guard let raw = object as? NSString,
-                                              let sourceID = UUID(uuidString: raw as String),
-                                              sourceID != todo.id else { return }
-                                        DispatchQueue.main.async {
-                                            timer.moveTodo(id: sourceID, before: todo.id)
-                                        }
-                                    }
-                                    return true
+                                    handleTodoDrop(providers: providers, targetProjectID: nil, before: todo.id)
                                 }
+                        }
+                        if !completedLoose.isEmpty {
+                            completedLooseSection(completedLoose)
                         }
                     }
                 }
@@ -676,42 +720,82 @@ struct MainWindowView: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: Garden.cornerMedium)
-                    .stroke(Garden.line.opacity(0.30), lineWidth: 1)
+                    .stroke(isDropTargetLoose ? Garden.red.opacity(0.55) : Garden.line.opacity(0.30), lineWidth: isDropTargetLoose ? 1.5 : 1)
             )
+            .onDrop(of: [UTType.text], isTargeted: $isDropTargetLoose) { providers in
+                handleTodoDrop(providers: providers, targetProjectID: nil, before: nil)
+            }
         } else {
-            ForEach(looseTodos) { todo in
-                todoRow(todo, isSubtask: false)
-                    .onDrag {
-                        NSItemProvider(object: todo.id.uuidString as NSString)
-                    }
-                    .onDrop(of: [UTType.text], isTargeted: nil) { providers in
-                        guard let provider = providers.first else { return false }
-                        provider.loadObject(ofClass: NSString.self) { object, _ in
-                            guard let raw = object as? NSString,
-                                  let sourceID = UUID(uuidString: raw as String),
-                                  sourceID != todo.id else { return }
-                            DispatchQueue.main.async {
-                                timer.moveTodo(id: sourceID, before: todo.id)
-                            }
+            VStack(alignment: .leading, spacing: 3) {
+                ForEach(activeLoose) { todo in
+                    todoRow(todo, isSubtask: false)
+                        .onDrag {
+                            NSItemProvider(object: todo.id.uuidString as NSString)
                         }
-                        return true
-                    }
+                        .onDrop(of: [UTType.text], isTargeted: nil) { providers in
+                            handleTodoDrop(providers: providers, targetProjectID: nil, before: todo.id)
+                        }
+                }
+                if !completedLoose.isEmpty {
+                    completedLooseSection(completedLoose)
+                }
             }
         }
     }
 
     @ViewBuilder
-    private func archivedProjectsSection(archivedProjects: [FocusProject]) -> some View {
+    private func completedLooseSection(_ completedLoose: [FocusTodo]) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        isLooseCompletedCollapsed.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: isLooseCompletedCollapsed ? "chevron.right" : "chevron.down")
+                            .font(.system(size: 9.5, weight: .semibold))
+                        Text("已完成 (\(completedLoose.count))")
+                            .font(.caption.weight(.medium))
+                    }
+                    .foregroundColor(Garden.muted)
+                }
+                .buttonStyle(.plain)
+                Spacer()
+                Button("清空") {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        timer.clearCompletedLooseTodos()
+                    }
+                }
+                .font(.caption2)
+                .buttonStyle(.plain)
+                .foregroundColor(Garden.muted)
+                .help("清空已完成的独立待办")
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+
+            if !isLooseCompletedCollapsed {
+                ForEach(completedLoose) { todo in
+                    todoRow(todo, isSubtask: false)
+                }
+            }
+        }
+        .padding(.top, 2)
+    }
+
+    @ViewBuilder
+    private func completedProjectsSection(completedProjects: [FocusProject]) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Button {
                 withAnimation(.easeInOut(duration: 0.15)) {
-                    isArchivedCollapsed.toggle()
+                    isCompletedProjectsCollapsed.toggle()
                 }
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: isArchivedCollapsed ? "chevron.right" : "chevron.down")
+                    Image(systemName: isCompletedProjectsCollapsed ? "chevron.right" : "chevron.down")
                         .font(.system(size: 10, weight: .semibold))
-                    Text("已归档大任务 (\(archivedProjects.count))")
+                    Text("已完成大任务 (\(completedProjects.count))")
                         .font(.caption.weight(.medium))
                     Spacer()
                 }
@@ -721,22 +805,40 @@ struct MainWindowView: View {
             }
             .buttonStyle(.plain)
 
-            if !isArchivedCollapsed {
-                ForEach(archivedProjects) { project in
-                    HStack {
-                        Image(systemName: "archivebox")
-                            .font(.system(size: 11))
+            if !isCompletedProjectsCollapsed {
+                ForEach(completedProjects) { project in
+                    let subtasks = timer.state.todos.filter { $0.projectID == project.id }
+                    let completedCount = subtasks.filter(\.isCompleted).count
+                    let projSecs = timer.state.focusSeconds(forProject: project.id)
+
+                    HStack(spacing: 7) {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                timer.toggleProjectCompleted(id: project.id)
+                            }
+                        } label: {
+                            GardenActionIcon(name: "checkmark.circle.fill", pointSize: 14, color: Garden.red, targetSize: 20)
+                        }
+                        .buttonStyle(.plain)
+                        .help("还原为未完成")
+                        .accessibilityLabel("还原大任务：\(project.name)")
+
                         Text(project.name)
                             .font(.caption)
                             .strikethrough()
-                        Spacer()
-                        Button("取消归档") {
-                            timer.toggleProjectArchived(id: project.id)
-                        }
-                        .font(.caption2)
-                        .buttonStyle(.plain)
-                        .foregroundColor(Garden.red)
+                            .lineLimit(1)
 
+                        if !subtasks.isEmpty {
+                            Text("\(completedCount)/\(subtasks.count)")
+                                .font(.caption2.monospacedDigit())
+                                .foregroundColor(Garden.muted)
+                        }
+                        if projSecs > 0 {
+                            Text(focusDuration(projSecs))
+                                .font(.caption2.monospacedDigit())
+                                .foregroundColor(Garden.muted)
+                        }
+                        Spacer()
                         Button("删除", role: .destructive) {
                             timer.deleteProject(id: project.id)
                         }
@@ -796,8 +898,6 @@ struct MainWindowView: View {
                     ForEach(timer.state.allTags, id: \.self) { tag in Button(tag) { selectedCategory = tag } }
                 }.frame(width: 140)
                 TextField("搜索名称或标签", text: $search).textFieldStyle(.roundedBorder).frame(width: 190)
-            } else {
-                Text("按时间顺序").font(.caption).foregroundColor(Garden.muted)
             }
         }
     }
@@ -805,11 +905,11 @@ struct MainWindowView: View {
         ZStack(alignment: .bottomTrailing) {
             if visibleRecords.isEmpty {
                 VStack(spacing: 10) {
-                    Text(historyTab ? "没有匹配的记录" : "这里会记下你做过的事情").font(.headline)
-                    Text(historyTab && (selectedCategory != nil || !search.isEmpty)
-                         ? "试试其他关键词，或清除标签筛选。"
-                         : "从下方开始一段专注，结束后再为它添加标签。")
-                        .font(.caption).foregroundColor(Garden.muted)
+                    Text(historyTab ? "没有匹配的记录" : "暂无专注记录").font(.headline)
+                    if historyTab && (selectedCategory != nil || !search.isEmpty) {
+                        Text("试试其他关键词，或清除标签筛选。")
+                            .font(.caption).foregroundColor(Garden.muted)
+                    }
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
@@ -953,7 +1053,7 @@ struct TimerCard: View {
                         }
                     } else {
                         HStack(spacing: 8) {
-                            TextField("下一段，想专注什么？（支持 #标签）", text: Binding(
+                            TextField("准备专注什么？", text: Binding(
                                 get: { timer.eventName },
                                 set: { timer.setEventName($0) }
                             )).textFieldStyle(.plain).font(.system(size: 14))
@@ -1064,7 +1164,7 @@ struct ExpandedTimer: View {
                         }
                     }
                 } else {
-                    TextField("这次准备做什么？（支持 #标签）", text: Binding(
+                    TextField("准备专注什么？", text: Binding(
                         get: { timer.eventName },
                         set: { timer.setEventName($0) }
                     )).textFieldStyle(.roundedBorder).frame(width: 300)
@@ -1106,7 +1206,6 @@ struct ExpandedTimer: View {
                     }
                 }
             }.frame(maxWidth: 340)
-            Text("收起或关闭主窗口后，菜单栏会继续陪你专注。").font(.caption).foregroundColor(Garden.muted)
         // Height follows the content: a fixed frame smaller than the work-state stack
         // clipped the caption against the sheet edge on both earlier attempts.
         }.padding(28).frame(width: 540)
@@ -1166,8 +1265,9 @@ struct MainSettings: View {
                         Button("贴回右下角") { TomyPetController.shared?.resetToDefaultCorner() }
                             .font(.system(size: 12))
                     }
-                    Toggle("锁定位置并穿透点击（鼠标移入自动半透明避让，按住 ⌥ 临时移动）", isOn: $tomyPetLocked)
+                    Toggle("锁定位置并穿透点击", isOn: $tomyPetLocked)
                         .font(.system(size: 12.5))
+                        .help("鼠标移入自动半透明避让，按住 ⌥ 临时移动")
                 }
                 .padding(.leading, 18)
                 .padding(.vertical, 2)
@@ -1176,7 +1276,6 @@ struct MainSettings: View {
             Toggle("菜单栏显示倒计时", isOn: $timer.showTimerInMenuBar).onChange(of: timer.showTimerInMenuBar) { _ in timer.updateStatus() }
             LaunchAtLogin.Toggle("登录时启动")
             KeyboardShortcuts.Recorder("开始 / 暂停 / 继续", name: .startStopTimer)
-            Text("时长可直接输入数字，并从下一段生效。暂停与休息不计入专注；到时显示无声提醒。每条记录的第一个标签用于统计分类，可在编辑时更改。").font(.caption).foregroundColor(Garden.muted)
             HStack {
                 Button("打开记录文件夹") { timer.openRecordsFolder() }
                 Spacer()
@@ -1233,30 +1332,17 @@ struct TodoRowView: View {
                     GardenActionIcon(name: "xmark", pointSize: 12)
                 }.buttonStyle(.plain).accessibilityLabel("取消重命名")
             } else {
-                Button {
-                    timer.selectCurrentTodo(todo.id)
-                } label: {
-                    HStack(spacing: 6) {
-                        if isCurrent {
-                            Text("🎯")
-                                .font(.system(size: 11))
-                        }
-                        Text(todo.title)
-                            .font(.system(size: 13, weight: isCurrent ? .semibold : .regular))
-                            .strikethrough(todo.isCompleted)
-                            .foregroundColor(todo.isCompleted ? Garden.muted : Garden.ink)
-                            .lineLimit(1)
-                        if !todo.tags.isEmpty {
-                            Text(todo.tags.map { "#\($0)" }.joined(separator: " "))
-                                .font(.caption2.weight(.medium))
-                                .foregroundColor(Garden.color(todo.tags.first ?? "", styles: timer.state.categoryStyles))
-                                .lineLimit(1)
-                        }
+                if todo.isCompleted {
+                    todoLabelContent
+                } else {
+                    Button {
+                        timer.selectCurrentTodo(todo.id)
+                    } label: {
+                        todoLabelContent
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .buttonStyle(.plain)
+                    .help("设为当前专注任务")
                 }
-                .buttonStyle(.plain)
-                .help("设为当前专注任务")
 
                 let seconds = timer.state.focusSeconds(forTodo: todo.id)
                 if seconds > 0 {
@@ -1280,7 +1366,9 @@ struct TodoRowView: View {
                 }
 
                 Menu {
-                    Button("设为当前任务") { timer.selectCurrentTodo(todo.id) }
+                    if !todo.isCompleted {
+                        Button("设为当前任务") { timer.selectCurrentTodo(todo.id) }
+                    }
                     Menu("设置标签") {
                         if !todo.tags.isEmpty {
                             Button("清除标签") { timer.setTodoTags(id: todo.id, tags: []) }
@@ -1294,21 +1382,23 @@ struct TodoRowView: View {
                             timer.setTodoTags(id: todo.id, tags: [tag])
                         }
                     }
-                    Menu("移至大任务") {
-                        if todo.projectID != nil {
-                            Button("移出大任务 (设为独立待办)") {
-                                timer.setTodoProject(todoID: todo.id, projectID: nil)
+                    if !todo.isCompleted {
+                        Menu("移至大任务") {
+                            if todo.projectID != nil {
+                                Button("移出大任务") {
+                                    timer.setTodoProject(todoID: todo.id, projectID: nil)
+                                }
+                                Divider()
+                            }
+                            ForEach(timer.state.projects.filter { !$0.isCompleted && $0.id != todo.projectID }) { proj in
+                                Button(proj.name) {
+                                    timer.setTodoProject(todoID: todo.id, projectID: proj.id)
+                                }
                             }
                             Divider()
-                        }
-                        ForEach(timer.state.projects.filter { !$0.isArchived && $0.id != todo.projectID }) { proj in
-                            Button(proj.name) {
-                                timer.setTodoProject(todoID: todo.id, projectID: proj.id)
+                            Button("+ 新建大任务...") {
+                                onNewProject()
                             }
-                        }
-                        Divider()
-                        Button("+ 新建大任务...") {
-                            onNewProject()
                         }
                     }
                     Button("重命名") {
@@ -1346,6 +1436,27 @@ struct TodoRowView: View {
         .opacity(todo.isCompleted ? 0.68 : 1)
     }
 
+    private var todoLabelContent: some View {
+        HStack(spacing: 6) {
+            if isCurrent {
+                Text("🎯")
+                    .font(.system(size: 11))
+            }
+            Text(todo.title)
+                .font(.system(size: 13, weight: isCurrent ? .semibold : .regular))
+                .strikethrough(todo.isCompleted)
+                .foregroundColor(todo.isCompleted ? Garden.muted : Garden.ink)
+                .lineLimit(1)
+            if !todo.tags.isEmpty {
+                Text(todo.tags.map { "#\($0)" }.joined(separator: " "))
+                    .font(.caption2.weight(.medium))
+                    .foregroundColor(Garden.color(todo.tags.first ?? "", styles: timer.state.categoryStyles))
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private func commitTodoRename() {
         let title = editingTodoTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return }
@@ -1366,7 +1477,7 @@ struct NewProjectSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("新建大任务 / 项目")
+                Text("新建大任务")
                     .font(.system(size: 16, weight: .semibold))
                 Spacer()
                 Button("取消", action: onCancel)
@@ -1374,16 +1485,12 @@ struct NewProjectSheet: View {
                     .buttonStyle(.plain)
                     .foregroundColor(Garden.muted)
             }
-            Text("大任务用于规划长周期目标（如期末复习、比赛项目、课程作业），其下可拆解多项具体子任务，专注时长将自动汇总归属。")
-                .font(.caption)
-                .foregroundColor(Garden.muted)
-                .lineSpacing(2)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("大任务名称")
                     .font(.caption)
                     .foregroundColor(Garden.muted)
-                TextField("例如：Robomaster 校内赛、材料力学大作业", text: $name)
+                TextField("大任务名称", text: $name)
                     .textFieldStyle(.plain)
                     .padding(.horizontal, 10)
                     .frame(height: 34)
@@ -1398,7 +1505,7 @@ struct NewProjectSheet: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("主分类标签 (可选)")
+                    Text("分类标签")
                         .font(.caption)
                         .foregroundColor(Garden.muted)
                     Spacer()
@@ -1409,7 +1516,7 @@ struct NewProjectSheet: View {
                             .foregroundColor(Garden.muted)
                     }
                 }
-                TextField("例如：竞赛、专业课、科研", text: $tagInput)
+                TextField("分类标签（可选）", text: $tagInput)
                     .textFieldStyle(.plain)
                     .padding(.horizontal, 10)
                     .frame(height: 34)
@@ -1445,9 +1552,6 @@ struct NewProjectSheet: View {
                         .padding(.vertical, 2)
                     }
                 }
-                Text("下属子任务将默认自动继承此主标签，专注统计自动归集至该分类。")
-                    .font(.caption2)
-                    .foregroundColor(Garden.muted)
             }
 
             HStack {
@@ -1500,7 +1604,7 @@ struct EditProjectSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("编辑大任务 / 项目")
+                Text("编辑大任务")
                     .font(.system(size: 16, weight: .semibold))
                 Spacer()
                 Button("取消", action: onCancel)
@@ -1527,7 +1631,7 @@ struct EditProjectSheet: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("主分类标签 (可选)")
+                    Text("分类标签")
                         .font(.caption)
                         .foregroundColor(Garden.muted)
                     Spacer()
@@ -1538,7 +1642,7 @@ struct EditProjectSheet: View {
                             .foregroundColor(Garden.muted)
                     }
                 }
-                TextField("例如：竞赛、专业课、科研", text: $tagInput)
+                TextField("分类标签（可选）", text: $tagInput)
                     .textFieldStyle(.plain)
                     .padding(.horizontal, 10)
                     .frame(height: 34)
@@ -1574,9 +1678,6 @@ struct EditProjectSheet: View {
                         .padding(.vertical, 2)
                     }
                 }
-                Text("修改后新建子任务将继承新主标签，已创建子任务保留既有标签。")
-                    .font(.caption2)
-                    .foregroundColor(Garden.muted)
             }
 
             HStack {

@@ -976,6 +976,86 @@ check(FocusRecord.togglingTag("STRASSE", in: ["Straße", "阅读"]) == ["阅读"
       "tag toggle removes an equivalent Unicode alias while keeping other tags")
 check(FocusRecord.togglingTag("  学习  ", in: ["阅读"]) == ["阅读", "学习"],
       "tag toggle trims a new selection and keeps the primary tag order")
+
+do {
+    // Legacy FocusProject JSON with only isArchived decodes into isCompleted and re-encodes both flags
+    let legacyProjectJSON = """
+    {"id":"00000000-0000-0000-0000-000000000111","name":"旧归档项目","tags":["专业课"],"isArchived":true,"createdAt":0}
+    """.data(using: .utf8)!
+    let decodedLegacyProj = try JSONDecoder().decode(FocusProject.self, from: legacyProjectJSON)
+    check(decodedLegacyProj.isCompleted && decodedLegacyProj.isArchived && decodedLegacyProj.completedAt == nil,
+          "legacy isArchived project decodes as completed")
+    let reencodedObject = try JSONSerialization.jsonObject(with: JSONEncoder().encode(decodedLegacyProj)) as! [String: Any]
+    check((reencodedObject["isCompleted"] as? Bool) == true && (reencodedObject["isArchived"] as? Bool) == true,
+          "re-encoded FocusProject writes both isCompleted and isArchived")
+
+    // Completing a project hides its subtasks from pendingTodos & currentTodo losslessly,
+    // preserves running activeTodoID, and restores exact checklist state when reopened.
+    var pState = FocusState()
+    let projID = pState.addProject(name: "电工学", tags: ["课程"], at: base)!
+    let subDone = pState.addTodo(title: "已完成子任务", projectID: projID, at: base)!
+    let subPending = pState.addTodo(title: "待学子任务", projectID: projID, at: base)!
+    pState.toggleTodo(id: subDone, at: base)
+    pState.selectCurrentTodo(subPending)
+    pState.startWork(name: "[电工学] · 待学子任务", seconds: 60, todoID: subPending, at: base)
+
+    let completedAt = base.addingTimeInterval(30)
+    pState.toggleProjectCompleted(id: projID, at: completedAt)
+    check(pState.project(for: projID)?.isCompleted == true &&
+          pState.project(for: projID)?.isArchived == true &&
+          pState.project(for: projID)?.completedAt == completedAt,
+          "toggleProjectCompleted marks project completed with timestamp")
+    check(pState.todos.first { $0.id == subPending }?.isCompleted == false &&
+          pState.todos.first { $0.id == subDone }?.isCompleted == true,
+          "completing project leaves subtask completion flags untouched")
+    check(pState.pendingTodos.isEmpty && pState.currentTodo == nil &&
+          pState.currentTodoID == nil && pState.seriesTodoID == nil &&
+          pState.activeTodoID == subPending,
+          "completing project hides subtasks and clears next-round selection while keeping running activeTodoID")
+    pState.selectCurrentTodo(subPending)
+    check(pState.currentTodoID == nil, "cannot select subtask belonging to completed project")
+
+    pState.tick(at: base.addingTimeInterval(60))
+    pState.stop(at: base.addingTimeInterval(61))
+    check(pState.records.first?.projectID == projID && pState.records.first?.todoID == subPending,
+          "running session still records project and task ownership after project completion")
+
+    pState.toggleProjectCompleted(id: projID, at: base.addingTimeInterval(100))
+    check(pState.project(for: projID)?.isCompleted == false &&
+          pState.project(for: projID)?.completedAt == nil &&
+          pState.pendingTodos.map(\.id) == [subPending],
+          "reopening project clears completedAt and restores unfinished subtasks cleanly")
+    pState.selectCurrentTodo(subPending)
+    check(pState.currentTodo?.id == subPending, "reopened project's subtask can be selected again")
+
+    // Cross-group relocateTodo & clearCompletedLooseTodos
+    let looseTodo = pState.addTodo(title: "散装练习", at: base)!
+    let looseDone = pState.addTodo(title: "已勾散装", at: base)!
+    pState.toggleTodo(id: looseDone, at: base)
+
+    pState.relocateTodo(id: looseTodo, toProject: projID, before: subPending)
+    check(pState.todos.first { $0.id == looseTodo }?.projectID == projID &&
+          pState.todos.first { $0.id == looseTodo }?.tags == ["课程"],
+          "relocating untagged loose todo into project inherits project tags")
+    let orderedIDs = pState.todos.filter { $0.projectID == projID }.map(\.id)
+    check(orderedIDs == [subDone, looseTodo, subPending],
+          "relocateTodo respects before target ordering inside project")
+
+    pState.relocateTodo(id: subPending, toProject: nil, before: looseDone)
+    check(pState.todos.first { $0.id == subPending }?.projectID == nil &&
+          pState.todos.first { $0.id == subPending }?.tags == ["课程"],
+          "relocating subtask out to loose todos detaches projectID while keeping tags")
+    let looseOrdered = pState.todos.filter { $0.projectID == nil }.map(\.id)
+    check(looseOrdered == [subPending, looseDone],
+          "relocateTodo places detached task before target loose todo")
+
+    pState.clearCompletedLooseTodos()
+    check(!pState.todos.contains { $0.id == looseDone } &&
+          pState.todos.contains { $0.id == subPending } &&
+          pState.todos.contains { $0.id == subDone },
+          "clearCompletedLooseTodos removes only completed loose todos")
+}
+
 print("PASS: \(checks) total checks including project moves and Unicode category identity")
 
 // MARK: - Tomy Desktop Pet Pure Engine & Ergonomics Checks

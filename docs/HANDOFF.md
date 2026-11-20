@@ -2,7 +2,17 @@
 
 **易变层** —— 每次会话结束时更新。稳定约定见 [`../AGENTS.md`](../AGENTS.md)，问题清单见 [`BACKLOG.md`](BACKLOG.md)。
 
-最后更新：2026-11-19，by Antigravity · **专注打磨 macOS 版本**：按用户决定下线并移除全部 Windows 版工程（`TomatoBar-Desktop/`、`.github/workflows/windows-build.yml`）、官网与 `v3.11.0` Release 中的 Windows 下载入口与 `.exe` 附件，重新核验网页端全视口并发布至 `gh-pages`。
+最后更新：2026-11-20，by Antigravity · **悬浮窗瘦身重构、全端去 AI 冗余文案、大任务完成态与 7 项交互升级**：
+- **领域与桥接（`State.swift`、`Timer.swift`、`TomyDesktopPet.swift`）**：
+  - `FocusProject` 新增 `isCompleted` / `completedAt` 并兼容解码旧 `isArchived`（同时双向写出兼容字段）；`toggleProjectCompleted(id:at:)` 无损隐藏已完成大任务下子任务（不改写子任务自身勾选态、保留运行中 `activeTodoID`），恢复时原样复原；`pendingTodos`/`currentTodo`/`selectCurrentTodo` 均过滤已完成大任务子任务。
+  - 修复自由专注 `startWork()` 未解析输入框 `#标签` 的问题（与 `draftTags` 合并去重，行内首标签可作为主统计分类）；解除/完成/删除当前任务或完成所属大任务时自动清理残留 `eventName`（手动改名继续保留）；新增 `relocateTodo(id:toProject:before:)` 与 `clearCompletedLooseTodos()`；桌宠右键任务列表同步改用 `pendingTodos`。
+- **图 1 悬浮窗（`View.swift`）**：移除常驻三段 Tab 栏与展开撑高区，改为 `PopoverRoute` 二级页导航（`.focus` / `.records` / `.intervals` / `.settings`，宽 `340pt`，失活自动回到 `.focus`）；合并顶部输入与「接下来」（单行自由输入内嵌标签按钮、去掉重复选任务按钮，「接下来」自动排除顶部当前任务并折叠快速添加框）；`开始专注` 旁新增 `N分钟 ⌄` 快捷预设菜单（`15/25/35/45/60` + `自定义时长…`）；「最近记录」压成紧凑双行去除大留白，移走 `打开记录文件夹` 至设置页。
+- **图 2 主窗口与图表（`MainWindow.swift`、`FocusCharts.swift`、`Notifications.swift`）**：
+  - 全面清理图 2 红框 3 处及全 App 弹窗/设置/编辑器/占位符/菜单的 AI 解释文案，保留「让专注，慢慢生长」与「每一段投入，都有迹可循」；
+  - 大任务卡片顶栏右侧（`…` 前）增加完成圆圈 `○`，统一以「已完成大任务 (N)」取代「归档」；独立待办增加可折叠「已完成 (N)」与一键「清空」，修复已完成项误导点击态；支持跨大任务/独立待办拖拽迁入/迁出并持久化折叠状态；点 `…` → `添加子任务` 自动聚焦联机输入框；「历史」页改用最新在前排序；日视图「专注足迹」色块内直接展示图标、分类名与时长。
+- **验证边界**：`scripts/test.sh`（346 项领域检查，含旧 `isArchived` 兼容、无损大任务完成、跨组迁移、清空已完成独立待办）、`scripts/build.sh`（universal Release `arm64 + x86_64` clean build + 严格签名）、`scripts/test-bridge.sh`（211 项真实 `TBTimer` 桥接检查，含自由专注 `#标签` 解析、残留 `eventName` 清空、`toggleProjectCompleted`、`relocateTodo`）、`scripts/test-launch-context.sh`（8 项合成启动检查）全部通过；已通过 `scripts/dev-run.sh` 启动 `/tmp` 开发版待用户目视验收（`/Applications` 正式版及用户真实 `sessions.json` 未受修改；受本机无录屏权限与 `.transient` NSPopover 限制，真实 SwiftUI 布局与跨组拖拽手感待实机交互核验）。
+
+历史更新：2026-11-19，by Antigravity · **专注打磨 macOS 版本**：按用户决定下线并移除全部 Windows 版工程（`TomatoBar-Desktop/`、`.github/workflows/windows-build.yml`）、官网与 `v3.11.0` Release 中的 Windows 下载入口与 `.exe` 附件，重新核验网页端全视口并发布至 `gh-pages`。
 - **公开下载包与 GitHub Release（tag `v3.11.0`）**：已从 `v3.11.0` Release 移除 Windows `.exe` 附件及文案并同步释放，当前仅保留 macOS 双架构 DMG（`6,871,572` 字节，SHA-256 `c8a60bd6be2646a98799730ff26311b880d75989cf0413451ab77b402e9f105c`）与 ZIP（`6,264,991` 字节，SHA-256 `04ed2adbbfcfadaaf65bb205058ac6cef198f4716dccb862abaa4cf42686d14b`），更新说明见 [`V1.5.0更新说明.md`](V1.5.0更新说明.md)。
 
 历史更新：2026-11-18，by Antigravity · **V1.5.0（3.11.0 / build 8）**：发布新版 GitHub Release、更新 `/Applications` 正式版并同步更新 README 与 GitHub Pages 官网桌宠互动展示：

@@ -125,20 +125,27 @@ struct FocusProject: Codable, Identifiable, Equatable {
     var name: String
     var tags: [String]
     var color: String?
-    var isArchived: Bool
+    var isCompleted: Bool
+    var completedAt: Date?
+    var isArchived: Bool {
+        get { isCompleted }
+        set { isCompleted = newValue }
+    }
     let createdAt: Date
 
-    init(id: UUID = UUID(), name: String, tags: [String] = [], color: String? = nil, isArchived: Bool = false, createdAt: Date) {
+    init(id: UUID = UUID(), name: String, tags: [String] = [], color: String? = nil,
+         isCompleted: Bool = false, isArchived: Bool = false, completedAt: Date? = nil, createdAt: Date) {
         self.id = id
         self.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         self.tags = FocusRecord.normalizedTags(tags)
         self.color = color
-        self.isArchived = isArchived
+        self.isCompleted = isCompleted || isArchived
+        self.completedAt = self.isCompleted ? completedAt : nil
         self.createdAt = createdAt
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, tags, color, isArchived, createdAt
+        case id, name, tags, color, isArchived, isCompleted, completedAt, createdAt
     }
 
     init(from decoder: Decoder) throws {
@@ -147,8 +154,22 @@ struct FocusProject: Codable, Identifiable, Equatable {
         name = try v.decode(String.self, forKey: .name)
         tags = FocusRecord.normalizedTags(try v.decodeIfPresent([String].self, forKey: .tags) ?? [])
         color = try v.decodeIfPresent(String.self, forKey: .color)
-        isArchived = try v.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
+        let legacyArchived = try v.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
+        isCompleted = try v.decodeIfPresent(Bool.self, forKey: .isCompleted) ?? legacyArchived
+        completedAt = try v.decodeIfPresent(Date.self, forKey: .completedAt)
         createdAt = try v.decode(Date.self, forKey: .createdAt)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(tags, forKey: .tags)
+        try container.encodeIfPresent(color, forKey: .color)
+        try container.encode(isCompleted, forKey: .isArchived)
+        try container.encode(isCompleted, forKey: .isCompleted)
+        try container.encodeIfPresent(completedAt, forKey: .completedAt)
+        try container.encode(createdAt, forKey: .createdAt)
     }
 }
 
@@ -302,10 +323,15 @@ struct FocusState: Codable {
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
-    /// The selected task, if it still exists and is unfinished.
+    private func isProjectCompleted(_ projectID: UUID?) -> Bool {
+        guard let projectID else { return false }
+        return project(for: projectID)?.isCompleted ?? false
+    }
+
+    /// The selected task, if it still exists, is unfinished, and its parent project is active.
     var currentTodo: FocusTodo? {
         guard let id = currentTodoID else { return nil }
-        return todos.first { $0.id == id && !$0.isCompleted }
+        return todos.first { $0.id == id && !$0.isCompleted && !isProjectCompleted($0.projectID) }
     }
 
     var allTags: [String] {
@@ -332,7 +358,9 @@ struct FocusState: Codable {
         return records.filter { $0.hasTag(tag) }
     }
 
-    var pendingTodos: [FocusTodo] { todos.filter { !$0.isCompleted } }
+    var pendingTodos: [FocusTodo] {
+        todos.filter { !$0.isCompleted && !isProjectCompleted($0.projectID) }
+    }
 
     func focusSeconds(forTodo id: UUID) -> TimeInterval {
         records.filter { $0.todoID == id }.reduce(0) { $0 + $1.seconds }
@@ -393,7 +421,8 @@ struct FocusState: Codable {
     /// The running work keeps its own `activeTodoID`, so its record is never rewritten.
     mutating func selectCurrentTodo(_ id: UUID?) {
         if let id = id {
-            guard todos.contains(where: { $0.id == id && !$0.isCompleted }) else { return }
+            guard let todo = todos.first(where: { $0.id == id && !$0.isCompleted }),
+                  !isProjectCompleted(todo.projectID) else { return }
         }
         currentTodoID = id
         if id == nil, phase != .work { seriesTodoID = nil }
@@ -409,6 +438,28 @@ struct FocusState: Codable {
             return
         }
         todos.insert(item, at: target)
+    }
+
+    /// Moves a todo across project boundaries (or into loose todos) and updates order.
+    mutating func relocateTodo(id: UUID, toProject projectID: UUID?, before targetID: UUID? = nil) {
+        guard let sourceIndex = todos.firstIndex(where: { $0.id == id }) else { return }
+        if let projectID, project(for: projectID) == nil { return }
+        if todos[sourceIndex].projectID != projectID {
+            setTodoProject(todoID: id, projectID: projectID)
+        }
+        if targetID != id {
+            moveTodo(id: id, before: targetID)
+        }
+    }
+
+    /// Removes completed loose todos while preserving active todos and project subtasks.
+    mutating func clearCompletedLooseTodos() {
+        let removedIDs = Set(todos.filter { $0.projectID == nil && $0.isCompleted }.map(\.id))
+        guard !removedIDs.isEmpty else { return }
+        todos.removeAll { removedIDs.contains($0.id) }
+        if let id = activeTodoID, removedIDs.contains(id) { activeTodoID = nil }
+        if let id = seriesTodoID, removedIDs.contains(id) { seriesTodoID = nil }
+        if let id = currentTodoID, removedIDs.contains(id) { currentTodoID = nil }
     }
 
     @discardableResult
@@ -444,9 +495,34 @@ struct FocusState: Codable {
         }
     }
 
+    private mutating func clearSelection(forProject projectID: UUID) {
+        if let curID = currentTodoID, todos.first(where: { $0.id == curID })?.projectID == projectID {
+            currentTodoID = nil
+        }
+        if let serID = seriesTodoID, todos.first(where: { $0.id == serID })?.projectID == projectID {
+            seriesTodoID = nil
+        }
+    }
+
+    /// Completes or reopens a project without mutating its subtasks' own completion state,
+    /// so reopening restores the exact previous subtask checklist.
+    mutating func toggleProjectCompleted(id: UUID, at now: Date) {
+        guard let index = projects.firstIndex(where: { $0.id == id }) else { return }
+        projects[index].isCompleted.toggle()
+        projects[index].completedAt = projects[index].isCompleted ? now : nil
+        if projects[index].isCompleted {
+            clearSelection(forProject: id)
+        }
+    }
+
     mutating func toggleProjectArchived(id: UUID) {
         guard let index = projects.firstIndex(where: { $0.id == id }) else { return }
-        projects[index].isArchived.toggle()
+        projects[index].isCompleted.toggle()
+        if !projects[index].isCompleted {
+            projects[index].completedAt = nil
+        } else {
+            clearSelection(forProject: id)
+        }
     }
 
     mutating func setTodoProject(todoID: UUID, projectID: UUID?) {

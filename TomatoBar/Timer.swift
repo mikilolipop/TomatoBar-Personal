@@ -199,12 +199,20 @@ final class TBTimer: ObservableObject {
         }
     }
 
+    private func clearEventNameIfMatching(_ previousDisplay: String?) {
+        guard let previousDisplay, FocusRecord.sameTag(eventName, previousDisplay) else { return }
+        eventName = ""
+    }
+
     func selectCurrentTodo(_ id: UUID?) {
         guard storageError == nil else { return }
+        let previousDisplay = state.currentTodo.map { state.displayName(for: $0) }
         change { state, _ in
             state.selectCurrentTodo(id)
-            if let id = id, let todo = state.todos.first(where: { $0.id == id }) {
+            if let id = id, let todo = state.currentTodo, todo.id == id {
                 self.eventName = state.displayName(for: todo)
+            } else if id == nil {
+                self.clearEventNameIfMatching(previousDisplay)
             }
         }
     }
@@ -243,9 +251,21 @@ final class TBTimer: ObservableObject {
         }
     }
 
-    func toggleProjectArchived(id: UUID) {
+    func toggleProjectCompleted(id: UUID) {
         guard storageError == nil else { return }
-        change { state, _ in state.toggleProjectArchived(id: id) }
+        let previousDisplay = (state.currentTodo?.projectID == id)
+            ? state.currentTodo.map { state.displayName(for: $0) }
+            : nil
+        change { state, date in
+            state.toggleProjectCompleted(id: id, at: date)
+            if state.currentTodoID == nil {
+                self.clearEventNameIfMatching(previousDisplay)
+            }
+        }
+    }
+
+    func toggleProjectArchived(id: UUID) {
+        toggleProjectCompleted(id: id)
     }
 
     func setTodoProject(todoID: UUID, projectID: UUID?) {
@@ -288,17 +308,53 @@ final class TBTimer: ObservableObject {
 
     func toggleTodo(id: UUID) {
         guard storageError == nil else { return }
-        change { state, date in state.toggleTodo(id: id, at: date) }
+        let previousDisplay = (state.currentTodoID == id)
+            ? state.currentTodo.map { state.displayName(for: $0) }
+            : nil
+        change { state, date in
+            state.toggleTodo(id: id, at: date)
+            if state.currentTodoID == nil {
+                self.clearEventNameIfMatching(previousDisplay)
+            }
+        }
     }
 
     func deleteTodo(id: UUID) {
         guard storageError == nil else { return }
-        change { state, _ in state.deleteTodo(id: id) }
+        let previousDisplay = (state.currentTodoID == id)
+            ? state.currentTodo.map { state.displayName(for: $0) }
+            : nil
+        change { state, _ in
+            state.deleteTodo(id: id)
+            if state.currentTodoID == nil {
+                self.clearEventNameIfMatching(previousDisplay)
+            }
+        }
     }
 
     func moveTodo(id: UUID, before targetID: UUID?) {
         guard storageError == nil else { return }
         change { state, _ in state.moveTodo(id: id, before: targetID) }
+    }
+
+    func relocateTodo(id: UUID, toProject projectID: UUID?, before targetID: UUID? = nil) {
+        guard storageError == nil else { return }
+        let previousDisplay = (state.currentTodoID == id)
+            ? state.currentTodo.map { state.displayName(for: $0) }
+            : nil
+        change { state, _ in
+            state.relocateTodo(id: id, toProject: projectID, before: targetID)
+            if let todo = state.currentTodo, todo.id == id {
+                self.eventName = state.displayName(for: todo)
+            } else if state.currentTodo == nil {
+                self.clearEventNameIfMatching(previousDisplay)
+            }
+        }
+    }
+
+    func clearCompletedLooseTodos() {
+        guard storageError == nil else { return }
+        change { state, _ in state.clearCompletedLooseTodos() }
     }
 
     func primaryAction() {
@@ -310,9 +366,15 @@ final class TBTimer: ObservableObject {
         guard storageError == nil else { return }
         let todoID = state.currentTodoID
         let minutes = Self.clamped(workIntervalLength, to: 1...180)
-        let tags: [String]? = (todoID != nil) ? nil : state.draftTags
-        change { $0.startWork(name: eventName, seconds: Double(minutes * 60),
-                              todoID: todoID, tags: tags, at: $1) }
+        if todoID != nil {
+            change { $0.startWork(name: eventName, seconds: Double(minutes * 60),
+                                  todoID: todoID, tags: nil, at: $1) }
+        } else {
+            let (parsedName, inlineTags) = FocusTodo.parseInput(eventName)
+            let effectiveTags = FocusRecord.normalizedTags(state.draftTags + inlineTags)
+            change { $0.startWork(name: parsedName, seconds: Double(minutes * 60),
+                                  todoID: nil, tags: effectiveTags, at: $1) }
+        }
     }
     func startRest() {
         // Same storageError gate as startWork: if the just-completed focus is still only

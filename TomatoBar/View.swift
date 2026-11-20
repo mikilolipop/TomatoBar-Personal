@@ -10,7 +10,7 @@ struct FocusTaskMenuContent: View {
 
     var body: some View {
         if showsPrompt { Text("选择已有待办专注：") }
-        let projects = timer.state.projects.filter { !$0.isArchived }
+        let projects = timer.state.projects.filter { !$0.isCompleted }
         let todos = timer.state.pendingTodos.filter { $0.id != excluding }
         ForEach(projects) { project in
             let tasks = todos.filter { $0.projectID == project.id }
@@ -166,16 +166,21 @@ struct GardenNumberInputRow: View {
 }
 
 struct TBPopoverView: View {
+    private enum PopoverRoute: Equatable {
+        case focus, records, intervals, settings
+    }
+
     @ObservedObject var timer: TBTimer
-    @State private var tab = 0
-    @AppStorage("popoverTabsCollapsed") private var isTabsCollapsed = true
+    @State private var route: PopoverRoute = .focus
     @AppStorage(TomyPetController.showKey) private var showDesktopPet = true
     @AppStorage(TomyPetController.sizeKey) private var tomyPetSize = TomyPetSize.medium.rawValue
     @AppStorage(TomyPetController.lockedKey) private var tomyPetLocked = false
     @State private var editingRecord: FocusRecord?
     @State private var selectedTag: String?
     @State private var showCancelConfirm = false
+    @State private var isAddingQuickTodo = false
     @State private var quickTodoTitle = ""
+    @SwiftUI.FocusState private var isQuickTodoFocused: Bool
     @State private var showingCustomTagAlert = false
     @State private var customTagTargetTodoID: UUID?
     @State private var isCustomTagForDraft = false
@@ -186,31 +191,97 @@ struct TBPopoverView: View {
     @State private var cancelWasPaused = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 9) {
+        VStack(alignment: .leading, spacing: 12) {
+            switch route {
+            case .focus:
+                focusRouteView
+            case .records:
+                recordsRouteView
+            case .intervals:
+                intervalsRouteView
+            case .settings:
+                settingsRouteView
+            }
+        }
+        .padding(16)
+        .frame(width: 340)
+        .background(Garden.paper)
+        .foregroundColor(Garden.ink)
+        .accentColor(Garden.red)
+        .preferredColorScheme(.light)
+        .onDisappear {
+            if editingRecord == nil && !showCancelConfirm && !showingCustomTagAlert {
+                route = .focus
+                isAddingQuickTodo = false
+            }
+        }
+        .alert("取消这段专注？", isPresented: $showCancelConfirm) {
+            Button("继续专注", role: .cancel) { if !cancelWasPaused { timer.togglePause() } }
+                .keyboardShortcut(.cancelAction)
+            Button("放弃这段", role: .destructive) { timer.cancel() }
+        } message: { Text(cancelFocusMessage(timer.state)) }
+        .alert("自定义新标签", isPresented: $showingCustomTagAlert) {
+            TextField("输入新标签名称", text: $customTagInput)
+            Button("确定") {
+                let tag = customTagInput.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+                if !tag.isEmpty {
+                    if isCustomTagForDraft {
+                        let current = timer.state.draftTags
+                        if !current.contains(where: { FocusRecord.sameTag($0, tag) }) {
+                            timer.setDraftTags(current + [tag])
+                        }
+                    } else if let id = customTagTargetTodoID {
+                        timer.setTodoTags(id: id, tags: [tag])
+                    }
+                }
+                customTagInput = ""
+                customTagTargetTodoID = nil
+                isCustomTagForDraft = false
+            }
+            Button("取消", role: .cancel) {
+                customTagInput = ""
+                customTagTargetTodoID = nil
+                isCustomTagForDraft = false
+            }
+        }
+        // P16: the other window's edit or delete can empty out the tag this filter
+        // points at. Re-check it whenever the shared record list changes, not only
+        // after this view's own save.
+        .onChange(of: timer.state.records) { _ in clearStaleFilter() }
+    }
+
+    private var focusRouteView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
                 GardenArt(name: "PixelTomato", activity: timer.windowActivity)
-                    .frame(width: 30, height: 30)
+                    .frame(width: 26, height: 26)
                 Text("TomatoBar")
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
                 Spacer()
                 Text(timer.phaseLabel)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(Garden.muted)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.16)) { route = .settings }
+                } label: {
+                    GardenActionIcon(name: "gearshape", pointSize: 13, color: Garden.muted, targetSize: 24)
+                }
+                .buttonStyle(.plain)
+                .help("设置")
+                .accessibilityLabel("设置")
             }
 
-            if timer.state.phase == .idle || timer.state.phase == .restFinished {
+            if canPrepareNext {
                 focusTargetSelection
             } else {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text(timer.state.name)
-                            .font(.system(size: 15, weight: .medium))
-                            .lineLimit(2)
-                        if !timer.state.activeTags.isEmpty {
-                            Text(timer.state.activeTags.map { "#\($0)" }.joined(separator: " "))
-                                .font(.caption2)
-                                .foregroundColor(Garden.color(timer.state.activeTags.first ?? "", styles: timer.state.categoryStyles))
-                        }
+                HStack(spacing: 6) {
+                    Text(timer.state.name)
+                        .font(.system(size: 15, weight: .medium))
+                        .lineLimit(2)
+                    if !timer.state.activeTags.isEmpty {
+                        Text(timer.state.activeTags.map { "#\($0)" }.joined(separator: " "))
+                            .font(.caption2)
+                            .foregroundColor(Garden.color(timer.state.activeTags.first ?? "", styles: timer.state.categoryStyles))
                     }
                 }
             }
@@ -262,27 +333,86 @@ struct TBPopoverView: View {
                     .buttonStyle(GardenPrimaryButtonStyle())
                     .frame(maxWidth: .infinity)
             } else {
-                Button { timer.startWork() } label: {
-                    Text("开始专注 · \(timer.workIntervalLength) 分钟")
-                        .font(.system(size: 15, weight: .semibold))
-                        .frame(maxWidth: .infinity)
+                HStack(spacing: 8) {
+                    Button { timer.startWork() } label: {
+                        Text("开始专注")
+                            .font(.system(size: 15, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(GardenPrimaryButtonStyle())
+                    .disabled(timer.storageError != nil)
+
+                    Menu {
+                        ForEach([15, 25, 35, 45, 60], id: \.self) { minutes in
+                            Button {
+                                timer.workIntervalLength = minutes
+                            } label: {
+                                if timer.workIntervalLength == minutes {
+                                    Label("\(minutes) 分钟", systemImage: "checkmark")
+                                } else {
+                                    Text("\(minutes) 分钟")
+                                }
+                            }
+                        }
+                        Divider()
+                        Button("自定义时长…") {
+                            withAnimation(.easeInOut(duration: 0.16)) { route = .intervals }
+                        }
+                    } label: {
+                        Color.clear
+                            .frame(width: 86, height: 42)
+                            .contentShape(RoundedRectangle(cornerRadius: Garden.cornerMedium))
+                    }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .frame(width: 86, height: 42)
+                    .overlay {
+                        HStack(spacing: 3) {
+                            Text("\(timer.workIntervalLength)分钟")
+                                .font(.system(size: 13, weight: .medium).monospacedDigit())
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundColor(Garden.muted)
+                        }
+                        .foregroundColor(Garden.ink)
+                        .frame(width: 86, height: 42)
+                        .background(
+                            RoundedRectangle(cornerRadius: Garden.cornerMedium)
+                                .fill(Garden.surface)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Garden.cornerMedium)
+                                .stroke(Garden.line.opacity(0.85), lineWidth: 1)
+                        )
+                        .allowsHitTesting(false)
+                    }
+                    .help("切换专注时长")
+                    .accessibilityLabel("专注时长：\(timer.workIntervalLength)分钟")
                 }
-                .buttonStyle(GardenPrimaryButtonStyle())
-                .disabled(timer.storageError != nil)
             }
 
             HStack {
-                Label("今日 \(Int(timer.todaySeconds / 60)) 分钟", systemImage: "clock")
+                HStack(spacing: 5) {
+                    Image(systemName: "clock")
+                        .font(.system(size: 11))
+                    Text("今日 \(Int(timer.todaySeconds / 60)) 分钟 · 完成 \(timer.todayCount) 个")
+                }
+                .foregroundColor(Garden.muted)
                 Spacer()
-                Text("完成 \(timer.todayCount) 个番茄")
+                Button {
+                    withAnimation(.easeInOut(duration: 0.16)) { route = .records }
+                } label: {
+                    HStack(spacing: 3) {
+                        Text("最近记录")
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundColor(Garden.muted)
+                }
+                .buttonStyle(.plain)
             }
             .font(.system(size: 12))
-            .foregroundColor(Garden.muted)
             .padding(.horizontal, 2)
-
-            if canPrepareNext && editingRecord == nil {
-                nextTodoSection
-            }
 
             if let error = timer.storageError {
                 VStack(alignment: .leading, spacing: 5) {
@@ -294,36 +424,8 @@ struct TBPopoverView: View {
                 }.font(.caption)
             }
 
-            HStack(spacing: 3) {
-                popoverTab("记录", value: 0)
-                popoverTab("时长", value: 1)
-                popoverTab("设置", value: 2)
-                Button {
-                    withAnimation(.easeInOut(duration: 0.18)) {
-                        isTabsCollapsed.toggle()
-                    }
-                } label: {
-                    Image(systemName: (isTabsCollapsed && editingRecord == nil) ? "chevron.down" : "chevron.up")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(Garden.muted)
-                        .frame(width: 26, height: 26)
-                }
-                .buttonStyle(.plain)
-                .help((isTabsCollapsed && editingRecord == nil) ? "展开面板" : "折叠面板")
-                .accessibilityLabel((isTabsCollapsed && editingRecord == nil) ? "展开面板" : "折叠面板")
-            }
-            .padding(3)
-            .background(Garden.line.opacity(0.30))
-            .cornerRadius(Garden.cornerMedium)
-
-            if !isTabsCollapsed || editingRecord != nil {
-                Group {
-                    if tab == 0 { history }
-                    else if tab == 1 { intervals }
-                    else { settings }
-                // Editing needs its own space; keeping the next-task list above it squeezed
-                // the category controls into a tiny second scroll area.
-                }.frame(height: editingRecord != nil ? 380 : canPrepareNext ? 235 : 320)
+            if canPrepareNext {
+                nextTodoSection
             }
 
             Rectangle().fill(Garden.line.opacity(0.7)).frame(height: 1)
@@ -332,8 +434,8 @@ struct TBPopoverView: View {
                     Label("打开主窗口", systemImage: "macwindow")
                         .font(.caption)
                 }
-                    .buttonStyle(.plain)
-                    .foregroundColor(Garden.muted)
+                .buttonStyle(.plain)
+                .foregroundColor(Garden.muted)
                 Spacer()
                 Button("退出") { NSApp.terminate(nil) }
                     .buttonStyle(.plain)
@@ -341,99 +443,94 @@ struct TBPopoverView: View {
                     .foregroundColor(Garden.muted)
             }
         }
-        .padding(18)
-        .frame(width: 350)
-        .background(Garden.paper)
-        .foregroundColor(Garden.ink)
-        .accentColor(Garden.red)
-        .preferredColorScheme(.light)
-        .alert("取消这段专注？", isPresented: $showCancelConfirm) {
-            Button("继续专注", role: .cancel) { if !cancelWasPaused { timer.togglePause() } }
-                .keyboardShortcut(.cancelAction)
-            Button("放弃这段", role: .destructive) { timer.cancel() }
-        } message: { Text(cancelFocusMessage(timer.state)) }
-        .alert("自定义新标签", isPresented: $showingCustomTagAlert) {
-            TextField("输入新标签名称", text: $customTagInput)
-            Button("确定") {
-                let tag = customTagInput.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-                if !tag.isEmpty {
-                    if isCustomTagForDraft {
-                        let current = timer.state.draftTags
-                        if !current.contains(where: { FocusRecord.sameTag($0, tag) }) {
-                            timer.setDraftTags(current + [tag])
-                        }
-                    } else if let id = customTagTargetTodoID {
-                        timer.setTodoTags(id: id, tags: [tag])
+    }
+
+    private func secondaryHeader(_ title: String) -> some View {
+        secondaryHeader(title) { EmptyView() }
+    }
+
+    private func secondaryHeader<Trailing: View>(_ title: String, @ViewBuilder trailing: () -> Trailing) -> some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 8) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.16)) {
+                        editingRecord = nil
+                        route = .focus
                     }
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("返回")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundColor(Garden.red)
                 }
-                customTagInput = ""
-                customTagTargetTodoID = nil
-                isCustomTagForDraft = false
+                .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
+
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                Spacer()
+                trailing()
             }
-            Button("取消", role: .cancel) {
-                customTagInput = ""
-                customTagTargetTodoID = nil
-                isCustomTagForDraft = false
-            }
-        } message: {
-            Text("输入新标签后将立即应用，并加入已有标签列表。")
+            Rectangle().fill(Garden.line.opacity(0.65)).frame(height: 1)
         }
-        // P16: the other window's edit or delete can empty out the tag this filter
-        // points at. Re-check it whenever the shared record list changes, not only
-        // after this view's own save.
-        .onChange(of: timer.state.records) { _ in clearStaleFilter() }
     }
 
     private var focusTargetSelection: some View {
         Group {
             if let current = timer.state.currentTodo {
                 HStack(spacing: 8) {
-                    Image(systemName: "target")
-                        .foregroundColor(Garden.red)
-                        .font(.system(size: 15, weight: .semibold))
+                    Button { timer.toggleTodo(id: current.id) } label: {
+                        GardenActionIcon(name: "circle", pointSize: 15, color: Garden.muted, targetSize: 22)
+                    }
+                    .buttonStyle(.plain)
+                    .help("标记完成")
+                    .accessibilityLabel("标记完成：\(current.title)")
+
                     VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
-                            if let proj = current.projectID.flatMap({ timer.state.project(for: $0) }) {
-                                Text(proj.name)
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundColor(Garden.ink)
-                                    .padding(.horizontal, 4)
-                                    .padding(.vertical, 1)
-                                    .background(Garden.surface.opacity(0.9))
-                                    .cornerRadius(3)
-                            }
-                            Text("当前任务")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundColor(Garden.red)
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 1)
-                                .background(Garden.red.opacity(0.12))
-                                .cornerRadius(4)
-                            if !current.tags.isEmpty {
-                                Text(current.tags.map { "#\($0)" }.joined(separator: " "))
-                                    .font(.caption2)
-                                    .foregroundColor(Garden.color(current.tags.first ?? "", styles: timer.state.categoryStyles))
-                            }
-                            let secs = timer.state.focusSeconds(forTodo: current.id)
-                            if secs > 0 {
-                                Text("已专注 \(focusDuration(secs))")
-                                    .font(.caption2.monospacedDigit())
-                                    .foregroundColor(Garden.muted)
-                            }
-                        }
                         Text(current.title)
                             .font(.system(size: 13, weight: .medium))
                             .lineLimit(1)
+
+                        let project = current.projectID.flatMap { timer.state.project(for: $0) }
+                        let secs = timer.state.focusSeconds(forTodo: current.id)
+                        if project != nil || !current.tags.isEmpty || secs > 0 {
+                            HStack(spacing: 5) {
+                                if let proj = project {
+                                    Text(proj.name)
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundColor(Garden.ink)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 1)
+                                        .background(Garden.line.opacity(0.28))
+                                        .cornerRadius(3)
+                                }
+                                if !current.tags.isEmpty {
+                                    Text(current.tags.map { "#\($0)" }.joined(separator: " "))
+                                        .font(.caption2)
+                                        .foregroundColor(Garden.color(current.tags.first ?? "", styles: timer.state.categoryStyles))
+                                        .lineLimit(1)
+                                }
+                                if secs > 0 {
+                                    Text(focusDuration(secs))
+                                        .font(.caption2.monospacedDigit())
+                                        .foregroundColor(Garden.muted)
+                                }
+                            }
+                        }
                     }
-                    Spacer()
+
+                    Spacer(minLength: 4)
+
                     Menu {
                         Button("切回自由专注") { timer.selectCurrentTodo(nil) }
-                        Divider()
                         if timer.state.pendingTodos.count > 1 {
-                            Text("切换到其他待办：")
-                            FocusTaskMenuContent(timer: timer, excluding: current.id, showsPrompt: false)
                             Divider()
+                            FocusTaskMenuContent(timer: timer, excluding: current.id, showsPrompt: false)
                         }
+                        Divider()
                         Menu("设置任务标签") {
                             if !current.tags.isEmpty {
                                 Button("清除标签") { timer.setTodoTags(id: current.id, tags: []) }
@@ -451,7 +548,7 @@ struct TBPopoverView: View {
                             }
                         }
                     } label: {
-                        GardenActionIcon(name: "ellipsis.circle", pointSize: 14, color: Garden.muted)
+                        GardenActionIcon(name: "ellipsis.circle", pointSize: 14, color: Garden.muted, targetSize: 20)
                     }
                     .menuStyle(.borderlessButton)
                     .menuIndicator(.hidden)
@@ -460,12 +557,12 @@ struct TBPopoverView: View {
                     Button {
                         timer.selectCurrentTodo(nil)
                     } label: {
-                        GardenActionIcon(name: "xmark.circle.fill", pointSize: 14, color: Garden.muted)
+                        GardenActionIcon(name: "xmark.circle.fill", pointSize: 14, color: Garden.muted, targetSize: 20)
                     }
                     .buttonStyle(.plain)
                     .help("切回自由专注")
                 }
-                .padding(.horizontal, 11)
+                .padding(.horizontal, 10)
                 .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: Garden.cornerMedium)
@@ -476,90 +573,59 @@ struct TBPopoverView: View {
                         .stroke(Garden.red.opacity(0.38), lineWidth: 1)
                 )
             } else {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        TextField("这次准备做什么？（支持 #标签）", text: Binding(
-                            get: { timer.eventName },
-                            set: { timer.setEventName($0) }
-                        ))
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 13))
-                        .padding(.horizontal, 11)
-                        .frame(height: 38)
-                        .background(
-                            RoundedRectangle(cornerRadius: Garden.cornerMedium)
-                                .fill(Garden.surface)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: Garden.cornerMedium)
-                                .stroke(Garden.line.opacity(0.85), lineWidth: 1)
-                        )
-                        .accessibilityLabel("事件名称")
+                HStack(spacing: 6) {
+                    TextField("准备专注什么？", text: Binding(
+                        get: { timer.eventName },
+                        set: { timer.setEventName($0) }
+                    ))
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+                    .accessibilityLabel("事件名称")
 
-                        if !timer.state.pendingTodos.isEmpty {
-                            Menu {
-                                FocusTaskMenuContent(timer: timer)
-                            } label: {
-                                HStack(spacing: 3) {
-                                    Image(systemName: "target")
-                                        .font(.system(size: 11))
-                                    Text("选任务")
-                                        .font(.system(size: 12, weight: .medium))
-                                }
-                                .padding(.horizontal, 8)
-                                .frame(height: 38)
+                    Menu {
+                        FocusDraftTagMenuContent(timer: timer, onCustomTag: {
+                            isCustomTagForDraft = true
+                            customTagTargetTodoID = nil
+                            customTagInput = ""
+                            showingCustomTagAlert = true
+                        })
+                    } label: {
+                        if timer.state.draftTags.isEmpty {
+                            Image(systemName: "tag")
+                                .font(.system(size: 12))
+                                .foregroundColor(Garden.muted)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 4)
+                                .contentShape(Rectangle())
+                        } else {
+                            Text(timer.state.draftTags.map { "#\($0)" }.joined(separator: " "))
+                                .font(.system(size: 11, weight: .medium))
+                                .lineLimit(1)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
                                 .background(
-                                    RoundedRectangle(cornerRadius: Garden.cornerMedium)
-                                        .fill(Garden.surface)
+                                    Capsule()
+                                        .fill(Garden.color(timer.state.draftTags.first ?? "", styles: timer.state.categoryStyles).opacity(0.14))
                                 )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: Garden.cornerMedium)
-                                        .stroke(Garden.line.opacity(0.85), lineWidth: 1)
-                                )
-                            }
-                            .menuStyle(.borderlessButton)
-                            .menuIndicator(.hidden)
-                            .foregroundColor(Garden.ink)
-                            .help("从待办列表选择当前任务")
+                                .foregroundColor(Garden.color(timer.state.draftTags.first ?? "", styles: timer.state.categoryStyles))
                         }
                     }
-
-                    HStack(spacing: 6) {
-                        Menu {
-                            FocusDraftTagMenuContent(timer: timer, onCustomTag: {
-                                isCustomTagForDraft = true
-                                customTagTargetTodoID = nil
-                                customTagInput = ""
-                                showingCustomTagAlert = true
-                            })
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "tag")
-                                    .font(.system(size: 10))
-                                if timer.state.draftTags.isEmpty {
-                                    Text("选择标签")
-                                        .font(.system(size: 11))
-                                } else {
-                                    Text(timer.state.draftTags.map { "#\($0)" }.joined(separator: " "))
-                                        .font(.system(size: 11, weight: .medium))
-                                }
-                                Image(systemName: "chevron.down")
-                                    .font(.system(size: 8))
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(
-                                Capsule()
-                                    .fill(timer.state.draftTags.isEmpty ? Garden.line.opacity(0.2) : Garden.color(timer.state.draftTags.first ?? "", styles: timer.state.categoryStyles).opacity(0.14))
-                            )
-                            .foregroundColor(timer.state.draftTags.isEmpty ? Garden.muted : Garden.color(timer.state.draftTags.first ?? "", styles: timer.state.categoryStyles))
-                        }
-                        .menuStyle(.borderlessButton)
-                        .menuIndicator(.hidden)
-
-                        Spacer()
-                    }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .help(timer.state.draftTags.isEmpty ? "选择标签" : "修改标签")
+                    .accessibilityLabel(timer.state.draftTags.isEmpty ? "选择标签" : "已选标签：\(timer.state.draftTags.joined(separator: " "))")
                 }
+                .padding(.horizontal, 10)
+                .frame(height: 38)
+                .background(
+                    RoundedRectangle(cornerRadius: Garden.cornerMedium)
+                        .fill(Garden.surface)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: Garden.cornerMedium)
+                        .stroke(Garden.line.opacity(0.85), lineWidth: 1)
+                )
             }
         }
     }
@@ -569,27 +635,50 @@ struct TBPopoverView: View {
     }
 
     private var nextTodoSection: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack {
+        let upNext = timer.state.pendingTodos.filter { $0.id != timer.state.currentTodoID }
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
                 Text("接下来")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 12.5, weight: .semibold))
+                if !upNext.isEmpty {
+                    Text("\(upNext.count)")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundColor(Garden.muted)
+                }
                 Spacer()
-                Text("\(timer.state.pendingTodos.count) 项")
-                    .font(.caption2)
-                    .foregroundColor(Garden.muted)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.14)) {
+                        isAddingQuickTodo.toggle()
+                    }
+                    if isAddingQuickTodo {
+                        DispatchQueue.main.async { isQuickTodoFocused = true }
+                    }
+                } label: {
+                    if upNext.isEmpty && timer.state.currentTodo != nil && !isAddingQuickTodo {
+                        Label("添加待办", systemImage: "plus")
+                            .font(.caption)
+                            .foregroundColor(Garden.muted)
+                    } else {
+                        GardenActionIcon(name: isAddingQuickTodo ? "minus" : "plus", pointSize: 11, color: Garden.muted, targetSize: 22)
+                    }
+                }
+                .buttonStyle(.plain)
+                .help(isAddingQuickTodo ? "收起输入框" : "添加待办")
+                .accessibilityLabel(isAddingQuickTodo ? "收起待办输入框" : "添加待办")
             }
 
-            if timer.state.pendingTodos.isEmpty {
-                Text("还没有待办。先记下一件想做的事。")
-                    .font(.caption)
-                    .foregroundColor(Garden.muted)
-                    .padding(.vertical, 2)
+            if upNext.isEmpty && !isAddingQuickTodo {
+                if timer.state.currentTodo == nil {
+                    Text("点击 + 记下待办")
+                        .font(.caption)
+                        .foregroundColor(Garden.muted)
+                        .padding(.vertical, 1)
+                }
             } else {
-                ForEach(Array(timer.state.pendingTodos.prefix(3))) { todo in
-                    let isCurrent = timer.state.currentTodoID == todo.id
+                ForEach(Array(upNext.prefix(4))) { todo in
                     HStack(spacing: 7) {
                         Button { timer.toggleTodo(id: todo.id) } label: {
-                            GardenActionIcon(name: "circle", pointSize: 14)
+                            GardenActionIcon(name: "circle", pointSize: 13.5, targetSize: 20)
                         }
                         .buttonStyle(.plain)
                         .help("标记完成")
@@ -597,21 +686,17 @@ struct TBPopoverView: View {
 
                         Button { timer.selectCurrentTodo(todo.id) } label: {
                             HStack(spacing: 4) {
-                                if isCurrent {
-                                    Text("🎯")
-                                        .font(.system(size: 10))
-                                }
                                 if let proj = todo.projectID.flatMap({ timer.state.project(for: $0) }) {
                                     Text(proj.name)
-                                        .font(.system(size: 9, weight: .semibold))
+                                        .font(.system(size: 9.5, weight: .semibold))
                                         .foregroundColor(Garden.muted)
-                                        .padding(.horizontal, 3)
+                                        .padding(.horizontal, 4)
                                         .padding(.vertical, 1)
-                                        .background(Garden.surface.opacity(0.8))
+                                        .background(Garden.surface.opacity(0.85))
                                         .cornerRadius(3)
                                 }
                                 Text(todo.title)
-                                    .font(.system(size: 12, weight: isCurrent ? .semibold : .regular))
+                                    .font(.system(size: 12))
                                     .foregroundColor(Garden.ink)
                                     .lineLimit(1)
                                 if !todo.tags.isEmpty {
@@ -653,56 +738,76 @@ struct TBPopoverView: View {
                         .menuStyle(.borderlessButton)
                         .menuIndicator(.hidden)
                         .frame(width: 16, height: 16)
-                        .overlay(GardenActionIcon(name: "ellipsis", pointSize: 11, color: Garden.muted).allowsHitTesting(false))
+                        .overlay(GardenActionIcon(name: "ellipsis", pointSize: 11, color: Garden.muted, targetSize: 16).allowsHitTesting(false))
 
                         Button {
                             timer.selectCurrentTodo(todo.id)
                             timer.startWork()
                         } label: {
-                            GardenActionIcon(name: "play.fill", pointSize: 11, color: Garden.red)
+                            GardenActionIcon(name: "play.fill", pointSize: 11, color: Garden.red, targetSize: 20)
                         }
                         .buttonStyle(.plain)
                         .help("立即开始")
                         .accessibilityLabel("开始待办：\(todo.title)")
                         .disabled(timer.storageError != nil || timer.state.needsAttention || timer.state.isTiming)
                     }
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, 7)
                     .frame(height: 28)
                     .background(
                         RoundedRectangle(cornerRadius: Garden.cornerSmall)
-                            .fill(isCurrent ? Garden.red.opacity(0.10) : Garden.surface.opacity(0.72))
+                            .fill(Garden.surface.opacity(0.72))
                     )
+                }
+
+                if upNext.count > 4 {
+                    Menu {
+                        FocusTaskMenuContent(timer: timer, excluding: timer.state.currentTodoID, showsPrompt: false)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("还有 \(upNext.count - 4) 项待办")
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 9))
+                        }
+                        .font(.caption)
+                        .foregroundColor(Garden.muted)
+                        .padding(.top, 1)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
                 }
             }
 
-            HStack(spacing: 6) {
-                TextField("快速添加待办（支持 #标签）", text: $quickTodoTitle)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 12))
-                    .padding(.horizontal, 9)
-                    .frame(height: 30)
-                    .background(
-                        RoundedRectangle(cornerRadius: Garden.cornerSmall)
-                            .fill(Garden.surface)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Garden.cornerSmall)
-                            .stroke(Garden.line.opacity(0.72), lineWidth: 1)
-                    )
-                    .onSubmit { addQuickTodo() }
-                Button { addQuickTodo() } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(Garden.paper)
-                        .frame(width: 26, height: 26)
-                        .background(Circle().fill(Garden.red))
+            if isAddingQuickTodo {
+                HStack(spacing: 6) {
+                    TextField("添加待办...", text: $quickTodoTitle)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12))
+                        .padding(.horizontal, 9)
+                        .frame(height: 30)
+                        .background(
+                            RoundedRectangle(cornerRadius: Garden.cornerSmall)
+                                .fill(Garden.surface)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Garden.cornerSmall)
+                                .stroke(Garden.line.opacity(0.72), lineWidth: 1)
+                        )
+                        .focused($isQuickTodoFocused)
+                        .onSubmit { addQuickTodo() }
+                    Button { addQuickTodo() } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(Garden.paper)
+                            .frame(width: 26, height: 26)
+                            .background(Circle().fill(Garden.red))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(quickTodoTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .accessibilityLabel("添加待办")
                 }
-                .buttonStyle(.plain)
-                .disabled(quickTodoTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .accessibilityLabel("快速添加待办")
             }
         }
-        .padding(10)
+        .padding(9)
         .background(
             RoundedRectangle(cornerRadius: Garden.cornerMedium)
                 .fill(Garden.line.opacity(0.16))
@@ -716,36 +821,8 @@ struct TBPopoverView: View {
         quickTodoTitle = ""
     }
 
-    private func popoverTab(_ title: String, value: Int) -> some View {
-        let isSelected = (!isTabsCollapsed || editingRecord != nil) && tab == value
-        return Button {
-            if isTabsCollapsed && editingRecord == nil {
-                tab = value
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    isTabsCollapsed = false
-                }
-            } else if tab == value {
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    isTabsCollapsed = true
-                }
-            } else {
-                tab = value
-            }
-        } label: {
-            Text(title)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(isSelected ? Garden.paper : Garden.ink)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 7)
-                .background(isSelected ? Garden.red : Color.clear)
-                .cornerRadius(Garden.cornerSmall)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-    }
-
-    private var history: some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private var recordsRouteView: some View {
+        VStack(alignment: .leading, spacing: 10) {
             if let record = editingRecord {
                 RecordEditor(record: record, availableCategories: timer.state.allCategories,
                              styles: timer.state.categoryStyles, onCancel: {
@@ -762,77 +839,91 @@ struct TBPopoverView: View {
                     if error == nil { clearStaleFilter(); editingRecord = nil }
                     return error
                 }).id(record.id)
+                    .frame(height: 390)
             } else {
-                HStack {
-                    Menu {
-                        Button("全部记录") { selectedTag = nil }
-                        ForEach(timer.state.allTags, id: \.self) { tag in
-                            Button(tag) { selectedTag = tag }
-                        }
-                    } label: {
-                        Label(selectedTag ?? "全部记录", systemImage: "line.3.horizontal.decrease.circle")
-                            .lineLimit(1)
-                            .foregroundColor(Garden.ink)
-                    }.menuStyle(.borderlessButton)
-                    Spacer()
-                    Text("\(timer.state.filteredRecords(tag: selectedTag).count) 条")
-                        .font(.caption).foregroundColor(Garden.muted)
-                }
-                if timer.state.filteredRecords(tag: selectedTag).isEmpty {
-                    VStack(spacing: 10) {
-                        GardenArt(name: "PixelSprout", activity: timer.windowActivity)
-                            .frame(width: 46, height: 35)
-                        Text(selectedTag == nil ? "还没有专注记录" : "这个标签下还没有记录")
-                            .font(.system(size: 15, weight: .medium))
-                        Text(selectedTag == nil ? "完成一段专注后，这里会留下足迹。" : "换个标签看看，或者继续留下一段专注。")
+                let records = timer.state.filteredRecords(tag: selectedTag)
+                secondaryHeader("最近记录") {
+                    HStack(spacing: 8) {
+                        Menu {
+                            Button("全部") { selectedTag = nil }
+                            ForEach(timer.state.allTags, id: \.self) { tag in
+                                Button(tag) { selectedTag = tag }
+                            }
+                        } label: {
+                            HStack(spacing: 3) {
+                                Text(selectedTag ?? "全部")
+                                    .lineLimit(1)
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 9, weight: .semibold))
+                            }
                             .font(.caption)
+                            .foregroundColor(Garden.ink)
+                        }
+                        .menuStyle(.borderlessButton)
+                        .menuIndicator(.hidden)
+
+                        Text("\(records.count) 条")
+                            .font(.caption.monospacedDigit())
                             .foregroundColor(Garden.muted)
-                    }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
+
+                if records.isEmpty {
+                    VStack(spacing: 8) {
+                        GardenArt(name: "PixelSprout", activity: timer.windowActivity)
+                            .frame(width: 42, height: 32)
+                        Text(selectedTag == nil ? "还没有专注记录" : "这个标签下还没有记录")
+                            .font(.system(size: 14, weight: .medium))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 220)
                 } else {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 0) {
-                            ForEach(timer.state.filteredRecords(tag: selectedTag)) { record in
-                                VStack(alignment: .leading, spacing: 5) {
-                                    HStack(alignment: .top) {
-                                        Text(record.name).font(.subheadline).lineLimit(2)
-                                        Spacer()
-                                        Text(duration(record.seconds)).font(.subheadline.monospacedDigit())
-                                        Button { editingRecord = record } label: {
-                                            GardenActionIcon(name: "pencil", pointSize: 12)
-                                        }.buttonStyle(.borderless)
+                            ForEach(records) { record in
+                                VStack(alignment: .leading, spacing: 3) {
+                                    HStack(spacing: 7) {
+                                        Circle()
+                                            .fill(Garden.color(record.category, styles: timer.state.categoryStyles))
+                                            .frame(width: 7, height: 7)
+                                        Text(record.name)
+                                            .font(.system(size: 13, weight: .medium))
+                                            .lineLimit(1)
+                                        Spacer(minLength: 6)
+                                        Text(focusDuration(record.seconds))
+                                            .font(.system(size: 12).monospacedDigit())
                                             .foregroundColor(Garden.muted)
-                                            .help("编辑名称和标签")
-                                            .accessibilityLabel("编辑记录：\(record.name)")
+                                        Button { editingRecord = record } label: {
+                                            GardenActionIcon(name: "pencil", pointSize: 11, color: Garden.muted, targetSize: 20)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .help("编辑记录")
+                                        .accessibilityLabel("编辑记录：\(record.name)")
                                     }
-                                    if !record.tags.isEmpty {
-                                        Text(record.tags.map { "#\($0)" }.joined(separator: "  "))
-                                            .font(.caption).foregroundColor(Garden.red).lineLimit(2)
-                                    }
-                                    HStack {
-                                        Text(record.startedAt, style: .date)
-                                        Text(record.startedAt, style: .time)
+                                    HStack(spacing: 6) {
+                                        Text(record.startedAt, format: .dateTime.month().day().hour().minute())
+                                        if !record.tags.isEmpty {
+                                            Text(record.tags.map { "#\($0)" }.joined(separator: " "))
+                                                .foregroundColor(Garden.color(record.category, styles: timer.state.categoryStyles))
+                                                .lineLimit(1)
+                                        }
                                         Spacer()
-                                        Text(record.completed ? "已完成" : "提前结束")
-                                    }.font(.caption2).foregroundColor(Garden.muted)
+                                        if !record.completed {
+                                            Text("提前结束")
+                                        }
+                                    }
+                                    .font(.system(size: 11))
+                                    .foregroundColor(Garden.muted)
+                                    .padding(.leading, 14)
                                 }
-                                .padding(.vertical, 10)
-                                Rectangle().fill(Garden.line.opacity(0.65)).frame(height: 1)
+                                .padding(.vertical, 7)
+                                Rectangle().fill(Garden.line.opacity(0.55)).frame(height: 1)
                             }
                         }
+                        .padding(.trailing, 4)
                     }
+                    .frame(height: 300)
                 }
-                Button { timer.openRecordsFolder() } label: {
-                    Label("打开记录文件夹", systemImage: "folder")
-                        .font(.caption)
-                        .foregroundColor(Garden.muted)
-                        .padding(.horizontal, 10)
-                        .frame(height: 30)
-                        .background(
-                            RoundedRectangle(cornerRadius: Garden.cornerSmall)
-                                .fill(Garden.line.opacity(0.24))
-                        )
-                }
-                .buttonStyle(.plain)
             }
         }
     }
@@ -847,25 +938,19 @@ struct TBPopoverView: View {
         }
     }
 
-    private func duration(_ seconds: TimeInterval) -> String {
-        let value = Int(seconds)
-        return "\(value / 60)分\(value % 60)秒"
-    }
-
-    private var intervals: some View {
-        VStack(spacing: 12) {
+    private var intervalsRouteView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            secondaryHeader("计时时长")
             GardenNumberInputRow(title: "专注", value: $timer.workIntervalLength, range: 1...180, unit: "分钟")
             GardenNumberInputRow(title: "短休息", value: $timer.shortRestIntervalLength, range: 1...60, unit: "分钟")
             GardenNumberInputRow(title: "长休息", value: $timer.longRestIntervalLength, range: 1...60, unit: "分钟")
             GardenNumberInputRow(title: "每组", value: $timer.workIntervalsInSet, range: 1...10, unit: "个番茄")
-            Text("可直接输入数字。专注 1–180 分钟，休息 1–60 分钟；调整从下一段生效。")
-                .font(.caption).foregroundColor(Garden.muted)
-            Spacer(minLength: 0)
-        }.padding(.top, 4)
+        }
     }
 
-    private var settings: some View {
-        VStack(alignment: .leading, spacing: 14) {
+    private var settingsRouteView: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            secondaryHeader("设置")
             KeyboardShortcuts.Recorder("开始 / 暂停 / 继续", name: .startStopTimer)
             Toggle("菜单栏显示倒计时", isOn: $timer.showTimerInMenuBar)
                 .onChange(of: timer.showTimerInMenuBar) { _ in timer.updateStatus() }
@@ -891,10 +976,14 @@ struct TBPopoverView: View {
                 }
             }
             LaunchAtLogin.Toggle("登录时启动")
-            Text("到时会显示无声提醒窗口，确认后再继续。电脑睡眠或退出应用时自动暂停。")
-                .font(.caption).foregroundColor(Garden.muted)
-            Spacer(minLength: 0)
-        }.padding(.top, 4)
+            Rectangle().fill(Garden.line.opacity(0.55)).frame(height: 1)
+            Button { timer.openRecordsFolder() } label: {
+                Label("打开记录文件夹", systemImage: "folder")
+                    .font(.system(size: 12.5))
+                    .foregroundColor(Garden.ink)
+            }
+            .buttonStyle(.plain)
+        }
     }
 }
 
@@ -1126,7 +1215,6 @@ struct RecordEditor: View {
                 }.buttonStyle(.borderedProminent)
                     .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-            Text("时长和完成状态保持不变").font(.caption2).foregroundColor(.secondary)
         }
         .foregroundColor(Garden.ink).accentColor(Garden.red).preferredColorScheme(.light)
         // role: .destructive keeps macOS from making the delete the default button, and
@@ -1247,9 +1335,6 @@ struct RecordEditor: View {
                 Button("设为主分类", action: applyCustomCategory)
                     .disabled(newCategory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-            Text("主分类决定图表归属与显示图标；其他标签仅用于搜索和筛选。")
-                .font(.caption).foregroundColor(Garden.muted)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -1277,7 +1362,7 @@ struct RecordEditor: View {
                         .background(Color.accentColor.opacity(0.12)).cornerRadius(5)
                 }
             }
-            if otherTags.isEmpty { Text("没有其他标签 · 仅用于搜索和筛选").font(.caption).foregroundColor(Garden.muted) }
+            if otherTags.isEmpty { Text("暂无其他标签").font(.caption).foregroundColor(Garden.muted) }
         }
     }
 
